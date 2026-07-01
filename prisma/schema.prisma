@@ -378,6 +378,12 @@ model Waitlist {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
   name         String?
+  // age/city/source are additive to ARCHITECTURE.md §10's minimal column
+  // list — they capture what the DESIGN.md §6 application form actually
+  // collects (age is also a compliance checkpoint per ARCHITECTURE.md §9).
+  age          Int?
+  city         String?
+  source       String?
   referralCode String?  @map("referral_code")
   invitedBy    String?  @map("invited_by") @db.Uuid
   createdAt    DateTime @default(now()) @map("created_at")
