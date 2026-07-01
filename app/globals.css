@@ -2,26 +2,335 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   OBSIDIAN CLUB — COLOR SYSTEM (source of truth: DESIGN.md §2)
+   All colors flow from these variables. Never hardcode hex.
+   ============================================================ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Фоны */
+  --color-bg-primary: #0a0908; /* Obsidian Black — основной фон */
+  --color-bg-secondary: #111009; /* чуть светлее для карточек */
+  --color-bg-elevated: #1a1816; /* поднятые элементы, модалки */
+  --color-bg-surface: #221f1c; /* поверхности, инпуты */
+
+  /* Акцент */
+  --color-accent: #8b1a1a; /* Dark Red — главный акцент */
+  --color-accent-hover: #a01f1f; /* hover состояние */
+  --color-accent-muted: #5c1111; /* приглушённый акцент */
+  --color-accent-glow: rgba(139, 26, 26, 0.15); /* свечение */
+
+  /* Текст */
+  --color-text-primary: #edeae4; /* основной текст (светлый тёплый) */
+  --color-text-secondary: #9e9a94; /* вторичный текст */
+  --color-text-muted: #5c5955; /* приглушённый текст */
+  --color-text-accent: #8b1a1a; /* акцентный текст */
+
+  /* Границы */
+  --color-border: #2a2724; /* основная граница */
+  --color-border-accent: #8b1a1a; /* акцентная граница */
+  --color-border-subtle: #1e1c1a; /* едва заметная */
+
+  /* Статусы */
+  --color-success: #2d6a4f; /* тёмно-зелёный */
+  --color-warning: #7d5a00; /* тёмно-золотой */
+  --color-error: #8b1a1a; /* совпадает с акцентом */
+
+  /* Специальные */
+  --color-gold: #c9a84c; /* для наград и достижений */
+  --color-gold-muted: #7a6030; /* приглушённое золото */
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* ============================================================
+   BASE
+   ============================================================ */
+@layer base {
+  html {
+    background: var(--color-bg-primary);
+  }
+  body {
+    background: var(--color-bg-primary);
+    color: var(--color-text-secondary);
+    font-family: var(--font-cormorant), "Cormorant Garamond", serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    /* iOS safe areas */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  ::selection {
+    background: var(--color-accent);
+    color: var(--color-text-primary);
   }
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+/* ============================================================
+   TYPOGRAPHY SCALE (DESIGN.md §3)
+   ============================================================ */
+@layer components {
+  .text-display {
+    font-family: var(--font-cinzel), "Cinzel", serif;
+    font-size: clamp(2rem, 5vw, 4rem);
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--color-text-primary);
+  }
+  .text-h1 {
+    font-family: var(--font-cinzel), "Cinzel", serif;
+    font-size: clamp(1.5rem, 3vw, 2.5rem);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--color-text-primary);
+  }
+  .text-h2 {
+    font-family: var(--font-cinzel), "Cinzel", serif;
+    font-size: clamp(1.125rem, 2vw, 1.75rem);
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text-primary);
+  }
+  .text-label {
+    font-family: var(--font-inter), "Inter", sans-serif;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+  }
+  .text-body {
+    font-family: var(--font-cormorant), "Cormorant Garamond", serif;
+    font-size: 1.0625rem;
+    font-weight: 400;
+    line-height: 1.7;
+    color: var(--color-text-secondary);
+  }
+  .text-caption {
+    font-family: var(--font-inter), "Inter", sans-serif;
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: var(--color-text-muted);
+  }
+  .text-data {
+    font-family: var(--font-inter), "Inter", sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+  }
+
+  /* ==========================================================
+     BRAND ELEMENTS & DIVIDERS (DESIGN.md §4)
+     ========================================================== */
+  .divider-accent {
+    border: none;
+    height: 1px;
+    background: linear-gradient(
+      to right,
+      transparent,
+      var(--color-accent),
+      transparent
+    );
+    opacity: 0.4;
+  }
+  .status-line {
+    width: 2px;
+    background: var(--color-accent);
+    border-radius: 1px;
+  }
+
+  /* ==========================================================
+     BUTTONS (DESIGN.md §5)
+     ========================================================== */
+  .btn-primary {
+    background: var(--color-accent);
+    color: var(--color-text-primary);
+    font-family: var(--font-cinzel), "Cinzel", serif;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 0.875rem 2rem;
+    border: none;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+  }
+  .btn-primary:hover {
+    background: var(--color-accent-hover);
+  }
+  .btn-primary:active {
+    transform: scale(0.98);
+  }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--color-text-primary);
+    font-family: var(--font-cinzel), "Cinzel", serif;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 0.875rem 2rem;
+    border: 1px solid var(--color-border);
+    border-radius: 2px;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+  }
+  .btn-secondary:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--color-text-muted);
+    font-family: var(--font-inter), "Inter", sans-serif;
+    font-size: 0.8125rem;
+    letter-spacing: 0.05em;
+    padding: 0.5rem 1rem;
+    border: none;
+    cursor: pointer;
+    transition: color 0.2s;
+  }
+  .btn-ghost:hover {
+    color: var(--color-text-primary);
+  }
+
+  /* ==========================================================
+     CARDS (DESIGN.md §5)
+     ========================================================== */
+  .card {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    padding: 1.5rem;
+    transition: border-color 0.2s;
+  }
+  .card:hover {
+    border-color: var(--color-accent-muted);
+  }
+  .card-premium {
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-accent-muted);
+    border-radius: 4px;
+    padding: 1.5rem;
+    box-shadow: 0 0 20px var(--color-accent-glow);
+  }
+  .card-profile {
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    padding: 2rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .card-profile::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(to right, var(--color-accent), transparent);
+  }
+
+  /* ==========================================================
+     INPUTS (DESIGN.md §5)
+     ========================================================== */
+  .input {
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 2px;
+    color: var(--color-text-primary);
+    font-family: var(--font-cormorant), "Cormorant Garamond", serif;
+    font-size: 1rem;
+    padding: 0.75rem 1rem;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .input:focus {
+    border-color: var(--color-accent);
+  }
+  .input::placeholder {
+    color: var(--color-text-muted);
+    font-style: italic;
+  }
+  .input-label {
+    font-family: var(--font-inter), "Inter", sans-serif;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    margin-bottom: 0.5rem;
+    display: block;
+  }
+
+  /* ==========================================================
+     AVATAR + LEVEL FRAMES / STARS (DESIGN.md §5)
+     ========================================================== */
+  .avatar {
+    border-radius: 50%;
+    border: 2px solid var(--color-border);
+    overflow: hidden;
+  }
+  .avatar-level-1 {
+    border-color: #3a3530;
+  }
+  .avatar-level-2 {
+    border-color: #5c5955;
+  }
+  .avatar-level-3 {
+    border-color: #8b7355;
+  }
+  .avatar-level-4 {
+    border-color: #8b1a1a;
+  } /* Наставник */
+  .avatar-level-5 {
+    border-color: #c9a84c;
+  } /* Мастер */
+  .avatar-level-6 {
+    border-color: #c9a84c;
+    box-shadow: 0 0 12px rgba(201, 168, 76, 0.4);
+  } /* Совет */
+  .star-filled {
+    color: #c9a84c;
+  }
+  .star-empty {
+    color: #2a2724;
+  }
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
+/* ============================================================
+   ANIMATIONS (DESIGN.md §7) — slow, premium, never bouncy
+   ============================================================ */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes accentPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 8px var(--color-accent-glow);
+  }
+  50% {
+    box-shadow: 0 0 16px var(--color-accent-glow);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
   }
 }
