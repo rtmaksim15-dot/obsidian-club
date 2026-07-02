@@ -9,6 +9,13 @@ import {
 } from "lucide-react";
 import Logo from "@/components/ui/Logo";
 import WaitlistForm from "@/components/shared/WaitlistForm";
+import {
+  Reveal,
+  RevealGroup,
+  RevealItem,
+  RevealList,
+  RevealListItem,
+} from "@/components/shared/Reveal";
 
 const INSIDE = [
   {
@@ -85,37 +92,41 @@ export default function LandingPage() {
 
       {/* ========================== PHILOSOPHY ========================== */}
       <section className="mx-auto max-w-2xl px-6 py-24 sm:py-32">
-        <p className="text-label mb-5">The Philosophy</p>
-        <h2 className="text-h1">This is not a social network.</h2>
-        <div className="mt-8 space-y-6">
-          <p className="text-body">
-            Obsidian Club is not a place you register. It is a place you are
-            granted access to. Membership is not bought — it is earned, extended,
-            and, when it must be, withdrawn.
-          </p>
-          <p className="text-body">
-            Everything here rests on four things: reputation, rating, influence,
-            and trust. They are not numbers to inflate. They are the record of how
-            you conduct yourself, who you bring, and what you give.
-          </p>
-          <p className="text-body">
-            An invitation is an act of responsibility. Those you bring reflect on
-            you. Those who understand this rise. Those who do not, quietly leave.
-          </p>
-          <p className="text-body italic text-ob-muted">
-            If a person brings no value to the club, the club no longer brings
-            value to them.
-          </p>
-        </div>
+        <Reveal>
+          <p className="text-label mb-5">The Philosophy</p>
+          <h2 className="text-h1">This is not a social network.</h2>
+          <div className="mt-8 space-y-6">
+            <p className="text-body">
+              Obsidian Club is not a place you register. It is a place you are
+              granted access to. Membership is not bought — it is earned, extended,
+              and, when it must be, withdrawn.
+            </p>
+            <p className="text-body">
+              Everything here rests on four things: reputation, rating, influence,
+              and trust. They are not numbers to inflate. They are the record of how
+              you conduct yourself, who you bring, and what you give.
+            </p>
+            <p className="text-body">
+              An invitation is an act of responsibility. Those you bring reflect on
+              you. Those who understand this rise. Those who do not, quietly leave.
+            </p>
+            <p className="text-body italic text-ob-muted">
+              If a person brings no value to the club, the club no longer brings
+              value to them.
+            </p>
+          </div>
+        </Reveal>
       </section>
 
       {/* ========================== WHAT'S INSIDE ====================== */}
       <section className="mx-auto max-w-5xl px-6 py-24">
-        <p className="text-label mb-5 text-center">Within</p>
-        <h2 className="text-h2 mb-12 text-center">What lies inside</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {INSIDE.map(({ icon: Icon, name, line }) => (
-            <div key={name} className="card group">
+        <Reveal>
+          <p className="text-label mb-5 text-center">Within</p>
+          <h2 className="text-h2 mb-12 text-center">What lies inside</h2>
+        </Reveal>
+        <RevealGroup className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {INSIDE.map(({ icon: Icon, name, line }, i) => (
+            <RevealItem key={name} index={i} className="card group">
               <Icon
                 size={22}
                 strokeWidth={1.5}
@@ -123,38 +134,40 @@ export default function LandingPage() {
               />
               <h3 className="text-h2 mt-4 !text-base">{name}</h3>
               <p className="text-body mt-2 !text-base">{line}</p>
-            </div>
+            </RevealItem>
           ))}
-        </div>
+        </RevealGroup>
       </section>
 
       {/* ============================ LEVELS =========================== */}
       <section className="mx-auto max-w-4xl px-6 py-24">
-        <p className="text-label mb-5 text-center">The Order</p>
-        <h2 className="text-h2 mb-12 text-center">Six levels. One beyond them.</h2>
+        <Reveal>
+          <p className="text-label mb-5 text-center">The Order</p>
+          <h2 className="text-h2 mb-12 text-center">Six levels. One beyond them.</h2>
 
-        {/* Lord Obsidian — above all */}
-        <div
-          className="mx-auto mb-10 max-w-md rounded-ob border p-6 text-center"
-          style={{
-            borderColor: "var(--color-gold-muted)",
-            boxShadow: "0 0 24px rgba(201,168,76,0.12)",
-          }}
-        >
-          <p
-            className="font-cinzel uppercase tracking-brand"
-            style={{ color: "var(--color-gold)" }}
+          {/* Lord Obsidian — above all */}
+          <div
+            className="mx-auto mb-10 max-w-md rounded-ob border p-6 text-center"
+            style={{
+              borderColor: "var(--color-gold-muted)",
+              boxShadow: "0 0 24px rgba(201,168,76,0.12)",
+            }}
           >
-            Lord Obsidian
-          </p>
-          <p className="text-body mt-2 !text-base">
-            Beyond the levels. The one. The founder. The voice of the club.
-          </p>
-        </div>
+            <p
+              className="font-cinzel uppercase tracking-brand"
+              style={{ color: "var(--color-gold)" }}
+            >
+              Lord Obsidian
+            </p>
+            <p className="text-body mt-2 !text-base">
+              Beyond the levels. The one. The founder. The voice of the club.
+            </p>
+          </div>
+        </Reveal>
 
-        <ol className="space-y-3">
-          {LEVELS.map((l) => (
-            <li key={l.rank} className="card flex items-center gap-5">
+        <RevealList className="space-y-3">
+          {LEVELS.map((l, i) => (
+            <RevealListItem key={l.rank} index={i} className="card flex items-center gap-5">
               <span className="status-line h-10 shrink-0" />
               <span className="font-cinzel text-ob-muted w-10 shrink-0 text-lg">
                 {l.rank}
@@ -165,33 +178,53 @@ export default function LandingPage() {
                 </h3>
                 <p className="text-body !text-base">{l.line}</p>
               </div>
-            </li>
+            </RevealListItem>
           ))}
-        </ol>
+        </RevealList>
       </section>
 
       {/* ============================ APPLY ============================ */}
       <section id="apply" className="mx-auto max-w-lg scroll-mt-16 px-6 py-24 sm:py-32">
-        <p className="text-label mb-5 text-center">Application</p>
-        <h2 className="text-h1 mb-10 text-center">Apply for membership</h2>
-        <WaitlistForm />
+        <Reveal>
+          <p className="text-label mb-5 text-center">Application</p>
+          <h2 className="text-h1 mb-10 text-center">Apply for membership</h2>
+          <WaitlistForm />
+        </Reveal>
       </section>
 
       {/* ============================ FOOTER =========================== */}
       <footer className="border-t border-ob-border px-6 py-12">
         <div className="mx-auto flex max-w-5xl flex-col items-center gap-6 sm:flex-row sm:justify-between">
           <Logo size={72} variant="dark" />
-          <p className="text-caption order-last sm:order-none">
+          {/* color overridden to --color-text-secondary: --color-text-muted
+              is 2.86:1 on this background, below WCAG AA's 4.5:1 for real
+              links/copy (still fine for true de-emphasized tags/labels) */}
+          <p
+            className="text-caption order-last sm:order-none"
+            style={{ color: "var(--color-text-secondary)" }}
+          >
             © {new Date().getFullYear()} Obsidian Club. All rights reserved.
           </p>
           <nav className="flex gap-6">
-            <a href="#" className="text-caption transition-colors hover:text-ob-text">
+            <a
+              href="#"
+              className="text-caption transition-colors hover:text-ob-text"
+              style={{ color: "var(--color-text-secondary)" }}
+            >
               Privacy
             </a>
-            <a href="#" className="text-caption transition-colors hover:text-ob-text">
+            <a
+              href="#"
+              className="text-caption transition-colors hover:text-ob-text"
+              style={{ color: "var(--color-text-secondary)" }}
+            >
               Terms
             </a>
-            <a href="#" className="text-caption transition-colors hover:text-ob-text">
+            <a
+              href="#"
+              className="text-caption transition-colors hover:text-ob-text"
+              style={{ color: "var(--color-text-secondary)" }}
+            >
               Contact
             </a>
           </nav>

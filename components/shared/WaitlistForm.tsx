@@ -101,7 +101,9 @@ export default function WaitlistForm() {
         {status === "submitting" ? "Submitting…" : "Submit Application"}
       </button>
 
-      <p className="text-caption text-center">
+      {/* --color-text-secondary, not the class default --color-text-muted:
+          muted is 2.86:1 on this background, below WCAG AA's 4.5:1 */}
+      <p className="text-caption text-center" style={{ color: "var(--color-text-secondary)" }}>
         Applications are reviewed manually. Not everyone is accepted.
       </p>
     </form>
