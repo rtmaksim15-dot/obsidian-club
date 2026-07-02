@@ -1,0 +1,142 @@
+# Decisions Log
+
+A chronological record of product and engineering decisions — accepted,
+replaced, or deprecated — with the reasoning behind each. This is the
+project's historical memory: **add new entries at the bottom, in date
+order. Never delete or rewrite a past entry** — if a decision changes,
+add a new entry that says so and mark the old one superseded.
+
+For deep technical rationale (options considered, trade-offs, review
+conditions) behind a specific technical decision, see the linked ADR. This
+log also covers decisions an ADR wouldn't (product/process choices,
+account/access blockers, scope calls).
+
+---
+
+### 2026-07-01 — Read the source doc package before writing any code
+
+Confirmed the 6-file strategic package (`CLAUDE.md`, `PRODUCT.md`,
+`ARCHITECTURE.md`, `DESIGN.md`, `CONTENT_SYSTEM.md`, `ROADMAP.md`) existed
+in iCloud (not the initially-expected local folder) and read all of it
+before starting, per `CLAUDE.md`'s own rule #1. **Status: standing
+practice** — every session should do this before touching product logic.
+
+### 2026-07-01 — Pin Next.js 14 + Tailwind CSS v3, not "latest"
+
+`create-next-app@latest` resolves to Next 15 + Tailwind v4, whose config
+format is incompatible with `DESIGN.md`'s documented v3-syntax config.
+Presented as an explicit choice to Max: framework freshness vs. spec
+fidelity. **Max chose spec fidelity.** Full rationale:
+[ADR-0001](docs/ADR/0001-pin-nextjs-14-tailwind-v3.md).
+
+### 2026-07-01 — Defer the Vercel deploy to Max; build and prepare everything else
+
+Claude Code cannot log into Max's Vercel account. Presented as a choice;
+**Max chose "build + prep, I'll deploy."** Applies to Supabase and Resend
+too, as those needs arose. **Status: still blocking** — see
+`TECH_DEBT.md`.
+
+### 2026-07-01 — Pin Prisma to v6, not v7
+
+Same category of problem as the Next/Tailwind pin: Prisma 7 removed
+`url`/`directUrl` from `schema.prisma`, breaking `ARCHITECTURE.md`'s
+documented schema shape. Decided independently (not asked of Max — a pure
+technical-compatibility call, not a product trade-off). Full rationale:
+[ADR-0002](docs/ADR/0002-pin-prisma-v6.md).
+
+### 2026-07-01 — Landing page at `app/(landing)/page.tsx`, per the documented folder plan
+
+Resolved a route conflict between the `create-next-app` scaffold default
+(`app/page.tsx`) and `ARCHITECTURE.md`'s documented route-group structure
+by following the documented structure. Full rationale:
+[ADR-0006](docs/ADR/0006-landing-route-placement.md).
+
+### 2026-07-01 — Extend the `Waitlist` schema with `age`/`city`/`source`
+
+`DESIGN.md`'s application form collects fields `ARCHITECTURE.md`'s
+minimal Stage-1 table doesn't have columns for. Extended the table rather
+than silently dropping submitted data (age is a compliance signal). Full
+rationale: [ADR-0004](docs/ADR/0004-extend-waitlist-schema.md).
+
+### 2026-07-01 — Landing page set to `robots: noindex` (later superseded)
+
+Defensive Week 1 default, no specific justification beyond general
+caution. **Superseded 2026-07-02** — see below.
+
+### 2026-07-02 — Wire real waitlist persistence + confirmation email
+
+`/api/waitlist` moved from validate-only to actually writing to the
+database (idempotent on duplicate email, `503` if the database is
+unreachable) and sending a Resend confirmation email (best-effort, never
+fails the request). Established the API conventions later formalized in
+[ADR-0005](docs/ADR/0005-api-conventions.md).
+
+### 2026-07-02 — Adopted framer-motion for scroll-reveal animation (same-day, superseded)
+
+First implementation of `DESIGN.md`'s fadeInUp scroll reveals used
+framer-motion, per `ARCHITECTURE.md`'s stated animation library. **Superseded
+same day** once measured against real performance data — see next entry.
+
+### 2026-07-02 — Removed framer-motion from the landing page
+
+A real Lighthouse audit measured the framer-motion implementation at
+1,240ms Total Blocking Time and a Performance score of 66/100. Replaced
+with a plain IntersectionObserver + CSS-transition implementation with
+identical visual behavior and near-zero JS cost. framer-motion stays
+installed for future authenticated Platform pages. Full rationale, with
+measurements: [ADR-0003](docs/ADR/0003-remove-framer-motion-from-landing.md).
+
+### 2026-07-02 — Landing page flipped to indexable (supersedes the 2026-07-01 noindex default)
+
+`noindex` directly contradicted `ROADMAP.md`'s Week 3 SEO goal and the
+landing's entire stated purpose (be found via search/social to grow the
+waitlist, per `CONTENT_SYSTEM.md`). Flipped to `index: true, follow: true`,
+scoped to the public landing route only — the future authenticated
+platform stays gated by auth, not robots meta. Full rationale:
+[ADR-0007](docs/ADR/0007-landing-page-indexable.md).
+
+### 2026-07-02 — Vercel Analytics chosen over Google Analytics
+
+`ROADMAP.md` offered either as acceptable. Google Analytics needs Max to
+create a GA4 property first (another account-creation blocker); Vercel
+Analytics activates automatically on the Vercel deploy Max already needs
+to do. Full rationale: [ADR-0008](docs/ADR/0008-vercel-analytics-over-ga.md).
+
+### 2026-07-02 — Fixed WCAG contrast failures without touching brand tokens
+
+A real accessibility audit found footer/disclaimer text at 2.86:1
+contrast (fails WCAG AA's 4.5:1). Fixed by pointing those specific
+elements at the already-approved `--color-text-secondary` token instead of
+lightening the locked `--color-text-muted` brand token. Full rationale:
+[ADR-0009](docs/ADR/0009-fix-contrast-without-changing-tokens.md).
+
+### 2026-07-02 — Adopted the full engineering documentation framework (this document, ADRs, CHANGELOG, TECH_DEBT, BACKLOG, `/docs`)
+
+Explicit direction from Max: the project moves from "building pages" to
+"building a long-term software platform." Introduced Architecture
+Decision Records, this decisions log, a Keep-a-Changelog-format
+`CHANGELOG.md`, `TECH_DEBT.md`, `BACKLOG.md`, and the `/docs` tree
+(`Vision.md`, `Philosophy.md`, `Architecture.md`, `UX.md`, `UI.md`,
+`API/`, `ADR/`). Established the rule that documentation is the single
+source of truth — implementation conflicting with documentation means
+stop and ask, never silently resolve either direction.
+
+### 2026-07-02 — Switched from week-based to version-based work tracking
+
+Per Max's direction: stop organizing work primarily by calendar week
+(`ROADMAP.md`'s original framing); organize by product version instead
+(`v0.1` = Landing, `v0.2` = Authentication, `v0.3` = Profile, `v0.4` =
+Community, `v0.5` = Reputation, ...; `v1.0` = the January 2027 public
+launch per `ROADMAP.md`). Everything built through this date is
+retroactively declared **`v0.1.0`** in `CHANGELOG.md`. `ROADMAP.md`
+itself is unchanged (Max's external planning document, outside this repo)
+— this is how work gets tracked *inside* the repo (`BACKLOG.md`,
+`CHANGELOG.md`, commit messages) from here forward.
+
+### *(pending)* Authentication strategy — not yet decided
+
+`ARCHITECTURE.md` proposes NextAuth v5 **or** Clerk without a firm pick.
+No decision has been made — this is an open item for `v0.2`, tracked in
+`BACKLOG.md`, not something to resolve unilaterally when that work
+starts. Listed here as a placeholder so it's visible in the timeline
+rather than a silent gap.
