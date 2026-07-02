@@ -133,10 +133,61 @@ itself is unchanged (Max's external planning document, outside this repo)
 — this is how work gets tracked *inside* the repo (`BACKLOG.md`,
 `CHANGELOG.md`, commit messages) from here forward.
 
-### *(pending)* Authentication strategy — not yet decided
+### 2026-07-02 — Middleware must degrade gracefully without Supabase credentials too (caught before commit)
 
-`ARCHITECTURE.md` proposes NextAuth v5 **or** Clerk without a firm pick.
-No decision has been made — this is an open item for `v0.2`, tracked in
-`BACKLOG.md`, not something to resolve unilaterally when that work
-starts. Listed here as a placeholder so it's visible in the timeline
-rather than a silent gap.
+The first `middleware.ts` implementation called `createServerClient()`
+unconditionally on every request. Since `NEXT_PUBLIC_SUPABASE_URL` is
+still a placeholder (Supabase isn't provisioned — see `TECH_DEBT.md`),
+this threw on **every single request**, including the already-shipped
+public landing page — not just the new protected routes. Caught by
+testing `curl http://localhost:3000/` before committing, not by
+assumption. Fixed by checking for the env vars up front in both
+`middleware.ts` and `lib/auth/session.ts#getCurrentUser()`, treating
+"Supabase not configured" as "not logged in" (fail closed on protected
+routes, pass through untouched everywhere else) — the same defensive
+pattern already used for Resend (`v0.1`) and the waitlist DB write, just
+initially missed for middleware specifically because it runs on *every*
+request, not just one feature's API route. **Lesson for future
+integrations that touch middleware or root layout: the "degrade
+gracefully without real credentials" rule applies there first**, since a
+crash at that layer takes down pages that have nothing to do with the
+feature being added.
+
+### 2026-07-02 — Authentication strategy: Supabase Auth (resolves the previously-pending entry)
+
+`ARCHITECTURE.md` names NextAuth v5, Clerk, *and* implicitly Supabase Auth
+(bundled into its "DB Hosting: Supabase... + Auth..." line) across two
+different sections — a real doc ambiguity, not a clean either/or.
+Presented to Max as an explicit three-way choice. **Max chose Supabase
+Auth** — reuses the Supabase project already required for the database,
+adds no new vendor account (unlike Clerk), and pairs naturally with the
+Row Level Security work `ARCHITECTURE.md` §9 already requires (unlike a
+from-scratch NextAuth setup). Full rationale:
+[ADR-0010](docs/ADR/0010-supabase-auth.md).
+
+### 2026-07-02 — Added `isAdmin` to `User` and status tracking to `Waitlist`
+
+Building the admin approval API surfaced two more schema gaps in the same
+category as the earlier `Waitlist` field extension
+([ADR-0004](docs/ADR/0004-extend-waitlist-schema.md)): `ARCHITECTURE.md`'s
+`User` table has no admin/non-admin distinction despite its own documented
+`/api/admin/*` endpoints, and its `Waitlist` table has no status column
+despite `PRODUCT.md` §1 explicitly specifying three application statuses
+by name. Both added as minimal, documented, additive fields — not invented
+scope, filling gaps the source docs left between them. Full rationale:
+[ADR-0011](docs/ADR/0011-isadmin-field.md),
+[ADR-0012](docs/ADR/0012-waitlist-status-tracking.md).
+
+### 2026-07-02 — Simplified Initiation Ritual: approval grants Level I directly
+
+`PRODUCT.md` §1 Stage 2 specifies a 5-step mandatory Initiation Ritual
+(profile, Code of Conduct, intro material, self-introduction, safety
+rules) between application approval and receiving Level I access. This
+ritual is **not built in `v0.2`** — approving an application currently
+grants Level I and `active` status immediately, with no ritual gate. This
+is a deliberate, documented scope simplification for `v0.2` (which
+`BACKLOG.md` scopes as "Authentication," not "Onboarding"), not a
+decision to drop the ritual from the product — it's expected to land when
+`v0.3`'s Hall UI exists to host it. Flagged explicitly rather than left
+as a silent gap; see `TECH_DEBT.md` and `docs/UX.md`'s implementation
+status table.

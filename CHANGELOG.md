@@ -8,7 +8,73 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.1.0` is the current released version.
+Nothing yet — `v0.2.0` is the current released version.
+
+## [0.2.0] — 2026-07-02
+
+Authentication: Supabase Auth login, an approval-gated onboarding flow
+(no open self-registration, per `PRODUCT.md`), admin panel v1, a minimal
+Hall and profile view, and avatar upload. Also introduced the engineering
+documentation framework (`/docs`, ADRs, this changelog, `DECISIONS.md`,
+`TECH_DEBT.md`, `BACKLOG.md`) that now governs how this project is built.
+
+### Added
+
+- Supabase Auth integration: `lib/auth/` (browser/server/admin clients,
+  `getCurrentUser()`, `requireAdmin()`), `middleware.ts` (session refresh
+  + route protection for `/hall`, `/rooms`, `/profile`, `/events`,
+  `/content`, `/marketplace`, `/progress`, `/admin`). See
+  [ADR-0010](docs/ADR/0010-supabase-auth.md).
+- `/login` — email/password sign-in. No public registration page; access
+  is granted via admin approval, per `PRODUCT.md`'s "you don't register,
+  you're granted access" model.
+- Admin panel v1: `/admin/applications` + `GET/PATCH /api/admin/applications`
+  — review, approve, or decline Waitlist entries. Approval creates a
+  Supabase Auth user + matching `User` row at Level I, and sends a
+  branded "your access has been granted" email via Resend. See
+  [docs/API/admin.md](docs/API/admin.md).
+- `/hall` — minimal authenticated status view (real reputation/rating/
+  influence/Trust Score data). Full Hall UI is `v0.3`.
+- `/profile/[id]` — minimal member profile view. Tabs (achievements,
+  content, reviews) are `v0.3`.
+- Avatar upload via uploadthing (`app/api/uploadthing/`,
+  `components/shared/AvatarUploadButton.tsx`), surfaced on `/hall`.
+- `User.isAdmin` and `Waitlist.status`/`reviewedAt`/`reviewedBy` — schema
+  additions beyond `ARCHITECTURE.md`'s documented columns, needed for the
+  admin approval flow. See [ADR-0011](docs/ADR/0011-isadmin-field.md),
+  [ADR-0012](docs/ADR/0012-waitlist-status-tracking.md).
+- The full engineering documentation framework: `/docs` (Vision,
+  Philosophy, Architecture, UX, UI, API/, ADR/), `DECISIONS.md`,
+  `TECH_DEBT.md`, `BACKLOG.md`, and this file. Work is now tracked by
+  product version instead of calendar week.
+
+### Changed
+
+- Work organization moved from calendar-week tracking (`ROADMAP.md`'s
+  original framing) to product-version tracking
+  (`v0.1` = Landing, `v0.2` = Authentication, ...).
+
+### Fixed
+
+- `middleware.ts` and `lib/auth/session.ts` initially crashed **every**
+  request (including the public landing page) when Supabase credentials
+  aren't configured — caught before commit by testing the landing page
+  after adding auth, not by assumption. Fixed to degrade to "not logged
+  in" instead of throwing. See `DECISIONS.md`, 2026-07-02.
+
+### Removed
+
+- N/A.
+
+### Known gaps / deliberate simplifications (see [TECH_DEBT.md](TECH_DEBT.md))
+
+Not verified end-to-end (blocked on Max provisioning Supabase, Resend,
+and Uploadthing accounts); the Initiation Ritual (`PRODUCT.md` §1 Stage 2)
+is simplified — approval grants Level I directly rather than gating on
+the 5-step ritual; usernames are auto-generated with no self-edit flow
+yet; the purpose of the originally-planned `(auth)/apply/` route is
+unresolved and needs Max's input; Supabase Auth user creation and the
+matching `users` row write aren't atomic.
 
 ## [0.1.0] — 2026-07-02
 

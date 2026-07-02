@@ -33,7 +33,17 @@ is incomplete, not "documented later."
 | `201` | Created (a new record was accepted) |
 | `400` | Malformed request body (not valid JSON) |
 | `422` | Well-formed but invalid input (failed validation) |
-| `503` | A downstream dependency (database, etc.) is unavailable — **not** the caller's fault, distinguish this from `422`/`400` |
+| `403` | Authenticated, but not authorized (e.g. not an admin) |
+| `404` | The referenced resource doesn't exist |
+| `409` | The resource exists but is in the wrong state for this action (e.g. an application already reviewed) |
+| `503` | A downstream dependency (database, Supabase Auth, etc.) is unavailable — **not** the caller's fault, distinguish this from `422`/`400` |
+
+`401` (not authenticated at all) is reserved but not yet emitted by any
+route — the admin endpoints currently return `403` uniformly whether the
+caller is anonymous or logged-in-but-not-admin, since `requireAdmin()`
+doesn't distinguish the two. Split this into `401`/`403` if a route ever
+needs the caller to tell the difference (e.g. a client that wants to show
+"log in" vs. "you don't have access").
 
 ## Validation
 
@@ -56,8 +66,14 @@ still succeed. Side effects like this should be written so they can never
 throw past the caller — catch and log internally
 (see `lib/utils/email.ts`).
 
-## Auth (once it exists, v0.2+)
+## Auth (v0.2+)
 
-Not yet implemented. When it lands, this section must be updated *before*
-any endpoint relies on it — don't let an endpoint's real auth behavior
-diverge from what's written here.
+Supabase Auth (see [ADR-0010](../ADR/0010-supabase-auth.md)). Route
+Handlers that need to know who's calling use
+`lib/auth/session.ts#getCurrentUser()`; admin-only routes use
+`lib/auth/require-admin.ts#requireAdmin()` on top of it, returning `403`
+if the check fails (see the status-code table above for the current
+401/403 conflation). Session cookies are handled by `middleware.ts`,
+which also fail-closes protected page routes to `/login` — this doesn't
+cover API routes, so **every** admin API route must call `requireAdmin()`
+itself; don't rely on middleware to protect `/api/admin/*`.

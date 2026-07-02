@@ -95,11 +95,74 @@ when this env var isn't set — meaning OpenGraph/canonical URLs will
 resolve incorrectly (to localhost) if deployed without setting it. **Must
 be set in Vercel's environment variables at deploy time.**
 
+## Initiation Ritual not built — approval grants Level I directly (`v0.2`)
+
+`PRODUCT.md` §1 Stage 2 specifies a mandatory 5-step ritual between
+approval and receiving Level I. Not built — approving an application in
+`app/api/admin/applications/[id]/route.ts` grants Level I + `active`
+status immediately, no gate. Deliberate `v0.2` scope simplification (see
+`DECISIONS.md`, 2026-07-02), expected to land in `v0.3` once the Hall UI
+exists to host the ritual steps.
+
+## `(auth)/apply/` folder purpose is unclear
+
+`ARCHITECTURE.md` §7's folder plan lists `app/(auth)/apply/` as "форма
+заявки" (application form) — but the actual waitlist application form
+lives embedded in the Landing page (`app/(landing)/page.tsx`'s Apply
+section), matching `DESIGN.md` §6's Landing Page spec exactly (a single
+scrolling page with the form at the bottom). It's unclear whether
+`(auth)/apply/` is meant to be a *separate*, standalone `/apply` route
+(e.g. for direct-linking from marketing instead of the full landing), or
+just an artifact of the original folder plan that predates the landing's
+actual single-page design. **Not resolved — needs Max's input**, not a
+guess. The folder remains empty.
+
+## Username is auto-generated; no self-edit flow exists
+
+The application form never collects a username (not specified anywhere in
+`DESIGN.md`/`PRODUCT.md`). `lib/utils/codes.ts#generateUsernameFromEmail`
+derives a placeholder from the applicant's email on approval. There's no
+"edit my profile" page yet for a member to change it (or their bio,
+avatar via the profile page rather than the Hall, etc.) — avatar upload
+currently lives on `/hall` somewhat awkwardly, since there's no dedicated
+settings page. Expected to be resolved as part of the Initiation
+Ritual / full Hall UI (`v0.3`).
+
+## Supabase Auth user creation isn't atomic with the `users` row write
+
+`app/api/admin/applications/[id]/route.ts`: if Supabase Auth user creation
+succeeds but the follow-up Prisma transaction (creating the `users` row,
+marking the application approved) fails, there's an orphaned
+`auth.users` row with no matching `public.users` row. Logged loudly via
+`console.error` for manual reconciliation — there's no automated recovery.
+Low risk at current scale (one admin, low volume) but should be revisited
+before this becomes a high-throughput flow.
+
+## `401`/`403` conflated in the admin API
+
+`requireAdmin()` returns `403` whether the caller is anonymous or
+logged-in-but-not-admin — see [docs/API/README.md](docs/API/README.md).
+Fine for now (no client currently needs to distinguish the two), but
+worth splitting if a client ever wants to show "log in" vs. "you don't
+have access" differently.
+
+## Avatar upload is wired but unverified
+
+`app/api/uploadthing/`, `lib/utils/uploadthing.ts`,
+`components/shared/AvatarUploadButton.tsx` are all in place and build
+cleanly, but `UPLOADTHING_SECRET`/`UPLOADTHING_APP_ID` are empty — same
+blocked-on-Max pattern as Resend/Supabase. **Cannot be verified
+end-to-end** (a real upload, a real `onUploadComplete` write) until Max
+provisions an Uploadthing account.
+
 ## Blocked on Max (accounts Claude cannot create)
 
 - Vercel project + domain (needed for any deployment at all)
-- Supabase project (needed for `DATABASE_URL`/`DIRECT_URL`)
+- Supabase project (needed for `DATABASE_URL`/`DIRECT_URL` **and** real
+  Auth — as of `v0.2`, this blocks login/admin/Hall/profile working
+  end-to-end, not just the database)
 - Resend account + verified sending domain (needed for `RESEND_API_KEY`)
+- Uploadthing account (needed for `UPLOADTHING_SECRET`/`UPLOADTHING_APP_ID`)
 
 These aren't "debt" in the sense of a shortcut taken — they're
 external dependencies the implementer has no way to self-serve. Tracked

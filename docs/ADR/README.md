@@ -20,3 +20,6 @@ to these where a decision has a technical deep-dive.
 | [0007](0007-landing-page-indexable.md) | Make the landing page indexable (`robots: index, follow`) | Accepted |
 | [0008](0008-vercel-analytics-over-ga.md) | Vercel Analytics over Google Analytics | Accepted |
 | [0009](0009-fix-contrast-without-changing-tokens.md) | Fix WCAG contrast failures without changing brand tokens | Accepted |
+| [0010](0010-supabase-auth.md) | Supabase Auth for authentication | Accepted |
+| [0011](0011-isadmin-field.md) | Add `isAdmin` to the `User` model | Accepted |
+| [0012](0012-waitlist-status-tracking.md) | Add status tracking to the `Waitlist` model | Accepted |

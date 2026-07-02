@@ -23,6 +23,15 @@ enum UserStatus {
   banned
 }
 
+// PRODUCT.md §1 documents exactly these three application statuses, but
+// ARCHITECTURE.md §10's minimal waitlist table never included a status
+// column at all — see ADR-0012.
+enum WaitlistStatus {
+  pending
+  approved
+  declined
+}
+
 enum RoomType {
   general
   thematic
@@ -105,6 +114,7 @@ model User {
   influence       Int        @default(0)
   trustScore      Int        @default(100) @map("trust_score")
   status          UserStatus @default(pending)
+  isAdmin         Boolean    @default(false) @map("is_admin") // not in ARCHITECTURE.md's User table — see ADR-0011
   invitedById     String?    @map("invited_by") @db.Uuid
   referralCode    String?    @unique @map("referral_code")
   referralCount   Int        @default(0) @map("referral_count")
@@ -375,8 +385,8 @@ model Notification {
 // ============================================================
 
 model Waitlist {
-  id           String   @id @default(uuid()) @db.Uuid
-  email        String   @unique
+  id           String         @id @default(uuid()) @db.Uuid
+  email        String         @unique
   name         String?
   // age/city/source are additive to ARCHITECTURE.md §10's minimal column
   // list — they capture what the DESIGN.md §6 application form actually
@@ -384,9 +394,15 @@ model Waitlist {
   age          Int?
   city         String?
   source       String?
-  referralCode String?  @map("referral_code")
-  invitedBy    String?  @map("invited_by") @db.Uuid
-  createdAt    DateTime @default(now()) @map("created_at")
+  referralCode String?        @map("referral_code")
+  invitedBy    String?        @map("invited_by") @db.Uuid
+  // Status tracking + a minimal review audit trail — additive beyond
+  // ARCHITECTURE.md §10's documented columns, needed to implement the
+  // application review flow PRODUCT.md §1 already specifies. See ADR-0012.
+  status       WaitlistStatus @default(pending)
+  reviewedAt   DateTime?      @map("reviewed_at")
+  reviewedBy   String?        @map("reviewed_by") @db.Uuid
+  createdAt    DateTime       @default(now()) @map("created_at")
 
   @@map("waitlist")
 }

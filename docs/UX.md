@@ -10,8 +10,8 @@
 | Stage | Status |
 |---|---|
 | Stage 0 — pre-platform warm-up, Landing, waitlist | ✅ Built (`v0.1`) |
-| Stage 1 — Application review (approve/decline) | ❌ Not built |
-| Stage 2 — Initiation ritual | ❌ Not built |
+| Stage 1 — Application review (approve/decline) | ✅ Built (`v0.2`, admin panel v1) — see [API/admin.md](API/admin.md) |
+| Stage 2 — Initiation ritual | ⚠️ **Simplified in `v0.2`**: approval grants Level I + active status directly. The actual 5-step ritual below isn't built/enforced yet — see [TECH_DEBT.md](../TECH_DEBT.md) |
 | Stage 3 — Progression (levels, reputation, rating) | ❌ Not built |
 | Stage 4 — Elite tiers (Mentor/Master/Council) | ❌ Not built |
 | Stage 5 — Purge (periodic membership review) | ❌ Not built |

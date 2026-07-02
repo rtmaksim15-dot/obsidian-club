@@ -19,29 +19,37 @@ unilaterally.
       migration (blocked — needs Max's account)
 - [ ] Resend account + verified sending domain + real `RESEND_API_KEY`
       (blocked — needs Max's account)
+- [ ] Uploadthing account + real `UPLOADTHING_SECRET`/`UPLOADTHING_APP_ID`
+      (blocked — needs Max's account; needed to verify avatar upload)
 - [ ] Set `NEXT_PUBLIC_APP_URL` in Vercel once the domain is live (see
       `TECH_DEBT.md`)
+- [ ] Once Supabase is live: set at least one real `User.isAdmin = true`
+      directly in the database (no admin-granting UI exists yet)
 
 ## Next
 
-*Approved upcoming work — `v0.2`.*
+*`v0.2` is functionally complete (code-wise) — verification blocked on
+the same Supabase/Resend/Uploadthing accounts listed in "Now" above.*
 
-### v0.2 — Authentication
+### v0.2 — Authentication ✅ (built 2026-07-02, unverified end-to-end)
 
 (Source: `ROADMAP.md`, August Weeks 1–2)
 
-- [ ] Decide auth strategy: NextAuth v5 vs. Clerk (open decision — see
-      `DECISIONS.md`'s pending entry; **do not decide silently**, confirm
-      with Max)
-- [ ] Registration / login flow
-- [ ] Admin panel v1 — approve/decline applications from the Waitlist
-- [ ] Basic member profile (data model already exists in
-      `prisma/schema.prisma`)
-- [ ] Avatar upload (uploadthing is installed, unused so far)
-- [ ] Level system live in the database (schema exists; needs the actual
-      promotion logic)
-- [ ] Hall (`/hall`) route structure — currently referenced by
-      `manifest.json`'s `start_url` but doesn't exist yet
+- [x] Decide auth strategy — **Supabase Auth**, confirmed by Max
+      2026-07-02. See [ADR-0010](docs/ADR/0010-supabase-auth.md).
+- [x] Registration / login flow — `/login` (Supabase email/password);
+      there's no open self-registration, matching `PRODUCT.md`'s
+      approval-gated model (see `docs/API/admin.md`).
+- [x] Admin panel v1 — `/admin/applications` + the approve/decline API.
+      See [ADR-0011](docs/ADR/0011-isadmin-field.md),
+      [ADR-0012](docs/ADR/0012-waitlist-status-tracking.md).
+- [x] Basic member profile — `/profile/[id]`, real data, no tabs yet
+      (deferred to `v0.3`).
+- [x] Avatar upload — wired (uploadthing), unverified without real keys.
+- [x] Level system live in the database — approval sets Level I directly;
+      **the Initiation Ritual gate is simplified/deferred**, see
+      `TECH_DEBT.md`.
+- [x] Hall (`/hall`) route — minimal status view; full UI is `v0.3`.
 
 ## Later
 
@@ -52,7 +60,10 @@ detail. Derived from `ROADMAP.md`'s existing Stage 2 plan.*
 
 (Source: `ROADMAP.md`, August Weeks 3–4) — full Hall UI (avatar, level,
 reputation, rating), progress-to-next-level tracking, referral link
-generation, basic notifications, mobile bottom navigation.
+generation, basic notifications, mobile bottom navigation, **the actual
+5-step Initiation Ritual** (deferred from `v0.2`, see `TECH_DEBT.md`),
+and a real profile self-edit flow (username, bio — currently
+auto-generated on approval, see `TECH_DEBT.md`).
 
 ### v0.4 — Community / Rooms
 
