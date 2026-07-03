@@ -8,7 +8,69 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.2.0` is the current released version.
+Nothing yet — `v0.3.0` is the current released version.
+
+## [0.3.0] — 2026-07-03
+
+The Hall: real member status, progress-to-next-level, a working referral
+chain, notifications, mobile navigation, an Initiation Ritual framework,
+and profile self-editing.
+
+### Added
+
+- Full Hall UI (`/hall`) — real reputation/rating/influence/Trust Score,
+  progress-to-next-level, referral link + stats, notifications. See
+  [docs/UX.md](docs/UX.md)'s implementation status table.
+- `lib/rating/level-progress.ts` — progress-to-next-level using only the
+  criteria `PRODUCT.md` §2 actually quantifies (reputation stars,
+  referral count); unquantified criteria ("steady/high activity")
+  render as plain text, never a fabricated progress number. Mentor+
+  correctly shown as appointed, not earned.
+- Referral resolution: the `Referral` model (unused since Week 1) is now
+  actually wired — approving an application whose entered code matches
+  a real member's `referralCode` creates a `Referral` row and increments
+  the inviter's count.
+- Real `Notification` rows — created on approval, shown on `/hall`.
+- Initiation Ritual (`/ritual`, `lib/auth/ritual.ts`) gates the Hall.
+  Step 1 (complete profile) is fully real, computed live from actual
+  `User` data. Steps 2/3/4/5 are honest "pending" states — see
+  [ADR-0013](docs/ADR/0013-initiation-ritual-step4-deferred.md) and
+  `DECISIONS.md` (2026-07-02) for why 3 of those 4 steps need real
+  content Max hasn't written yet, not just more code.
+- Mobile bottom navigation (`DESIGN.md` §8), plus "coming soon"
+  placeholder pages for Rooms/Content/Events (`app/(platform)/layout.tsx`,
+  `components/shared/ComingSoon.tsx`) so the nav doesn't dead-end ahead
+  of those versions.
+- Profile self-edit (`/profile/[id]/edit`, `PATCH /api/profile`) — display
+  name, username, bio. Avatar upload moved here from `/hall`.
+- `lib/utils/achievements.ts` — grants "Прошёл Ритуал Инициации"
+  (`PRODUCT.md` §7) on ritual completion.
+
+### Changed
+
+- `/hall` now redirects to `/ritual` until the ritual is complete
+  (previously ungated).
+- Avatar upload moved from `/hall` to `/profile/[id]/edit` (was
+  awkwardly placed on Hall in `v0.2` — see `TECH_DEBT.md`).
+
+### Fixed
+
+- `/ritual` was missing from `middleware.ts`'s `PROTECTED_PREFIXES` —
+  caught and fixed same day; its page-level auth check meant this was a
+  defense-in-depth gap, not an actual hole (still redirected correctly).
+
+### Removed
+
+- N/A.
+
+### Known gaps / deliberate simplifications (see [TECH_DEBT.md](TECH_DEBT.md))
+
+Ritual steps 2/3/5 need real content from Max; "steady/high activity"
+has no defined metric to track; `Referral.status` only ever reaches
+`joined`, never `active`/`problem`/`removed` (needs the `v0.5` rating
+engine's trigger points); notifications have no mark-as-read yet;
+username collisions return a generic error. Not verified end-to-end —
+still blocked on Max provisioning Supabase/Resend/Uploadthing.
 
 ## [0.2.0] — 2026-07-02
 

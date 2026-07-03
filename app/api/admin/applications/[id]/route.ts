@@ -7,6 +7,18 @@ import { generateReferralCode, generateUsernameFromEmail } from "@/lib/utils/cod
 
 type Body = { action?: "approve" | "decline" };
 
+// Ritual steps that need real policy/community content Max hasn't written
+// yet (Code of Conduct, Lord Obsidian's intro material, safety rules) —
+// or a feature that doesn't exist yet (the newcomers' room, which needs
+// Rooms, v0.4) start life explicitly "deferred", never silently faked as
+// complete. See ADR-0013.
+const INITIAL_RITUAL_PROGRESS = {
+  codeOfConduct: "deferred",
+  introMaterial: "deferred",
+  newcomerRoom: "deferred",
+  safetyRules: "deferred",
+};
+
 // PATCH /api/admin/applications/:id — approve or decline a waitlist entry.
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const admin = await requireAdmin();
@@ -61,16 +73,25 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     );
   }
 
+  // Referral resolution (PRODUCT.md §6 "Trust Chain"): if the applicant
+  // entered a code that matches a real member's referralCode, this is a
+  // real invite, not just a free-text field — link it.
+  const inviter = application.referralCode
+    ? await prisma.user.findUnique({ where: { referralCode: application.referralCode } })
+    : null;
+
   // Supabase Auth user was created successfully at this point. If the
-  // Prisma write below fails, we're left with an orphaned auth.users row
+  // Prisma writes below fail, we're left with an orphaned auth.users row
   // and no matching public.users row — there's no cross-system
   // transaction to roll both back atomically. Logged loudly so it can be
   // reconciled manually; see TECH_DEBT.md.
   try {
+    const newUserId = created.user.id;
+
     const [user] = await prisma.$transaction([
       prisma.user.create({
         data: {
-          id: created.user.id,
+          id: newUserId,
           email: application.email,
           username: generateUsernameFromEmail(application.email),
           displayName: application.name ?? application.email.split("@")[0],
@@ -80,13 +101,41 @@ export async function PATCH(request: Request, { params }: { params: { id: string
           status: "active",
           isAdmin: false,
           referralCode: generateReferralCode(),
+          invitedById: inviter?.id,
           joinedAt: new Date(),
+        },
+      }),
+      prisma.userProfile.create({
+        data: { userId: newUserId, ritualProgress: INITIAL_RITUAL_PROGRESS },
+      }),
+      prisma.notification.create({
+        data: {
+          userId: newUserId,
+          type: "welcome",
+          title: "Your access has been granted",
+          body: "Complete your profile to begin.",
         },
       }),
       prisma.waitlist.update({
         where: { id: application.id },
         data: { status: "approved", reviewedAt: new Date(), reviewedBy: admin.id },
       }),
+      ...(inviter
+        ? [
+            prisma.referral.create({
+              data: {
+                inviterId: inviter.id,
+                invitedId: newUserId,
+                codeUsed: application.referralCode,
+                status: "joined",
+              },
+            }),
+            prisma.user.update({
+              where: { id: inviter.id },
+              data: { referralCount: { increment: 1 } },
+            }),
+          ]
+        : []),
     ]);
 
     await sendAccessGrantedEmail(
@@ -98,7 +147,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return NextResponse.json({ ok: true, status: "approved", userId: user.id });
   } catch (err) {
     console.error(
-      `[admin/applications] Approved ${application.email} in Supabase Auth (user id ${created.user.id}) but failed to write the matching users row — needs manual reconciliation:`,
+      `[admin/applications] Approved ${application.email} in Supabase Auth (user id ${created.user.id}) but failed to write the matching rows — needs manual reconciliation:`,
       err
     );
     return NextResponse.json(

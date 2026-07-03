@@ -95,14 +95,49 @@ when this env var isn't set — meaning OpenGraph/canonical URLs will
 resolve incorrectly (to localhost) if deployed without setting it. **Must
 be set in Vercel's environment variables at deploy time.**
 
-## Initiation Ritual not built — approval grants Level I directly (`v0.2`)
+## Initiation Ritual: 4 of 5 steps need content/features that don't exist (`v0.3`)
 
-`PRODUCT.md` §1 Stage 2 specifies a mandatory 5-step ritual between
-approval and receiving Level I. Not built — approving an application in
-`app/api/admin/applications/[id]/route.ts` grants Level I + `active`
-status immediately, no gate. Deliberate `v0.2` scope simplification (see
-`DECISIONS.md`, 2026-07-02), expected to land in `v0.3` once the Hall UI
-exists to host the ritual steps.
+`PRODUCT.md` §1 Stage 2's 5-step ritual is now real infrastructure
+(`/ritual`, `lib/auth/ritual.ts`, gates the Hall) — but only step 1
+(complete profile) is actually actionable. Steps 2 (Code of Conduct), 3
+(Lord Obsidian's intro material), and 5 (safety/respect rules) need real
+policy/narrative content **Max hasn't written anywhere** in the source
+doc package; step 4 (newcomers' room) needs Rooms (`v0.4`). All four
+render as honest "pending" states, never faked complete. See
+`DECISIONS.md` (2026-07-02) and
+[ADR-0013](docs/ADR/0013-initiation-ritual-step4-deferred.md). **Needs
+Max to provide the actual Code of Conduct / Lord Obsidian's introduction
+/ safety guidelines text** before steps 2/3/5 can become real.
+
+## "Steady activity" / "high activity" have no defined metric
+
+`PRODUCT.md` §2's Level II/III requirements reference activity levels
+that aren't quantified anywhere. `lib/rating/level-progress.ts` shows
+these as plain requirement text with no computed checkmark (see
+`DECISIONS.md`, 2026-07-02) — there's currently no way to build a real
+one without Max defining what "steady"/"high" activity actually means
+(message count? login frequency? something else?).
+
+## Referral lifecycle is one-way (`pending`→`joined` only)
+
+`Referral.status` supports `pending`/`joined`/`active`/`problem`/`removed`
+(`ARCHITECTURE.md` §3), but the approval flow only ever sets `joined` —
+nothing transitions a referral to `active` (what makes an invitee
+"active" vs. just "joined"?), and nothing handles `problem`/`removed`
+(triggered when an invitee is warned/removed — the Trust Score impact
+`PRODUCT.md` §6 describes isn't wired to anything yet). Needs the rating
+engine (`v0.5`) to have real trigger points for these transitions.
+
+## Notifications have no "mark as read" affordance
+
+`Notification.isRead` exists and is displayed on `/hall`, but nothing
+ever sets it to `true` — there's no read/unread interaction yet.
+
+## Username collisions surface a generic error, no alternative suggestion
+
+`PATCH /api/profile` returns `409` on a taken username with no "try
+`name-2` instead" affordance — acceptable for a first pass, worth
+revisiting once profile editing gets real usage.
 
 ## `(auth)/apply/` folder purpose is unclear
 

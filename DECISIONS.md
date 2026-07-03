@@ -191,3 +191,52 @@ decision to drop the ritual from the product — it's expected to land when
 `v0.3`'s Hall UI exists to host it. Flagged explicitly rather than left
 as a silent gap; see `TECH_DEBT.md` and `docs/UX.md`'s implementation
 status table.
+
+### 2026-07-02 — `v0.3` (The Hall) started; moved Next→Now on Max's "продолжай"
+
+Per `BACKLOG.md`'s own rule ("items only move between Now/Next/Later with
+Max's approval"), starting `v0.3` work required that approval — given via
+Max's plain "continue" after this session reported `v0.2` complete and
+asked whether to proceed. Logged explicitly so the rule's application is
+traceable, not just followed silently.
+
+### 2026-07-02 — Initiation Ritual steps 2/3/5 also deferred, not just step 4
+
+Building the real `v0.3` ritual surfaced that step 4
+([ADR-0013](docs/ADR/0013-initiation-ritual-step4-deferred.md)) wasn't
+the only step with no real content behind it — steps 2 (Code of Conduct),
+3 (Lord Obsidian's introduction), and 5 (safety/respect rules) all need
+actual policy or narrative text that doesn't exist in any of the six
+source documents. Writing that content myself would mean inventing real
+community-conduct rules for an adult platform — flagged to Max rather
+than guessed at. **Max chose**: build the framework and a fully real
+step 1 (profile completion, computed live from actual data, not a
+self-reported checkbox), and show steps 2/3/4/5 as honest "pending
+content" placeholders — no fake "I agree" checkboxes for policy text
+nobody has written. Ritual completion is satisfied once every step is
+either genuinely done or explicitly deferred (same pattern
+[ADR-0013](docs/ADR/0013-initiation-ritual-step4-deferred.md) already
+established for step 4).
+
+### 2026-07-02 — Real referral resolution wired into the approval flow
+
+`PRODUCT.md` §6's "Trust Chain" was documented (`docs/UX.md`) but never
+actually implemented — the Waitlist form's `referralCode` field was
+free text with no connection to a real inviting member. `v0.3` resolves
+it for real: on approval, if the applicant's entered code matches an
+existing member's actual `referralCode`, a `Referral` row is created
+(`status: joined`) and the inviter's `referralCount` increments. No
+schema change needed — the `Referral` model already existed, unused,
+from the original Week 1 schema pass.
+
+### 2026-07-02 — Progress-to-next-level shows no fabricated activity metrics
+
+`PRODUCT.md` §2's Level II/III requirements mix quantified criteria
+(reputation stars) with unquantified ones ("steady activity," "high
+activity," "content or event contribution" — no source doc defines how
+to measure these). `lib/rating/level-progress.ts` computes real
+checkmarks only for the quantified criteria; unquantified ones render as
+plain requirement text with no invented progress number or fake
+checkmark. Consistent with the same principle behind the ritual-content
+decision above: real data or an honest "not tracked," never a
+fabricated metric.

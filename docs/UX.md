@@ -11,9 +11,9 @@
 |---|---|
 | Stage 0 — pre-platform warm-up, Landing, waitlist | ✅ Built (`v0.1`) |
 | Stage 1 — Application review (approve/decline) | ✅ Built (`v0.2`, admin panel v1) — see [API/admin.md](API/admin.md) |
-| Stage 2 — Initiation ritual | ⚠️ **Simplified in `v0.2`**: approval grants Level I + active status directly. The actual 5-step ritual below isn't built/enforced yet — see [TECH_DEBT.md](../TECH_DEBT.md) |
-| Stage 3 — Progression (levels, reputation, rating) | ❌ Not built |
-| Stage 4 — Elite tiers (Mentor/Master/Council) | ❌ Not built |
+| Stage 2 — Initiation ritual | ⚠️ **Framework built in `v0.3`, mostly deferred**: step 1 (complete profile) is real and gates the Hall; steps 2/3/5 need Code of Conduct / Lord Obsidian's intro / safety-rules content Max hasn't written yet, step 4 needs Rooms (`v0.4`) — all three shown honestly as "pending," not faked complete. See [ADR-0013](ADR/0013-initiation-ritual-step4-deferred.md) |
+| Stage 3 — Progression (levels, reputation, rating) | ⚠️ **Partially built in `v0.3`**: real progress-to-next-level display (`/hall`) for Levels I→II and II→III using the criteria `PRODUCT.md` §2 actually quantifies (reputation, referral count); nothing computes reputation/rating itself yet (no reviews, no rating engine — that's `v0.5`) |
+| Stage 4 — Elite tiers (Mentor/Master/Council) | ❌ Not built — `PRODUCT.md` §2 says these are appointed, not earned; `getLevelProgress()` reflects that (no fabricated checklist past Level III) |
 | Stage 5 — Purge (periodic membership review) | ❌ Not built |
 
 ## The full user journey

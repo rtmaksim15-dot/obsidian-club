@@ -25,11 +25,16 @@ unilaterally.
       `TECH_DEBT.md`)
 - [ ] Once Supabase is live: set at least one real `User.isAdmin = true`
       directly in the database (no admin-granting UI exists yet)
+- [ ] **Max to provide real content** for Initiation Ritual steps 2/3/5:
+      Code of Conduct text, Lord Obsidian's introductory material,
+      safety/respect guidelines (see `TECH_DEBT.md`) — blocks the ritual
+      from being real, not just technical wiring
 
 ## Next
 
-*`v0.2` is functionally complete (code-wise) — verification blocked on
-the same Supabase/Resend/Uploadthing accounts listed in "Now" above.*
+*`v0.2` and `v0.3` are functionally complete (code-wise) — verification
+blocked on the same Supabase/Resend/Uploadthing accounts listed in "Now"
+above.*
 
 ### v0.2 — Authentication ✅ (built 2026-07-02, unverified end-to-end)
 
@@ -51,19 +56,34 @@ the same Supabase/Resend/Uploadthing accounts listed in "Now" above.*
       `TECH_DEBT.md`.
 - [x] Hall (`/hall`) route — minimal status view; full UI is `v0.3`.
 
+### v0.3 — The Hall ✅ (built 2026-07-02/03, unverified end-to-end)
+
+(Source: `ROADMAP.md`, August Weeks 3–4)
+
+- [x] Full Hall UI — avatar, level, reputation/rating/influence/Trust
+      Score, real data throughout.
+- [x] Progress-to-next-level — real criteria for Levels I→II/II→III;
+      Mentor+ correctly shown as appointed, not earned (`PRODUCT.md` §2).
+- [x] Referral link generation + stats — **and real resolution wired
+      into approval** (creates `Referral` rows, increments
+      `referralCount` — this mechanic existed in the schema since Week 1
+      but was never actually connected until now).
+- [x] Basic notifications — real `Notification` rows, created on
+      approval, shown on `/hall`.
+- [x] Mobile bottom navigation (`DESIGN.md` §8) — plus "coming soon"
+      placeholders for Rooms/Content/Events so the nav doesn't dead-end
+      before those versions ship.
+- [x] Initiation Ritual — framework + a fully real step 1; **steps 2/3/5
+      need Max to write actual content** (Code of Conduct, Lord
+      Obsidian's intro, safety rules), step 4 needs Rooms (`v0.4`). See
+      "Now" above and `TECH_DEBT.md`.
+- [x] Profile self-edit — `/profile/[id]/edit`, self-only, moved avatar
+      upload here from `/hall`.
+
 ## Later
 
 *Intentionally postponed — approved direction, not yet scheduled in
 detail. Derived from `ROADMAP.md`'s existing Stage 2 plan.*
-
-### v0.3 — User Profile / The Hall
-
-(Source: `ROADMAP.md`, August Weeks 3–4) — full Hall UI (avatar, level,
-reputation, rating), progress-to-next-level tracking, referral link
-generation, basic notifications, mobile bottom navigation, **the actual
-5-step Initiation Ritual** (deferred from `v0.2`, see `TECH_DEBT.md`),
-and a real profile self-edit flow (username, bio — currently
-auto-generated on approval, see `TECH_DEBT.md`).
 
 ### v0.4 — Community / Rooms
 

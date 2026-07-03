@@ -6,7 +6,7 @@
 > If you find a mismatch that ISN'T explained by a linked ADR, that's a
 > conflict: stop and flag it (see [docs/README.md](README.md)).
 
-Current version: **v0.2.0** (Authentication). `package.json`'s `version`
+Current version: **v0.3.0** (The Hall). `package.json`'s `version`
 field is the single source of truth for the current version number.
 
 ## Stack (as actually installed)
@@ -40,36 +40,44 @@ obsidian-club/
 │   │   ├── page.tsx                     # the public Landing page
 │   │   └── opengraph-image.tsx          # generated social share image
 │   ├── (platform)/
-│   │   ├── hall/page.tsx                # minimal status view (v0.2; full UI is v0.3)
-│   │   ├── profile/[id]/page.tsx        # minimal profile view (v0.2; tabs are v0.3)
+│   │   ├── layout.tsx                   # bottom nav (DESIGN.md §8), mobile only
+│   │   ├── hall/page.tsx                # status, progress, referrals, notifications
+│   │   ├── ritual/page.tsx              # Initiation Ritual (v0.3, see ADR-0013)
+│   │   ├── profile/[id]/page.tsx        # profile view (no tabs yet)
+│   │   ├── profile/[id]/edit/page.tsx   # self-edit only
 │   │   ├── admin/applications/page.tsx  # admin panel v1 — approve/decline
-│   │   └── rooms|events|content|marketplace|progress/  # empty — v0.3+
+│   │   ├── rooms|content|events/page.tsx  # "coming soon" placeholders (v0.4/v0.6/v0.7 build the real thing)
+│   │   └── marketplace|progress/        # still empty — later versions
 │   ├── api/
 │   │   ├── waitlist/route.ts
 │   │   ├── admin/applications/route.ts, [id]/route.ts
+│   │   ├── profile/route.ts             # self-edit only, see API/profile.md
 │   │   └── uploadthing/core.ts, route.ts
 │   ├── icons/icon-192.png/route.tsx, icon-512.png/route.tsx
 │   ├── layout.tsx                       # fonts, metadata, Analytics
 │   └── globals.css                      # full DESIGN.md token system
 ├── components/
 │   ├── ui/Logo.tsx                      # OC monogram (placeholder, see TECH_DEBT)
-│   └── shared/WaitlistForm.tsx, Reveal.tsx, ApplicationsQueue.tsx, AvatarUploadButton.tsx
+│   └── shared/WaitlistForm.tsx, Reveal.tsx, ApplicationsQueue.tsx,
+│       AvatarUploadButton.tsx, BottomNav.tsx, ComingSoon.tsx, ProfileEditForm.tsx
 ├── lib/
 │   ├── auth/
 │   │   ├── supabase-browser.ts          # Client Component Supabase client
 │   │   ├── supabase-server.ts           # Server Component / Route Handler client
 │   │   ├── supabase-admin.ts            # service-role client — server-only
 │   │   ├── session.ts                   # getCurrentUser()
-│   │   └── require-admin.ts             # requireAdmin()
+│   │   ├── require-admin.ts             # requireAdmin()
+│   │   └── ritual.ts                    # getRitualStatus() — real, computed, see ADR-0013
+│   ├── rating/level-progress.ts         # getLevelProgress() — real criteria only, no fabricated metrics
 │   ├── db/prisma.ts
-│   └── utils/email.ts, ogIcon.tsx, codes.ts, uploadthing.ts
+│   └── utils/email.ts, ogIcon.tsx, codes.ts, uploadthing.ts, achievements.ts
 ├── prisma/schema.prisma
 └── docs/, CHANGELOG.md, DECISIONS.md, TECH_DEBT.md, BACKLOG.md
 ```
 
 `components/hall/`, `components/rooms/`, `components/profile/`,
-`components/events/`, `lib/rating/`, `lib/referral/` still exist as empty
-directories, reserved for `v0.3+`.
+`components/events/`, `lib/referral/` still exist as empty directories,
+reserved for later versions. `lib/rating/` is no longer empty (see above).
 
 ## Data model (actual, `prisma/schema.prisma`)
 
@@ -99,6 +107,7 @@ in `.env.local` is a placeholder. See [TECH_DEBT.md](../TECH_DEBT.md).
 - `POST /api/waitlist` — see [API/waitlist.md](API/waitlist.md).
 - `GET /api/admin/applications`, `PATCH /api/admin/applications/:id` —
   see [API/admin.md](API/admin.md).
+- `PATCH /api/profile` — see [API/profile.md](API/profile.md).
 - `GET/POST /api/uploadthing` — uploadthing's generated handler, not
   independently documented (framework-owned).
 
@@ -109,13 +118,35 @@ Conventions: [API/README.md](API/README.md)
 
 `middleware.ts` refreshes the Supabase session on every request and
 redirects unauthenticated visitors away from `/hall`, `/rooms`,
-`/profile`, `/events`, `/content`, `/marketplace`, `/progress`, and
-`/admin` (page routes only — **not** `/api/admin/*`, which must and does
-call `requireAdmin()` itself; see
+`/profile`, `/events`, `/content`, `/marketplace`, `/progress`, `/ritual`,
+and `/admin` (page routes only — **not** `/api/admin/*` or `/api/profile`,
+which must and do call `getCurrentUser()`/`requireAdmin()` themselves; see
 [API/README.md](API/README.md#auth-v02)). Both `middleware.ts` and
 `lib/auth/session.ts` degrade to "not logged in" rather than crashing
 when Supabase isn't configured — see the near-miss recorded in
-`DECISIONS.md` (2026-07-02).
+`DECISIONS.md` (2026-07-02). `/ritual` was initially missed from
+`PROTECTED_PREFIXES` (caught the same day, before it mattered) — its page
+component had its own auth check regardless, so this was a
+defense-in-depth gap, not an actual hole.
+
+## Initiation Ritual & the Hall (actual, `v0.3`)
+
+`lib/auth/ritual.ts#getRitualStatus()` computes ritual completion from
+real data — step 1 (complete profile) is derived live from
+`User.bio`/`avatarUrl`, never a self-reported flag. Steps 2/3/5 (Code of
+Conduct, Lord Obsidian's intro material, safety rules) and step 4
+(newcomers' room) all start `"deferred"` at account creation — there is
+no real content or Rooms feature to back them yet, and nothing here fakes
+that there is. See [ADR-0013](ADR/0013-initiation-ritual-step4-deferred.md)
+(step 4's rationale extends to steps 2/3/5 — same underlying problem,
+same resolution, confirmed with Max 2026-07-02).
+
+`lib/rating/level-progress.ts#getLevelProgress()` shows real
+progress-to-next-level criteria (reputation stars, referral count) with
+real checkmarks; `PRODUCT.md`'s unquantified criteria ("steady activity,"
+"high activity," "content or event contribution") are shown as
+requirements with no fabricated progress number, since no source doc
+defines how to measure them yet.
 
 ## Deployment status
 
