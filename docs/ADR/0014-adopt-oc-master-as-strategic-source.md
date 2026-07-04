@@ -135,3 +135,22 @@ eventually do and *how members initially get in*.
 - Revisit if Max provides a newer, dated document that itself claims to
   be "the single source of truth" — same pattern as this one, handle
   the same way (stop, compare, ask, don't guess).
+
+## 2026-07-04 clarification — Lineage B was never a competing spec
+
+Max clarified directly: Lineages A/B's satellite documents (`TZ v1`,
+`Codex`, `Master v2.docx`, `UserJourney Onboarding`, and the other
+brand/narrative PDFs in the folder) are **idea-processing drafts** —
+raw brainstorming, not documents that were ever meant to compete for
+authority the way this ADR's "three lineages" framing implied.
+`OC_MASTER.md` + the revised `CLAUDE.md` are the **deliberate output**
+of a working session between Max and Claude (the strategic-planning
+counterpart, distinct from Claude Code) specifically to produce
+instructions for Claude Code — i.e., for this repo. This doesn't change
+the decision above (`OC_MASTER.md` authoritative, existing build kept),
+but it simplifies the mental model: there's one instruction set, not a
+contest between two. The open question about reusing `Obsidian
+Codex.docx`'s actual prose (Code of Conduct text) for the Initiation
+Ritual is unaffected by this and remains genuinely open — good writing
+salvaged from a brainstorming draft is a different question from
+whether the draft's system design is canon.

@@ -330,3 +330,16 @@ text itself doesn't depend on Lineage B's Circle/Warden hierarchy or
 purchase-verification model, but it was authored as part of that
 now-superseded package, so reusing it is a distinct question from
 adopting the system it shipped alongside.
+
+### 2026-07-04 — Clarification: the other drafts were idea-processing, not a competing spec
+
+Max clarified directly: `TZ v1`, `Codex`, `Master v2.docx`,
+`UserJourney Onboarding`, and the other brand/narrative PDFs in the
+iCloud folder were brainstorming/idea-processing drafts — never
+intended to compete for authority. `OC_MASTER.md` + the revised
+`CLAUDE.md` are the deliberate output of a working session between Max
+and Claude (strategic planning) specifically to produce instructions
+for Claude Code. Doesn't change the decision above, simplifies the
+mental model going forward — see
+[ADR-0014](docs/ADR/0014-adopt-oc-master-as-strategic-source.md)'s
+2026-07-04 addendum.
