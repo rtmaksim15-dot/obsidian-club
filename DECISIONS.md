@@ -343,3 +343,44 @@ for Claude Code. Doesn't change the decision above, simplifies the
 mental model going forward — see
 [ADR-0014](docs/ADR/0014-adopt-oc-master-as-strategic-source.md)'s
 2026-07-04 addendum.
+
+### 2026-07-04 — `v0.6` (Content & Achievements) started on Max's "продолжай"
+
+Same precedent as `v0.3`-`v0.5`. Confirmed this scope isn't superseded
+by the `OC_MASTER.md` pivot — its Phase 1 "App MVP" priority explicitly
+includes a feed. Re-read `PRODUCT.md` §7-§10, §13 directly before
+building rather than relying on memory from earlier in the session,
+since this is Lineage A content (still valid) that needed precise
+numbers (content-creation rights by level, achievement names) — found
+one thing worth correcting: articles are Mentor+(4)/Master+(5)/Council
+only, not "Level II+" as loosely paraphrased in `docs/UX.md` earlier.
+Also surfaced a real, previously-unnoticed gap: `getLevelProgress()`
+(`v0.3`) only ever *displayed* progress toward the next level — nothing
+actually promoted a member's `User.level` when criteria were met. Fixed
+as part of this version.
+
+### 2026-07-04 — `v0.6` shipped: two implementation choices worth recording
+
+1. **Rating engine's `content` component (`ARCHITECTURE.md` §5) is now
+   real**, having been an honest zero through `v0.4`. Counted only
+   curated types (`article`/`lecture`/`course`/`manifesto`), deliberately
+   excluding plain `post`/`story` — those already feed the `activity`
+   component's post count, and double-counting the same post under both
+   buckets would have inflated rating for ordinary feed activity beyond
+   what `ARCHITECTURE.md` §5's weight split intends. 2 points per
+   curated piece, capped at the documented 5-point weight, is this
+   session's default (source doc names the bucket, not the curve) — same
+   pattern as `activity`/`achievements`/`referralQuality` already are.
+2. **`checkLevelUp()` only promotes on real criteria** (reputation,
+   referral count, has-published-content) and silently skips "steady/
+   high activity" rather than blocking promotion on it — since no source
+   doc quantifies that criterion (see `TECH_DEBT.md`, pre-existing gap).
+   This means a member can be auto-promoted without literally satisfying
+   every documented requirement. Judged the lesser risk versus the
+   alternative (nobody ever gets auto-promoted, since an unmeasurable
+   criterion could never evaluate to `true`) — flagged, not hidden.
+
+Also caught in this pass: root `README.md`'s "Current version" line had
+been stuck at `v0.1.0` since the very first version — never updated
+across `v0.2`-`v0.5`'s doc-sync steps. Fixed to `v0.6.0`; worth a beat of
+attention in future version-close-out passes.

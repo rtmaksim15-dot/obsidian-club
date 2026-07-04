@@ -139,6 +139,8 @@ model User {
   ratingHistory     RatingHistory[]
   notifications     Notification[]
   marketplaceItems  MarketplaceItem[]
+  likes             Like[]
+  comments          Comment[]
 
   @@map("users")
 }
@@ -215,10 +217,44 @@ model Post {
   createdAt   DateTime  @default(now()) @map("created_at")
   publishedAt DateTime? @map("published_at")
 
-  author User @relation(fields: [authorId], references: [id])
+  author   User      @relation(fields: [authorId], references: [id])
+  likes    Like[]
+  comments Comment[]
 
   @@index([authorId])
   @@map("posts")
+}
+
+// Additive beyond ARCHITECTURE.md's originally-documented Post-adjacent
+// tables — needed for real like/comment tracking (v0.6). likesCount on
+// Post stays as a cached counter, kept in sync on like/unlike; comment
+// counts are computed via Prisma's _count at query time instead of a
+// second cache.
+model Like {
+  postId    String   @map("post_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([postId, userId])
+  @@map("likes")
+}
+
+model Comment {
+  id        String   @id @default(uuid()) @db.Uuid
+  postId    String   @map("post_id") @db.Uuid
+  authorId  String   @map("author_id") @db.Uuid
+  content   String
+  isDeleted Boolean  @default(false) @map("is_deleted")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id])
+
+  @@index([postId])
+  @@map("comments")
 }
 
 // ============================================================

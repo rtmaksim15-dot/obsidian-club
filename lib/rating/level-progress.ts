@@ -23,12 +23,17 @@ const LEVEL_NAMES: Record<number, string> = {
 /**
  * Progress toward the next level, per PRODUCT.md §2's documented
  * requirements. Only criteria with a real, trackable metric get a
- * true/false checkmark (reputation, referral count) — "steady activity" /
- * "high activity" / "content or event contribution" aren't quantified
- * anywhere in the source docs, so they're shown as requirements, not
- * fabricated as computed checkmarks (met: null).
+ * true/false checkmark (reputation, referral count, and — as of v0.6 —
+ * has-published-content). "Steady activity" / "high activity" aren't
+ * quantified anywhere in the source docs, so they're shown as
+ * requirements, not fabricated as computed checkmarks (met: null). See
+ * `lib/rating/level-progression.ts#checkLevelUp` for the promotion logic
+ * that acts on the real criteria.
  */
-export function getLevelProgress(user: User): LevelProgress {
+export function getLevelProgress(
+  user: User,
+  opts: { hasPublishedContent?: boolean } = {},
+): LevelProgress {
   const reputation = Number(user.reputation);
 
   if (user.level === 1) {
@@ -50,7 +55,14 @@ export function getLevelProgress(user: User): LevelProgress {
       criteria: [
         { label: "High activity", met: null },
         { label: "Reputation 3+ stars", met: reputation >= 3 },
-        { label: "Contribution to content or events", met: null },
+        {
+          // Only the "content" half of "content or events" is trackable
+          // (no event-attendance data exists yet) — a real `true` when
+          // they've published, `null` (unknown, not `false`) otherwise,
+          // since they could still qualify via events we can't see.
+          label: "Contribution to content or events",
+          met: opts.hasPublishedContent === true ? true : null,
+        },
       ],
     };
   }

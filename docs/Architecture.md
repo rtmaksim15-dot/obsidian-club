@@ -6,7 +6,7 @@
 > If you find a mismatch that ISN'T explained by a linked ADR, that's a
 > conflict: stop and flag it (see [docs/README.md](README.md)).
 
-Current version: **v0.5.0** (Reputation). `package.json`'s
+Current version: **v0.6.0** (Content & Achievements). `package.json`'s
 `version` field is the single source of truth for the current version
 number.
 
@@ -49,7 +49,8 @@ obsidian-club/
 │   │   ├── admin/applications/page.tsx  # admin panel v1 — approve/decline
 │   │   ├── rooms/page.tsx               # real room list, locked rooms shown per DESIGN.md
 │   │   ├── rooms/[slug]/page.tsx        # room chat — real-time via Supabase Realtime
-│   │   ├── content|events/page.tsx      # "coming soon" placeholders (v0.6/v0.7 build the real thing)
+│   │   ├── content/page.tsx             # real feed + library (v0.6, see below)
+│   │   ├── events/page.tsx              # "coming soon" placeholder (v0.7 builds the real thing)
 │   │   └── marketplace|progress/        # still empty — later versions
 │   ├── api/
 │   │   ├── waitlist/route.ts
@@ -57,6 +58,7 @@ obsidian-club/
 │   │   ├── admin/rooms/route.ts         # admin creates thematic rooms — see docs/API/rooms.md
 │   │   ├── profile/route.ts             # self-edit only, see API/profile.md
 │   │   ├── rooms/route.ts, [slug]/route.ts, [slug]/messages/route.ts
+│   │   ├── posts/route.ts, [id]/route.ts, [id]/like/route.ts  # see API/posts.md
 │   │   ├── users/[id]/review/route.ts   # peer reviews, see API/reviews.md
 │   │   └── uploadthing/core.ts, route.ts
 │   ├── icons/icon-192.png/route.tsx, icon-512.png/route.tsx
@@ -66,7 +68,7 @@ obsidian-club/
 │   ├── ui/Logo.tsx                      # OC monogram (placeholder, see TECH_DEBT)
 │   └── shared/WaitlistForm.tsx, Reveal.tsx, ApplicationsQueue.tsx,
 │       AvatarUploadButton.tsx, BottomNav.tsx, ComingSoon.tsx, ProfileEditForm.tsx,
-│       RoomChat.tsx, ReviewForm.tsx
+│       RoomChat.tsx, ReviewForm.tsx, ContentComposer.tsx, LikeButton.tsx
 ├── lib/
 │   ├── auth/
 │   │   ├── supabase-browser.ts          # Client Component Supabase client
@@ -76,7 +78,9 @@ obsidian-club/
 │   │   ├── require-admin.ts             # requireAdmin()
 │   │   └── ritual.ts                    # getRitualStatus() — real, computed, see ADR-0013
 │   ├── rating/level-progress.ts         # getLevelProgress() — real criteria only, no fabricated metrics
+│   ├── rating/level-progression.ts      # checkLevelUp() — real I→II/II→III auto-promotion (v0.6)
 │   ├── rating/room-access.ts            # canAccessRoom() — level gate + newcomers' 30-day window
+│   ├── rating/content-rights.ts         # canCreatePostType() — PRODUCT.md §10's exact table (v0.6)
 │   ├── rating/rating-engine.ts          # recalculateRating() — ARCHITECTURE.md §5's weighted formula
 │   ├── rating/referral-lifecycle.ts     # syncReferralLifecycle() — joined→active, +10 Trust Score
 │   ├── db/prisma.ts
@@ -94,7 +98,8 @@ reserved for later versions. `lib/rating/` is no longer empty (see above).
 All 13 models from the original spec exist: `User`, `UserProfile`, `Room`,
 `Message`, `Post`, `Event`, `EventAttendee`, `Review`, `Referral`,
 `Achievement`, `UserAchievement`, `RatingHistory`, `MarketplaceItem`,
-`Notification`, plus `Waitlist`.
+`Notification`, plus `Waitlist`, plus two added in `v0.6`: `Like`,
+`Comment`.
 
 **Deviations from `ARCHITECTURE.md` §3/§10** (all documented, none
 silent):
@@ -103,6 +108,12 @@ silent):
 - `Waitlist` has status tracking (`status`, `reviewedAt`, `reviewedBy`) —
   see [ADR-0012](ADR/0012-waitlist-status-tracking.md).
 - `User` has `isAdmin` — see [ADR-0011](ADR/0011-isadmin-field.md).
+- `Like`/`Comment` models (`v0.6`) — `ARCHITECTURE.md`'s original `Post`
+  table only had a cached `likesCount` integer, no join table for who
+  liked what and no comment storage at all. Needed for real
+  like-toggling and comment counts once the content feed became real.
+  `Comment` exists in the schema (with `isDeleted` for soft-delete) but
+  has no API routes yet — see [TECH_DEBT.md](../TECH_DEBT.md).
 
 `User.id` is expected to match the corresponding Supabase
 `auth.users.id` exactly (same UUID) — enforced by application code at
@@ -125,6 +136,8 @@ below.
 - `GET /api/rooms`, `GET /api/rooms/:slug`, `GET/POST
   /api/rooms/:slug/messages`, `POST /api/admin/rooms` — see
   [API/rooms.md](API/rooms.md).
+- `GET/POST /api/posts`, `GET/PATCH/DELETE /api/posts/:id`, `POST
+  /api/posts/:id/like` — see [API/posts.md](API/posts.md).
 - `POST /api/users/:id/review` — see [API/reviews.md](API/reviews.md).
 - `GET/POST /api/uploadthing` — uploadthing's generated handler, not
   independently documented (framework-owned).
@@ -193,7 +206,7 @@ at real community content for an adult platform. `POST /api/admin/rooms`
 exists so admins can create thematic rooms with real topics as needed.
 See `DECISIONS.md`, 2026-07-03.
 
-## Rating engine (actual, `v0.5`)
+## Rating engine (actual, `v0.5`/`v0.6`)
 
 `lib/rating/rating-engine.ts#recalculateRating()` implements
 `ARCHITECTURE.md` §5's weighted formula exactly for the one
@@ -202,15 +215,19 @@ documented 30-point weight) and with **documented, reasonable defaults**
 for the others, since the source doc names what counts but not the exact
 curve:
 
-- `activity` (weight 20): `min(20, messageCount × 0.2 + postCount × 1)`.
+- `activity` (weight 20): `min(20, messageCount × 0.2 + postCount × 1)` —
+  counts *all* published posts/stories, regardless of type.
 - `achievements` (weight 15): sum of earned achievements'
   `ratingBonus`, capped at 15.
 - `referralQuality` (weight 20): sum of the inviter's `Referral.impactScore`
   values, capped at 20.
-- `events` (weight 10) and `content` (weight 5): **always 0** — no real
-  Events (`v0.7`) or content-creation (`v0.6`) feature exists yet to
-  measure them from. This is an honest zero, not the full weight and not
-  a fabricated partial score.
+- `content` (weight 5, real as of `v0.6`): `min(5, curatedCount × 2)`,
+  where `curatedCount` is published `article`/`lecture`/`course`/
+  `manifesto` posts only — deliberately disjoint from `activity`'s
+  post count so the same post isn't scored twice under two buckets.
+- `events` (weight 10): **still always 0** — no real Events feature
+  exists yet (`v0.7`) to measure it from. Honest zero, not the full
+  weight.
 
 Every recalculation logs its delta to `RatingHistory` (shown on
 `/hall`). Reputation itself (`User.reputation`, the 0-5 star value that
@@ -223,6 +240,51 @@ status (30+ days after the invitee joined) exactly as specified. The
 `-20`/`-50` deltas for invitee warnings/removals are **not implemented**
 — there's no member-warning or member-removal admin capability built
 yet to trigger them from (see [TECH_DEBT.md](../TECH_DEBT.md)).
+
+## Content & Achievements (actual, `v0.6`)
+
+`/content` (`app/(platform)/content/page.tsx`) replaces the "coming soon"
+placeholder with a real feed (posts/stories) and library
+(articles/lectures/courses/manifestos), both filtered server-side to
+`Post.minLevel <= viewer.level` — out-of-reach posts are excluded
+entirely, not shown locked (unlike Rooms; no source doc describes a
+"locked post" teaser to build toward).
+
+`lib/rating/content-rights.ts#canCreatePostType()` gates *creation*
+against `PRODUCT.md` §10's exact table (post/story: Level 1+; article:
+Mentor/4+; lecture, course: Master/5+; manifesto: admin-only, no member
+level grants it) — enforced server-side in `POST /api/posts`, not just
+hidden in `ContentComposer.tsx`'s type dropdown. Posts publish
+immediately on creation; no draft workflow is documented, so none was
+built. `Post.minLevel` (read-access gate) is set by the author at
+creation (default 1) and is independent of the creation-rights table —
+one controls who can *write* a type, the other who can *see* a specific
+post.
+
+Likes are a real `Like` join table (`POST /api/posts/:id/like`, toggles,
+keeps `Post.likesCount` in sync via transaction) — added this version
+alongside `Comment` (schema only; no comment API/UI yet, see
+[TECH_DEBT.md](../TECH_DEBT.md)).
+
+`lib/rating/level-progression.ts#checkLevelUp()` auto-promotes Level I→II
+and II→III, called opportunistically from the Hall page (same pattern as
+`syncReferralLifecycle`). It only gates on criteria with a real metric:
+reputation, referral count, and — new this version — has-published-content
+(replacing `getLevelProgress()`'s previous `met: null` for that
+criterion). `PRODUCT.md` §2's "steady activity"/"high activity" criteria
+still have no trackable metric anywhere in the source docs, so they
+can't gate promotion — a member could be blocked from a level they
+otherwise qualify for, or (more likely given the other checks) simply
+never gets promoted purely on volume of chat activity. See
+[TECH_DEBT.md](../TECH_DEBT.md).
+
+Two new achievements grant automatically: `level-up-2`/`level-up-3` (on
+promotion, from `checkLevelUp()`) and `first-post` (on a member's first
+published post, from `POST /api/posts`). `first-reputation-star` grants
+on a member's first received review (`POST /api/users/:id/review`).
+All four join `initiation-complete` (`v0.3`) in
+`lib/utils/achievements.ts#DEFINITIONS` — still a small, curated set per
+`PRODUCT.md` §7, not a general-purpose achievement framework.
 
 **No real cron/background job infrastructure exists.** Referral
 lifecycle transitions are checked opportunistically whenever the

@@ -11,6 +11,30 @@ const DEFINITIONS = {
     category: "personal" as const,
     ratingBonus: 0,
   },
+  "level-up-2": {
+    name: "Поднялся с Уровня I до II",
+    description: "Promoted from Initiate to Member.",
+    category: "personal" as const,
+    ratingBonus: 0,
+  },
+  "level-up-3": {
+    name: "Поднялся с Уровня II до III",
+    description: "Promoted from Member to Senior Member.",
+    category: "personal" as const,
+    ratingBonus: 0,
+  },
+  "first-reputation-star": {
+    name: "Первая звезда репутации",
+    description: "Received your first review.",
+    category: "personal" as const,
+    ratingBonus: 0,
+  },
+  "first-post": {
+    name: "Создал первый материал",
+    description: "Published your first piece of content.",
+    category: "personal" as const,
+    ratingBonus: 0,
+  },
 };
 
 /** Grants an achievement, creating its definition row on first use.

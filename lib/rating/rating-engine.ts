@@ -55,6 +55,23 @@ async function referralQualityComponent(userId: string): Promise<number> {
   return Math.min(WEIGHTS.referralQuality, Math.max(0, total));
 }
 
+async function contentComponent(userId: string): Promise<number> {
+  // Curated content only (article/lecture/course/manifesto), not plain
+  // posts/stories — those already feed `activityComponent`'s post count.
+  // Keeping the two disjoint avoids double-counting the same post under
+  // both buckets. 2 points per curated piece, capped at the 5-point
+  // weight, is this session's documented default (ARCHITECTURE.md §5
+  // names the "content" bucket but not its curve) — not literal spec.
+  const count = await prisma.post.count({
+    where: {
+      authorId: userId,
+      isPublished: true,
+      type: { in: ["article", "lecture", "course", "manifesto"] },
+    },
+  });
+  return Math.min(WEIGHTS.content, count * 2);
+}
+
 /** Recomputes and persists a member's rating, logging the delta to
  *  RatingHistory (PRODUCT.md's "История изменений рейтинга"). Call this
  *  after anything that could move the score: a new review, an
@@ -63,19 +80,18 @@ export async function recalculateRating(userId: string, reason: string, source: 
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return;
 
-  const [activity, achievements, referralQuality] = await Promise.all([
+  const [activity, achievements, referralQuality, content] = await Promise.all([
     activityComponent(userId),
     achievementsComponent(userId),
     referralQualityComponent(userId),
+    contentComponent(userId),
   ]);
   const reputation = await reputationComponent(userId, Number(user.reputation));
 
-  // events/content contribute 0 today — no real Events (v0.7) or
-  // content-creation (v0.6) feature exists yet to measure them from.
-  // WEIGHTS.events/WEIGHTS.content stay as documented max-caps for when
-  // those features land, not as unconditional additions.
+  // events still contributes 0 — no real Events feature exists yet
+  // (v0.7) to measure it from. content is real as of v0.6 (see
+  // contentComponent above).
   const events = 0;
-  const content = 0;
 
   const newRating = Math.round(reputation + activity + achievements + referralQuality + events + content);
 

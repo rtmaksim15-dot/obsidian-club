@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getRitualStatus } from "@/lib/auth/ritual";
 import { getLevelProgress } from "@/lib/rating/level-progress";
 import { syncReferralLifecycle } from "@/lib/rating/referral-lifecycle";
+import { checkLevelUp } from "@/lib/rating/level-progression";
 
 const LEVEL_NAMES: Record<number, string> = {
   1: "Initiate",
@@ -29,11 +30,13 @@ export default async function HallPage() {
   if (!ritual.complete) redirect("/ritual");
 
   // No real cron yet (see TECH_DEBT.md) — check referral lifecycle
-  // transitions opportunistically whenever the inviter loads their Hall.
+  // transitions and level-up eligibility opportunistically whenever a
+  // member loads their own Hall.
   await syncReferralLifecycle(user.id);
+  await checkLevelUp(user.id);
   user = (await prisma.user.findUnique({ where: { id: user.id } }))!;
 
-  const [notifications, referralCount, ratingHistory] = await Promise.all([
+  const [notifications, referralCount, ratingHistory, publishedContentCount] = await Promise.all([
     prisma.notification.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
@@ -45,9 +48,10 @@ export default async function HallPage() {
       orderBy: { createdAt: "desc" },
       take: 5,
     }),
+    prisma.post.count({ where: { authorId: user.id, isPublished: true } }),
   ]);
 
-  const progress = getLevelProgress(user);
+  const progress = getLevelProgress(user, { hasPublishedContent: publishedContentCount >= 1 });
   const referralLink = `${process.env.NEXT_PUBLIC_APP_URL || ""}/?ref=${user.referralCode}`;
 
   return (

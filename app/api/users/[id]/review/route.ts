@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import { recalculateRating } from "@/lib/rating/rating-engine";
+import { grantAchievement } from "@/lib/utils/achievements";
 
 type Body = { rating?: number; comment?: string; context?: string };
 
@@ -61,6 +62,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
     where: { id: reviewed.id },
     data: { reputation: avgReputation },
   });
+
+  if (visibleReviews.length === 1) {
+    await grantAchievement(reviewed.id, "first-reputation-star");
+  }
 
   await recalculateRating(reviewed.id, "Received a new review", "review");
 

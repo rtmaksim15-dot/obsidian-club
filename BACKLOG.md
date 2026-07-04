@@ -138,16 +138,38 @@ above.*
       newcomers' room's 30-day window could permanently lock a member
       out if they don't post in time — see `TECH_DEBT.md`.
 
+### v0.6 — Content & Achievements ✅ (built 2026-07-04, unverified end-to-end)
+
+(Source: `ROADMAP.md`, October Weeks 1–2). Confirmed by
+[ADR-0014](docs/ADR/0014-adopt-oc-master-as-strategic-source.md) as
+still-valid near-term scope — `OC_MASTER.md`'s Phase 1 "App MVP" includes
+a feed, so this wasn't superseded by the pivot.
+
+- [x] Content feed + library — `/content`, real feed (posts/stories) and
+      library (articles/lectures/courses/manifestos), level-gated reads.
+      See [API/posts.md](docs/API/posts.md).
+- [x] Creation rights by level — `lib/rating/content-rights.ts`,
+      `PRODUCT.md` §10's exact table, enforced server-side.
+- [x] Likes — real `Like` join table, toggle endpoint, `Post.likesCount`
+      kept in sync.
+- [x] Level auto-promotion (I→II, II→III) — `lib/rating/level-progression.ts#checkLevelUp()`,
+      real for the criteria that have a real metric; "steady/high
+      activity" still can't gate it (see `TECH_DEBT.md`).
+- [x] Achievements — `level-up-2`, `level-up-3`, `first-post`,
+      `first-reputation-star` added and wired to real triggers, joining
+      `initiation-complete` (`v0.3`).
+- [x] Rating engine's `content` component is real (was an honest zero
+      in `v0.5`) — curated content only, disjoint from `activity`'s post
+      count.
+- Not built: comment API/UI (`Comment` model exists, unused — see
+  `TECH_DEBT.md`), post media upload, draft/unpublish workflow, feed
+  pagination beyond 20, progressive (non-initiation) rituals/tasks —
+  `PRODUCT.md` doesn't specify what those are yet.
+
 ## Later
 
 *Intentionally postponed — approved direction, not yet scheduled in
 detail. Derived from `ROADMAP.md`'s existing Stage 2 plan.*
-
-### v0.6 — Content & Achievements
-
-(Source: `ROADMAP.md`, October Weeks 1–2) — content feed, member-created
-content by level, basic library, achievements system, rituals/tasks
-(initiation + progressive).
 
 ### v0.7 — Events & Marketplace
 

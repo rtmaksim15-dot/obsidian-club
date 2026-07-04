@@ -12,7 +12,7 @@
 | Stage 0 — pre-platform warm-up, Landing, waitlist | ✅ Built (`v0.1`) |
 | Stage 1 — Application review (approve/decline) | ✅ Built (`v0.2`, admin panel v1) — see [API/admin.md](API/admin.md) |
 | Stage 2 — Initiation ritual | ⚠️ **Steps 1 and 4 real (`v0.3`/`v0.5`)**: complete-profile and introduce-yourself-in-Newcomers are both checked against real data. Steps 2/3/5 still need Code of Conduct / Lord Obsidian's intro / safety-rules content Max hasn't written yet — shown honestly as "pending," not faked complete. See [ADR-0013](ADR/0013-initiation-ritual-step4-deferred.md) (includes a 2026-07-04 update on step 4 and a new deadlock risk it introduced — see [TECH_DEBT.md](../TECH_DEBT.md)) |
-| Stage 3 — Progression (levels, reputation, rating) | ✅ **Built in `v0.5`**: real reviews (`/profile/[id]`) drive reputation; the rating engine (`ARCHITECTURE.md` §5's weighted formula) computes overall rating and logs changes to `RatingHistory` (shown on `/hall`); Trust Score's `+10` referral-activation bonus is real. `events`/`content` rating components are honest zeros (those features don't exist yet); Trust Score's `-20`/`-50` deltas aren't wired (no member-warning/removal capability exists to trigger them). See [docs/Architecture.md](Architecture.md#rating-engine-actual-v05) |
+| Stage 3 — Progression (levels, reputation, rating) | ✅ **Built in `v0.5`/`v0.6`**: real reviews (`/profile/[id]`) drive reputation; the rating engine (`ARCHITECTURE.md` §5's weighted formula) computes overall rating and logs changes to `RatingHistory` (shown on `/hall`); Trust Score's `+10` referral-activation bonus is real. Level I→II and II→III auto-promotion is real as of `v0.6` (`lib/rating/level-progression.ts#checkLevelUp`), gated on the criteria that have a real metric (reputation, referral count, has-published-content); "steady/high activity" stay unmeasured (see `TECH_DEBT.md`). `events` rating component is still an honest zero; `content` isn't (see [docs/Architecture.md](Architecture.md#rating-engine-actual-v05)); Trust Score's `-20`/`-50` deltas aren't wired (no member-warning/removal capability exists to trigger them). |
 | Stage 4 — Elite tiers (Mentor/Master/Council) | ❌ Not built — `PRODUCT.md` §2 says these are appointed, not earned; `getLevelProgress()` reflects that (no fabricated checklist past Level III) |
 | Stage 5 — Purge (periodic membership review) | ❌ Not built |
 
@@ -104,10 +104,26 @@ thematic rooms as the community needs them (`POST /api/admin/rooms`).
 
 ## Content
 
-Types: stories, posts/articles, podcasts, lectures, manifestos, video,
-courses, a library (part free, part level-gated), internal club documents.
-Creation rights scale by level — see `PRODUCT.md` §10 for the full
-creator/rights table.
+✅ **Built in `v0.6`** — `/content`, real feed + library, `POST/GET/PATCH/DELETE
+/api/posts`. See [docs/Architecture.md](Architecture.md#content--achievements-actual-v06)
+and [API/posts.md](API/posts.md).
+
+Types: posts/stories (the ephemeral feed), articles, lectures, courses,
+manifestos (curated library types). Creation rights by level, per
+`PRODUCT.md` §10's exact table (previously mistranscribed in this file as
+"Level II+" for articles — corrected 2026-07-04, see `DECISIONS.md`):
+
+| Type | Minimum level to create |
+|---|---|
+| Post, Story | Level 1 (Initiate) |
+| Article | Mentor (Level 4)+ |
+| Lecture | Master (Level 5)+ |
+| Course | Master (Level 5)+ |
+| Manifesto | Admin only — no member level grants it |
+
+Types not built: podcasts, video. Read access is gated by `Post.minLevel`
+(set by the author at creation, default 1) — separate from the
+creation-rights table above, which gates who can *write* each type.
 
 ## Events
 

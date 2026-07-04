@@ -118,6 +118,26 @@ these as plain requirement text with no computed checkmark (see
 one without Max defining what "steady"/"high" activity actually means
 (message count? login frequency? something else?).
 
+**Consequence as of `v0.6`:** `lib/rating/level-progression.ts#checkLevelUp()`
+auto-promotes Level I→II/II→III but can only gate on the criteria that
+ARE real (reputation, referral count, has-published-content) — it
+silently skips the activity requirement rather than blocking promotion
+on an unmeasurable criterion. A member could get auto-promoted without
+ever satisfying "steady"/"high activity" in whatever sense Max meant.
+Same underlying gap, now with a real behavioral consequence instead of
+just a missing checkmark on a dashboard.
+
+## Level II→III "content or event contribution" only checks content
+
+`lib/rating/level-progress.ts`/`level-progression.ts` treat this
+criterion as satisfied by having published content; event participation
+isn't checked (no Events feature exists yet, `v0.7`). A member who only
+attends events won't show progress or get auto-promoted on that basis
+alone — the display correctly shows this as unknown (`null`), not
+`false`, but `checkLevelUp()` still can't promote them without published
+content. Revisit once Events (`v0.7`) exists and can contribute a real
+signal here.
+
 ## Referral lifecycle is one-way (`pending`→`joined` only)
 
 `Referral.status` supports `pending`/`joined`/`active`/`problem`/`removed`
@@ -274,6 +294,30 @@ Score bonus stays unapplied, until they do. Same underlying gap as
 Realtime's manual-enablement issue above: this app has no scheduled-job
 mechanism at all yet. Revisit once deployed to Vercel (Vercel Cron is
 the natural fit) or once Supabase's `pg_cron` becomes relevant.
+
+## Comment model exists but has no API/UI (`v0.6`)
+
+`Comment` was added to the schema alongside `Like` (real like-toggling
+needed a join table; comments were added at the same time since they're
+adjacent and equally absent from the original spec's data model) — but
+nothing can create or read a comment yet. `/content` shows a live
+`_count.comments` (always 0 today) with no way to change that. Needs its
+own pass: `POST/GET /api/posts/:id/comments`, a UI thread, and a decision
+on whether comments are level-gated like posts or open to anyone who can
+see the post.
+
+## Post media (`mediaUrls`) has no upload path
+
+`Post.mediaUrls` (a `Json` array) exists in the schema and is selected
+by the API, but nothing writes to it — `ContentComposer.tsx` is
+text-only. `PRODUCT.md`'s content types (photos, video) imply media is
+expected eventually; would reuse the existing `uploadthing` integration
+(already wired for avatars) rather than a new upload path.
+
+## Content feed has no pagination beyond "latest 20"
+
+Same shape of gap as Rooms' "latest 50 messages" — fine at zero real
+usage, needs cursor-based pagination before real content volume exists.
 
 ## Blocked on Max (accounts Claude cannot create)
 

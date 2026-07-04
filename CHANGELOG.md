@@ -8,7 +8,66 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.5.0` is the current released version.
+Nothing yet — `v0.6.0` is the current released version.
+
+## [0.6.0] — 2026-07-04
+
+Content & Achievements: a real content feed and library, level-gated
+creation rights, likes, level auto-promotion (I→II, II→III), and four
+new mechanically-real achievements.
+
+### Added
+
+- `GET/POST /api/posts`, `GET/PATCH/DELETE /api/posts/:id`, `POST
+  /api/posts/:id/like` (`docs/API/posts.md`) — the content feed and
+  library, replacing the `/content` "coming soon" placeholder.
+- `lib/rating/content-rights.ts#canCreatePostType()` — creation rights
+  by level per `PRODUCT.md` §10's exact table (post/story: Level 1+;
+  article: Mentor/4+; lecture, course: Master/5+; manifesto: admin-only).
+- `Like` model (real join table, toggled via the like endpoint,
+  `Post.likesCount` kept in sync) and `Comment` model (schema only — no
+  API/UI yet, see `TECH_DEBT.md`).
+- `/content` — real feed (posts/stories) + library
+  (articles/lectures/courses/manifestos) with a level filter, a
+  composer (`ContentComposer.tsx`, only shows types the caller can
+  create), and like buttons (`LikeButton.tsx`).
+- `lib/rating/level-progression.ts#checkLevelUp()` — real auto-promotion
+  for Level I→II and II→III, checked opportunistically on Hall load
+  (same pattern as `syncReferralLifecycle`). Gates only on criteria with
+  a real metric (reputation, referral count, has-published-content);
+  "steady/high activity" still can't gate it — see `TECH_DEBT.md`.
+- `lib/rating/level-progress.ts` — the Level II→III "content or event
+  contribution" criterion now shows a real `true` (was always `null`)
+  when the member has published content.
+- Four new achievements (`lib/utils/achievements.ts`): `level-up-2`,
+  `level-up-3` (on promotion), `first-post` (first published content),
+  `first-reputation-star` (first received review) — joining
+  `initiation-complete` (`v0.3`).
+- `lib/rating/rating-engine.ts`'s `content` component is now real (was
+  an honest zero) — curated content types only, capped at the
+  documented 5-point weight, disjoint from `activity`'s post count to
+  avoid double-counting.
+
+### Changed
+
+- `docs/UX.md` corrected: article creation requires Mentor(4)+, not
+  "Level II+" as previously (inaccurately) paraphrased.
+
+### Fixed
+
+- N/A.
+
+### Removed
+
+- N/A.
+
+### Known gaps / deliberate simplifications (see [TECH_DEBT.md](TECH_DEBT.md))
+
+No comment API/UI despite the `Comment` model existing; no post media
+upload (`mediaUrls` always empty); no draft/unpublish workflow (posts
+publish immediately); no feed pagination beyond 20; "steady/high
+activity" still has no defined metric, so `checkLevelUp()` silently
+skips it rather than blocking promotion on an unmeasurable criterion.
 
 ## [0.5.0] — 2026-07-04
 
