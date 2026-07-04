@@ -8,7 +8,60 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.3.0` is the current released version.
+Nothing yet — `v0.4.0` is the current released version.
+
+## [0.4.0] — 2026-07-03
+
+Community: real rooms, real-time chat, level-gated access, the
+newcomers' room's 30-day window, and the first local circles.
+
+### Added
+
+- `/rooms` — real room list (replaces the `v0.3` "coming soon"
+  placeholder), grouped by type, locked rooms shown with a lock icon
+  rather than hidden (`DESIGN.md`).
+- `/rooms/[slug]` — room chat: message history (oldest-first),
+  composer, live updates via Supabase Realtime
+  (`components/shared/RoomChat.tsx`).
+- `lib/rating/room-access.ts#canAccessRoom()` — server-side level gate
+  plus a real 30-day window for the newcomers' room (`PRODUCT.md` §1),
+  enforced on every room route, not just hidden in the UI.
+- `GET /api/rooms`, `GET /api/rooms/:slug`, `GET/POST
+  /api/rooms/:slug/messages`, `POST /api/admin/rooms` — see
+  [docs/API/rooms.md](docs/API/rooms.md).
+- `prisma/seed.ts` — seeds `general`, `newcomers`, and the 7 named
+  local circles (SF/LA/Miami/NY/Berlin/London/Tokyo, `CLAUDE.md` §7).
+  **No thematic rooms are seeded** — none are named in any source doc;
+  `POST /api/admin/rooms` exists so admins can create them with real
+  topics instead of this session guessing at community content. See
+  [DECISIONS.md](DECISIONS.md), 2026-07-03.
+
+### Changed
+
+- N/A.
+
+### Fixed
+
+- N/A.
+
+### Removed
+
+- The `v0.3` "coming soon" placeholder at `/rooms` (replaced by the
+  real page). `/content` and `/events` keep their placeholders until
+  `v0.6`/`v0.7`.
+
+### Known gaps / deliberate simplifications (see [TECH_DEBT.md](TECH_DEBT.md))
+
+Realtime chat updates require enabling Realtime on the `messages` table
+in the Supabase dashboard once the project exists (a manual step, not
+something a migration configures) — until then, messages still
+send/persist correctly, they just won't appear live for other members.
+No presence ("who's online"), no message pagination beyond the latest
+50, no message edit/delete, no rate limiting on posting. `RoomChat`
+re-fetches the message list on every new message rather than merging
+the Realtime payload (correct but wasteful at real scale). Not verified
+end-to-end — still blocked on Max provisioning Supabase (now also for
+Realtime specifically), Resend, and Uploadthing.
 
 ## [0.3.0] — 2026-07-03
 

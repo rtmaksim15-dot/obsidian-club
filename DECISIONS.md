@@ -240,3 +240,32 @@ plain requirement text with no invented progress number or fake
 checkmark. Consistent with the same principle behind the ritual-content
 decision above: real data or an honest "not tracked," never a
 fabricated metric.
+
+### 2026-07-03 — `v0.4` (Community / Rooms) started on Max's "продолжай"
+
+Same precedent as `v0.3`'s start: `BACKLOG.md`'s move-only-with-approval
+rule satisfied by Max's plain "continue" after `v0.3` was reported
+complete.
+
+### 2026-07-03 — Only structurally-documented rooms get seeded; no invented thematic topics
+
+`CLAUDE.md` §7 documents general rooms, thematic rooms, and named local
+circles (SF/LA/Miami/NY/Berlin/London/Tokyo) as categories — but only the
+local circles have concrete names anywhere in the source docs.
+"Thematic rooms" is never given specific topic names. Seeding invented
+thematic room topics (e.g. guessing at specific kink/practice categories
+for an adult community platform) would be the same category of problem
+as writing Initiation Ritual content myself — presuming real community
+content decisions that aren't mine to make.
+
+**Resolution:** `prisma/seed.ts` creates only what's explicitly named or
+structurally implied by the `RoomType` enum: one `general` room, one
+`newcomers` room, and the 7 named `local` circles. **No thematic rooms
+are seeded.** Room creation is added to the admin panel
+(`POST /api/admin/rooms`) so Max/admins can create thematic rooms with
+real topics as the community actually needs them — mechanism built,
+content left to a human. Didn't ask Max to confirm this one (unlike the
+ritual content gap) since it's a conservative default with no downside:
+building the creation mechanism and seeding nothing invented is strictly
+safer than guessing at topics, and normal admin discretion is exactly the
+kind of decision `docs/API/admin.md`-style tooling exists to enable.

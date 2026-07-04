@@ -6,8 +6,9 @@
 > If you find a mismatch that ISN'T explained by a linked ADR, that's a
 > conflict: stop and flag it (see [docs/README.md](README.md)).
 
-Current version: **v0.3.0** (The Hall). `package.json`'s `version`
-field is the single source of truth for the current version number.
+Current version: **v0.4.0** (Community / Rooms). `package.json`'s
+`version` field is the single source of truth for the current version
+number.
 
 ## Stack (as actually installed)
 
@@ -46,12 +47,16 @@ obsidian-club/
 │   │   ├── profile/[id]/page.tsx        # profile view (no tabs yet)
 │   │   ├── profile/[id]/edit/page.tsx   # self-edit only
 │   │   ├── admin/applications/page.tsx  # admin panel v1 — approve/decline
-│   │   ├── rooms|content|events/page.tsx  # "coming soon" placeholders (v0.4/v0.6/v0.7 build the real thing)
+│   │   ├── rooms/page.tsx               # real room list, locked rooms shown per DESIGN.md
+│   │   ├── rooms/[slug]/page.tsx        # room chat — real-time via Supabase Realtime
+│   │   ├── content|events/page.tsx      # "coming soon" placeholders (v0.6/v0.7 build the real thing)
 │   │   └── marketplace|progress/        # still empty — later versions
 │   ├── api/
 │   │   ├── waitlist/route.ts
 │   │   ├── admin/applications/route.ts, [id]/route.ts
+│   │   ├── admin/rooms/route.ts         # admin creates thematic rooms — see docs/API/rooms.md
 │   │   ├── profile/route.ts             # self-edit only, see API/profile.md
+│   │   ├── rooms/route.ts, [slug]/route.ts, [slug]/messages/route.ts
 │   │   └── uploadthing/core.ts, route.ts
 │   ├── icons/icon-192.png/route.tsx, icon-512.png/route.tsx
 │   ├── layout.tsx                       # fonts, metadata, Analytics
@@ -59,7 +64,8 @@ obsidian-club/
 ├── components/
 │   ├── ui/Logo.tsx                      # OC monogram (placeholder, see TECH_DEBT)
 │   └── shared/WaitlistForm.tsx, Reveal.tsx, ApplicationsQueue.tsx,
-│       AvatarUploadButton.tsx, BottomNav.tsx, ComingSoon.tsx, ProfileEditForm.tsx
+│       AvatarUploadButton.tsx, BottomNav.tsx, ComingSoon.tsx, ProfileEditForm.tsx,
+│       RoomChat.tsx
 ├── lib/
 │   ├── auth/
 │   │   ├── supabase-browser.ts          # Client Component Supabase client
@@ -69,9 +75,10 @@ obsidian-club/
 │   │   ├── require-admin.ts             # requireAdmin()
 │   │   └── ritual.ts                    # getRitualStatus() — real, computed, see ADR-0013
 │   ├── rating/level-progress.ts         # getLevelProgress() — real criteria only, no fabricated metrics
+│   ├── rating/room-access.ts            # canAccessRoom() — level gate + newcomers' 30-day window
 │   ├── db/prisma.ts
 │   └── utils/email.ts, ogIcon.tsx, codes.ts, uploadthing.ts, achievements.ts
-├── prisma/schema.prisma
+├── prisma/schema.prisma, seed.ts        # seeds only documented rooms — see DECISIONS.md 2026-07-03
 └── docs/, CHANGELOG.md, DECISIONS.md, TECH_DEBT.md, BACKLOG.md
 ```
 
@@ -101,6 +108,10 @@ database constraint. See [ADR-0010](ADR/0010-supabase-auth.md).
 
 No migrations have been run against a real database yet — `DATABASE_URL`
 in `.env.local` is a placeholder. See [TECH_DEBT.md](../TECH_DEBT.md).
+`prisma/seed.ts` seeds the `general`/`newcomers` rooms and the 7 named
+local circles once a real database exists (`npx prisma db seed`) —
+**no thematic rooms are seeded**, see [Rooms & real-time](#rooms--real-time-actual-v04)
+below.
 
 ## API (actual)
 
@@ -108,6 +119,9 @@ in `.env.local` is a placeholder. See [TECH_DEBT.md](../TECH_DEBT.md).
 - `GET /api/admin/applications`, `PATCH /api/admin/applications/:id` —
   see [API/admin.md](API/admin.md).
 - `PATCH /api/profile` — see [API/profile.md](API/profile.md).
+- `GET /api/rooms`, `GET /api/rooms/:slug`, `GET/POST
+  /api/rooms/:slug/messages`, `POST /api/admin/rooms` — see
+  [API/rooms.md](API/rooms.md).
 - `GET/POST /api/uploadthing` — uploadthing's generated handler, not
   independently documented (framework-owned).
 
@@ -147,6 +161,33 @@ real checkmarks; `PRODUCT.md`'s unquantified criteria ("steady activity,"
 "high activity," "content or event contribution") are shown as
 requirements with no fabricated progress number, since no source doc
 defines how to measure them yet.
+
+## Rooms & real-time (actual, `v0.4`)
+
+`lib/rating/room-access.ts#canAccessRoom()` enforces access
+server-side (never trusted from the client): a plain `minLevel` check for
+most room types, plus a 30-day window from `User.joinedAt` for the
+`newcomers` type specifically (`PRODUCT.md` §1: "Level I, first 30
+days"). Locked rooms are still returned by `GET /api/rooms` and shown in
+`/rooms`, marked with a lock icon — never hidden — per `DESIGN.md`.
+
+Real-time message delivery uses Supabase Realtime's `postgres_changes`
+on the `messages` table (`components/shared/RoomChat.tsx`), filtered by
+`room_id`. On a new-message event, the client re-fetches the room's
+message list rather than merging the raw Realtime payload (which lacks
+joined sender info) — simplest correct approach at this scale; see
+[TECH_DEBT.md](../TECH_DEBT.md) for the optimization opportunity.
+**Requires Realtime to be enabled on the `messages` table in the
+Supabase dashboard once the project exists** — this is a one-time manual
+step in Supabase's UI, not something Prisma migrations configure.
+
+Only `general`, `newcomers`, and the 7 named local circles (SF, LA,
+Miami, NY, Berlin, London, Tokyo — `CLAUDE.md` §7) are seeded
+(`prisma/seed.ts`). **No thematic rooms are seeded** — `CLAUDE.md` never
+names specific thematic topics, and inventing them would mean guessing
+at real community content for an adult platform. `POST /api/admin/rooms`
+exists so admins can create thematic rooms with real topics as needed.
+See `DECISIONS.md`, 2026-07-03.
 
 ## Deployment status
 

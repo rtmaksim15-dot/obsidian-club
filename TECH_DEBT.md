@@ -190,12 +190,44 @@ blocked-on-Max pattern as Resend/Supabase. **Cannot be verified
 end-to-end** (a real upload, a real `onUploadComplete` write) until Max
 provisions an Uploadthing account.
 
+## Realtime requires a manual Supabase dashboard step (`v0.4`)
+
+`components/shared/RoomChat.tsx` subscribes to `postgres_changes` on the
+`messages` table. Supabase requires Realtime to be explicitly enabled per
+table (via the dashboard or a SQL `ALTER PUBLICATION`) — this isn't
+something a Prisma migration configures. **Once Max provisions Supabase,
+someone needs to enable Realtime on `messages` before chat updates live**
+— otherwise messages will still send/persist correctly, they just won't
+appear for other members without a manual page refresh.
+
+## Room chat: no presence ("who's online"), no pagination, no edit/delete
+
+`DESIGN.md`'s room spec includes "who's online" (Supabase Presence — a
+different primitive from the `postgres_changes` used for messages) — not
+built in `v0.4`; `BACKLOG.md`'s one-line v0.4 scope didn't call it out
+specifically, so this is a scope boundary, not a silent cut, but it's
+real work still to do. Message history is "latest 50, no further
+pagination" — fine at zero real usage, will need cursor-based pagination
+before real rooms have real history. No message edit/delete endpoints
+(the `isDeleted` column exists, nothing sets it). No rate limiting on
+posting.
+
+## `RoomChat` re-fetches on every new message instead of merging the payload
+
+Supabase Realtime's `postgres_changes` INSERT payload only contains the
+raw new row (`user_id`, not the joined `displayName`/`avatarUrl`/`level`
+the chat UI needs) — rather than doing a second lookup to enrich just
+the new row, `RoomChat.tsx` re-fetches the whole message list on every
+new-message event. Correct, but wasteful once a room has real traffic —
+revisit with either a client-side user cache or a Realtime payload that
+includes what's needed (e.g. a Postgres view/function).
+
 ## Blocked on Max (accounts Claude cannot create)
 
 - Vercel project + domain (needed for any deployment at all)
 - Supabase project (needed for `DATABASE_URL`/`DIRECT_URL` **and** real
   Auth — as of `v0.2`, this blocks login/admin/Hall/profile working
-  end-to-end, not just the database)
+  end-to-end, not just the database) **and** Realtime (see above, `v0.4`)
 - Resend account + verified sending domain (needed for `RESEND_API_KEY`)
 - Uploadthing account (needed for `UPLOADTHING_SECRET`/`UPLOADTHING_APP_ID`)
 

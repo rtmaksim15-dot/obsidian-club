@@ -90,10 +90,17 @@ Invite limits by level: **I** → 2, **II** → 5, **III** → 10, **Mentor** �
 
 ## Rooms
 
+✅ **Built in `v0.4`** — `/rooms`, `/rooms/[slug]`, real-time chat. See
+[docs/Architecture.md](Architecture.md#rooms--real-time-actual-v04) and
+[API/rooms.md](API/rooms.md).
+
 Types: general, thematic, level-gated, Mentors-only, Masters-only,
 Council-only, a newcomers' room (Level I, first 30 days), and city-based
 local circles (starting set: SF, LA, Miami, NY, Berlin, London, Tokyo —
-expanding with the community).
+expanding with the community). **Only `general`, `newcomers`, and the 7
+named local circles are seeded** — no thematic room topics are named
+anywhere in the source docs, so none are invented; admins create
+thematic rooms as the community needs them (`POST /api/admin/rooms`).
 
 ## Content
 

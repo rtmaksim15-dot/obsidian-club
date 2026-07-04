@@ -1,13 +1,87 @@
-import ComingSoon from "@/components/shared/ComingSoon";
+import { redirect } from "next/navigation";
+import { Lock } from "lucide-react";
+import { getCurrentUser } from "@/lib/auth/session";
+import { prisma } from "@/lib/db/prisma";
+import { canAccessRoom } from "@/lib/rating/room-access";
 
-// Real Rooms (chat, local circles) are BACKLOG.md's v0.4 — this exists
-// only so the bottom nav (DESIGN.md §8) doesn't dead-end. No room data
-// is fabricated here.
-export default function RoomsPage() {
+const GROUP_LABELS: Record<string, string> = {
+  general: "General",
+  newcomers: "Newcomers",
+  local: "Local Circles",
+  thematic: "Thematic",
+  mentors: "Mentors",
+  masters: "Masters",
+  council: "Council",
+  level: "By Level",
+};
+const GROUP_ORDER = ["general", "newcomers", "thematic", "local", "mentors", "masters", "council", "level"];
+
+/**
+ * Rooms (`/rooms`), v0.4 — real data, replacing the "coming soon"
+ * placeholder. Locked rooms are shown, not hidden, per DESIGN.md.
+ */
+export default async function RoomsPage() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login?next=/rooms");
+
+  const rooms = await prisma.room.findMany({
+    where: { isActive: true },
+    orderBy: [{ type: "asc" }, { name: "asc" }],
+  });
+
+  const grouped = GROUP_ORDER.map((type) => ({
+    type,
+    label: GROUP_LABELS[type] ?? type,
+    rooms: rooms.filter((r) => r.type === type),
+  })).filter((g) => g.rooms.length > 0);
+
   return (
-    <ComingSoon
-      title="Rooms"
-      note="Where the club gathers. Opening in a future version."
-    />
+    <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
+      <div className="mx-auto max-w-2xl">
+        <p className="text-label mb-2">Community</p>
+        <h1 className="text-h1 mb-10">Rooms</h1>
+
+        {grouped.length === 0 ? (
+          <p className="text-body">No rooms yet.</p>
+        ) : (
+          <div className="space-y-10">
+            {grouped.map((group) => (
+              <section key={group.type}>
+                <p className="text-label mb-3">{group.label}</p>
+                <ul className="space-y-3">
+                  {group.rooms.map((room) => {
+                    const locked = !canAccessRoom(user, room);
+                    return (
+                      <li key={room.id}>
+                        {locked ? (
+                          <div className="card flex items-center justify-between opacity-60">
+                            <div>
+                              <p className="text-h2 !text-base">{room.name}</p>
+                              {room.description ? (
+                                <p className="text-caption mt-1">{room.description}</p>
+                              ) : null}
+                            </div>
+                            <Lock size={16} strokeWidth={1.5} style={{ color: "var(--color-text-muted)" }} />
+                          </div>
+                        ) : (
+                          <a href={`/rooms/${room.slug}`} className="card group block">
+                            <p className="text-h2 !text-base transition-colors group-hover:text-ob-accent">
+                              {room.name}
+                            </p>
+                            {room.description ? (
+                              <p className="text-caption mt-1">{room.description}</p>
+                            ) : null}
+                          </a>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ))}
+          </div>
+        )}
+      </div>
+    </main>
   );
 }

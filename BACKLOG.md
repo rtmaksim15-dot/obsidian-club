@@ -80,16 +80,32 @@ above.*
 - [x] Profile self-edit — `/profile/[id]/edit`, self-only, moved avatar
       upload here from `/hall`.
 
+### v0.4 — Community / Rooms ✅ (built 2026-07-03, unverified end-to-end)
+
+(Source: `ROADMAP.md`, September Weeks 1–2)
+
+- [x] Room list/types — `/rooms`, real data, locked rooms shown with a
+      lock (`DESIGN.md`), grouped by type.
+- [x] Real-time chat — `/rooms/[slug]`, Supabase Realtime on the
+      `messages` table. **Requires enabling Realtime on that table in
+      the Supabase dashboard once the project exists** — see
+      `TECH_DEBT.md`.
+- [x] Level-gated access — `lib/rating/room-access.ts`, enforced
+      server-side on every route, not just hidden in the UI.
+- [x] Newcomers' room — real 30-day window from `PRODUCT.md` §1, not
+      just a level check.
+- [x] First local circles — the 7 named cities from `CLAUDE.md` §7,
+      seeded via `prisma/seed.ts`.
+- [x] **No thematic rooms seeded** — none are named in any source doc;
+      `POST /api/admin/rooms` lets admins create them with real topics.
+      See `DECISIONS.md`, 2026-07-03.
+- Not built: presence ("who's online"), message pagination beyond the
+  latest 50, message edit/delete — see `TECH_DEBT.md`.
+
 ## Later
 
 *Intentionally postponed — approved direction, not yet scheduled in
 detail. Derived from `ROADMAP.md`'s existing Stage 2 plan.*
-
-### v0.4 — Community / Rooms
-
-(Source: `ROADMAP.md`, September Weeks 1–2) — room list/types, real-time
-chat (Supabase Realtime), level-gated access, newcomers' room, first local
-circles.
 
 ### v0.5 — Reputation
 
