@@ -42,6 +42,7 @@ documentation, not a new decision.
 |---|---|---|
 | [Vision.md](Vision.md) | What Obsidian Club is and why it exists | Rarely — only when the product's core premise changes |
 | [Philosophy.md](Philosophy.md) | The values/tone the product must embody | Rarely |
+| [LordObsidian.md](LordObsidian.md) | Canonical persona spec — appearance, voice, values, symbolism | Rarely — when Max provides new brand/character material |
 | [Architecture.md](Architecture.md) | Actual current technical architecture (stack, data model, folder layout) | Every version that changes the architecture |
 | [UX.md](UX.md) | User journeys and product mechanics (levels, reputation, referrals, rituals) | When product mechanics are added/changed |
 | [UI.md](UI.md) | Practical design-token and component reference for this codebase | When the design system changes |

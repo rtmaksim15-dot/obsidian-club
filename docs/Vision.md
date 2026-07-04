@@ -47,6 +47,8 @@ Never reveals their identity; communicates via announcements, personal
 invites, and rare appearances. Sets the entire community's cultural tone.
 **Confirmed (`OC_MASTER.md`): Lord Obsidian is a solo persona — Max
 himself** — never a team voice, even though a small team works behind it.
+Full canonical detail (appearance, voice, values, symbolism) is in
+[LordObsidian.md](LordObsidian.md), added 2026-07-04.
 
 ## Access model — three paths (`OC_MASTER.md`)
 

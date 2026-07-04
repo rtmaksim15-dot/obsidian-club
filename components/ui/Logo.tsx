@@ -1,6 +1,9 @@
-// OC monogram (DESIGN.md §4): O — double contour (light on dark), C — double
-// contour accent red. Rendered as outlined Cinzel glyphs so it reads as the
-// brand mark until the final vector asset is supplied.
+// OC monogram (DESIGN.md §4, extended by docs/LordObsidian.md's 2026-07-04
+// visual identity guide): O — double contour (light on dark), C — double
+// contour accent red, a small spear glyph on the axis between them
+// ("focus, control, direction — the axis that holds strength and
+// community in balance"). Rendered as outlined Cinzel glyphs so it reads
+// as the brand mark until the final vector asset is supplied.
 
 type LogoProps = {
   size?: number;
@@ -43,6 +46,14 @@ export default function Logo({ size = 200, variant = "dark", className }: LogoPr
         <text x={146} y={116} fill="none" stroke={bg} strokeWidth={2.5}>
           C
         </text>
+      </g>
+
+      {/* The spear — the axis between O (strength) and C (community),
+          per docs/LordObsidian.md's symbolism. Split top/bottom to echo
+          both halves of the mark. */}
+      <g>
+        <polygon points="109,40 103,63 115,63" fill={oColor} />
+        <polygon points="109,86 103,63 115,63" fill="var(--color-accent)" />
       </g>
     </svg>
   );

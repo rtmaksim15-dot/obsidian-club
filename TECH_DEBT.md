@@ -9,14 +9,18 @@ prioritized."
 ## Placeholder brand assets
 
 - **`components/ui/Logo.tsx`** — the OC monogram is drawn as outlined
-  Cinzel-glyph SVG text (stroke, double-contour), not Max's final vector
-  brand asset. Visually close to spec but not pixel-accurate.
+  Cinzel-glyph SVG text (stroke, double-contour) plus, as of 2026-07-04, a
+  spear glyph between O and C (see [docs/LordObsidian.md](docs/LordObsidian.md#symbolism-the-oc-monogram))
+  — still not Max's final vector brand asset. Visually close to spec but
+  not pixel-accurate.
 - **`lib/utils/ogIcon.tsx`** (PWA icons) and
-  **`app/(landing)/opengraph-image.tsx`** (social share image) — same
-  placeholder monogram, generated at request/build time via `next/og`
-  rather than a real static asset.
-- **Fix:** swap all three for the real vector asset once Max provides it.
-  No structural change needed — `Logo.tsx`'s API can stay the same;
+  **`app/(landing)/opengraph-image.tsx`** (social share image) — a
+  simpler two-letter placeholder (no double-contour, no spear —
+  deliberately, these render small and a spear glyph wouldn't read at
+  icon sizes), generated at request/build time via `next/og` rather than
+  a real static asset.
+- **Fix:** swap all three for the real vector asset once Max provides
+  one. No structural change needed — `Logo.tsx`'s API can stay the same;
   `ogIcon.tsx`/`opengraph-image.tsx` would switch from JSX-drawn glyphs to
   loading the real asset.
 
@@ -318,6 +322,20 @@ expected eventually; would reuse the existing `uploadthing` integration
 
 Same shape of gap as Rooms' "latest 50 messages" — fine at zero real
 usage, needs cursor-based pagination before real content volume exists.
+
+## Lord Obsidian reference portraits exist but aren't wired into the product
+
+Max's `Визуал/` iCloud folder (2026-07-04) includes real, consistent
+reference portraits of Lord Obsidian (see
+[docs/LordObsidian.md](docs/LordObsidian.md)) — none are committed to
+this repo or used anywhere in the live UI. Deliberately not done
+unilaterally: which portrait (if any) becomes "the" canonical image and
+where it should appear (Landing's "Lord Obsidian" card, `/ritual`,
+approval emails) is a real product/brand decision. Also: one source
+image includes background art not appropriate to publish as a
+web-servable asset — be deliberate about which files ever land under
+`public/` (anything there is directly web-accessible regardless of
+whether a component references it). See `DECISIONS.md`, 2026-07-04.
 
 ## Blocked on Max (accounts Claude cannot create)
 

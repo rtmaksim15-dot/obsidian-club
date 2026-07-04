@@ -41,6 +41,12 @@ unilaterally.
 - [x] ~~Reconcile `OC_MASTER.md` pivot with existing build~~ — resolved
       2026-07-04: existing foundation kept, new scope added as "Later"
       below. See [ADR-0014](docs/ADR/0014-adopt-oc-master-as-strategic-source.md).
+- [ ] **Open question, not decided:** which (if any) of the Lord
+      Obsidian reference portraits from `Визуал/` (see
+      [docs/LordObsidian.md](docs/LordObsidian.md)) should become a real,
+      user-facing image, and where (Landing's "Lord Obsidian" card?
+      `/ritual`? approval emails?). See `DECISIONS.md`/`TECH_DEBT.md`,
+      2026-07-04.
 
 ## Next
 

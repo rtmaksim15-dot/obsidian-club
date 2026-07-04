@@ -384,3 +384,41 @@ Also caught in this pass: root `README.md`'s "Current version" line had
 been stuck at `v0.1.0` since the very first version — never updated
 across `v0.2`-`v0.5`'s doc-sync steps. Fixed to `v0.6.0`; worth a beat of
 attention in future version-close-out passes.
+
+### 2026-07-04 — New visual identity material (`Визуал/` folder): used the safe parts, flagged the rest
+
+Max added a `Визуал/` subfolder to the iCloud docs folder: two brand
+identity guide sheets (logo/symbolism/palette/materials/values) and a
+Lord Obsidian character spec (a fixed reference face, appearance rules,
+personality, a full Midjourney prompt, and real generated reference
+portraits), asked to "use it."
+
+**Done without asking** (safe, additive, non-destructive to the locked
+brand — filling in detail the original `CLAUDE.md` left abstract, not
+changing anything already decided):
+- Wrote [docs/LordObsidian.md](docs/LordObsidian.md) — the durable,
+  text-form record of the persona spec, since the source images
+  themselves aren't committed to the repo.
+- Confirmed the guide's color palette (deep black / dark burgundy /
+  silver / gold / platinum) **exactly matches** this codebase's existing
+  CSS tokens — no changes needed, a validation rather than a correction.
+- Added the spear glyph to `components/ui/Logo.tsx` (the axis symbol
+  between O and C) — a new detail the guide specifies that the original
+  one-line `CLAUDE.md` brand description didn't include.
+- Added the "POWER. DISCIPLINE. TRUST." tagline to the Landing hero.
+
+**Deliberately not done** — flagged instead of guessed: the guide
+includes real, consistent reference *portraits* of Lord Obsidian (a
+specific generated human face used across many settings). Which
+portrait, if any, should become a live, user-facing asset, and where
+(Landing's "Lord Obsidian" card? `/ritual`? approval emails "from Lord
+Obsidian"?) is a real brand/product decision — not something to
+unilaterally pick for a "locked" recurring character on an adult
+platform. Also noted: one source image includes background art not
+appropriate to publish as a directly web-accessible asset if it were
+ever dropped into `public/` — flagged in `TECH_DEBT.md` as a reason to
+be deliberate about what lands there. Neither the portraits nor the
+brand-guide infographics themselves were copied into the repo (large
+binaries; the durable content is captured in `LordObsidian.md` instead).
+No version bump for this pass — small, cross-cutting, not tied to a
+`ROADMAP.md` milestone.

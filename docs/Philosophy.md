@@ -35,6 +35,9 @@ a game — sophisticated, consensual, beautiful. Lord Obsidian's tone:
 authoritative, mysterious, protective of the community. This governs
 copy, not just visuals — see [Vision.md](Vision.md) for the "not a porn
 platform, a lifestyle and practice community" framing this comes from.
+The detailed persona spec (appearance, canon rules, values, the
+"power is a duty, not a privilege" founder's quote) is in
+[LordObsidian.md](LordObsidian.md).
 
 ## Invitation is an act of responsibility
 

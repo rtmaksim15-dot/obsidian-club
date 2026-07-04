@@ -76,6 +76,12 @@ export default function LandingPage() {
           <p className="mt-3 font-cinzel uppercase tracking-ultra text-ob-accent text-sm sm:text-base">
             Private Community
           </p>
+          <p
+            className="mt-6 font-cinzel uppercase tracking-brand text-xs sm:text-sm"
+            style={{ color: "var(--color-text-secondary)" }}
+          >
+            Power. Discipline. Trust.
+          </p>
 
           <hr className="divider-accent my-10 w-56" />
 
