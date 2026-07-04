@@ -152,6 +152,16 @@ just an artifact of the original folder plan that predates the landing's
 actual single-page design. **Not resolved — needs Max's input**, not a
 guess. The folder remains empty.
 
+**Possible new explanation (2026-07-04):** `OC_MASTER.md`'s three-path
+access model ([Vision.md](docs/Vision.md#access-model--three-paths-oc_masterMD),
+[ADR-0014](docs/ADR/0014-adopt-oc-master-as-strategic-source.md)) means
+there may eventually be *three different* entry surfaces — the existing
+Landing Page waitlist form (Path 3, manual review), a purchase-order
+verification flow (Path 1), and a referral-link registration flow
+(Path 2). `(auth)/apply/` could plausibly become the home for Path 1 or
+Path 2's registration form once those are specified. Still a guess, not
+a confirmed answer — the underlying question hasn't been asked directly.
+
 ## Username is auto-generated; no self-edit flow exists
 
 The application form never collects a username (not specified anywhere in

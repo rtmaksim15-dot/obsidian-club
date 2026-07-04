@@ -293,3 +293,40 @@ access window (`lib/rating/room-access.ts`) could permanently lock out
 anyone who doesn't complete step 4 in time — not fixed, tracked in
 `TECH_DEBT.md` as a genuine product question (grace period? exception
 for ritual-incomplete members?), not something to default silently.
+
+### 2026-07-04 — Major strategic pivot: OC_MASTER.md discovered, adopted as source of truth
+
+Max pointed back at the iCloud docs folder; `files.zip` (new that day)
+contained `OC_MASTER.md` and a revised `CLAUDE.md`, both self-declaring
+*"the single source of truth for Obsidian Club."* Investigating
+revealed the folder actually holds three separate, conflicting document
+lineages (original 6-file package + a precursor architecture doc;
+2026-06-27 drafts — TZ, Codex, UserJourney Onboarding, and a "Master
+v2.docx" synthesizing them; and this new `files.zip` pair) — not just
+one update. Stopped and asked rather than guessing which was current,
+given the stakes (potentially invalidating five shipped versions). Full
+reasoning: [ADR-0014](docs/ADR/0014-adopt-oc-master-as-strategic-source.md).
+
+**Max's answers, in order:**
+1. Between `OC_MASTER.md` and `Obsidian Club Master v2.docx` (the two
+   documents that both call themselves authoritative and directly
+   conflict on iOS/Android, entry model, rating weights, and tech
+   stack) — **`OC_MASTER.md` wins.**
+2. Given `OC_MASTER.md` says nothing about implementation technology —
+   **keep the existing Next.js/Prisma/Supabase build, Hall, Rooms, and
+   reputation engine as the foundation.** `OC_MASTER.md`'s new elements
+   (purchase/referral entry paths, the physical-goods/marketplace/
+   courses/mental-health ecosystem, subscription tiers) are additive
+   future scope, not an immediate rebuild. The existing waitlist/
+   admin-approval flow is now understood as `OC_MASTER.md`'s own
+   "Path 3 — Manual Review (First 1000)," not a system being replaced.
+
+**Not yet resolved, flagged for a future conversation, not decided
+here:** whether `Obsidian Codex.docx`'s actual prose (club philosophy,
+six rules, "The Club's Promise") can be reused as real content for the
+Initiation Ritual's still-unresolved steps 2/5
+([ADR-0013](docs/ADR/0013-initiation-ritual-step4-deferred.md)) — the
+text itself doesn't depend on Lineage B's Circle/Warden hierarchy or
+purchase-verification model, but it was authored as part of that
+now-superseded package, so reusing it is a distinct question from
+adopting the system it shipped alongside.

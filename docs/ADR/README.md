@@ -24,3 +24,4 @@ to these where a decision has a technical deep-dive.
 | [0011](0011-isadmin-field.md) | Add `isAdmin` to the `User` model | Accepted |
 | [0012](0012-waitlist-status-tracking.md) | Add status tracking to the `Waitlist` model | Accepted |
 | [0013](0013-initiation-ritual-step4-deferred.md) | Initiation Ritual step 4 auto-satisfied pending Rooms | Accepted |
+| [0014](0014-adopt-oc-master-as-strategic-source.md) | Adopt OC_MASTER.md as strategic source of truth; keep existing technical foundation | Accepted |

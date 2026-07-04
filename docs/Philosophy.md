@@ -1,9 +1,11 @@
 # Philosophy
 
-> Source: transcribed from `CLAUDE.md` §11, 13; `PRODUCT.md` §1, 3–6;
-> `DESIGN.md` §1 (Max's strategic package, kept in iCloud). Same rule as
-> [Vision.md](Vision.md): if this page and the source docs disagree, the
-> source docs are correct.
+> Source: `OC_MASTER.md` + the revised `CLAUDE.md` (2026-07-04,
+> `files.zip` — see [ADR-0014](ADR/0014-adopt-oc-master-as-strategic-source.md))
+> take priority; the original `CLAUDE.md` §11, 13, `PRODUCT.md` §1, 3–6,
+> and `DESIGN.md` §1 still apply where the newer docs are silent. Same
+> rule as [Vision.md](Vision.md): if this page and the source docs
+> disagree, the source docs are correct.
 
 ## The one sentence everything else follows from
 
@@ -15,13 +17,24 @@ tie-breaker.
 
 ## This is not a social network
 
-Obsidian Club is not a place you sign up for — it's a place you're let into.
-Membership isn't purchased; it's earned, extended, and, when it must be,
-withdrawn.
+Obsidian Club is not a place you sign up for — it's a place you're let
+into, along one of three specific paths (product purchase, member
+referral, or manual review — see [Vision.md](Vision.md#access-model--three-paths-oc_masterMD)).
+Even where entry is purchase-triggered, membership itself is earned,
+extended, and, when it must be, withdrawn — the purchase opens the door,
+it doesn't buy standing once inside.
 
 Everything rests on four things: **reputation, rating, influence, and
 trust**. These are not numbers to farm — they're the record of how a person
 conducts themselves, who they bring in, and what they give.
+
+## Brand voice (`OC_MASTER.md`)
+
+Never pornographic. Always elegant, intentional, safe. Power dynamics are
+a game — sophisticated, consensual, beautiful. Lord Obsidian's tone:
+authoritative, mysterious, protective of the community. This governs
+copy, not just visuals — see [Vision.md](Vision.md) for the "not a porn
+platform, a lifestyle and practice community" framing this comes from.
 
 ## Invitation is an act of responsibility
 
@@ -43,6 +56,14 @@ status, and — ultimately — can be removed.
 
 > "If a person brings no value to the club, the club no longer brings value
 > to them."
+
+**Moderation model (`OC_MASTER.md`):** hybrid, AI-first. Automated tools
+handle clear-cut violations (hate speech, slurs, explicit policy breaks)
+consistently and without fatigue; ambiguous or disputed cases escalate to
+human review (Max + senior community moderators). Community moderators
+are recruited from top-rated members who volunteer — status and
+recognition, not obligation. None of this (reporting, AI moderation,
+community-moderator roles) is built yet — see `TECH_DEBT.md`.
 
 ## Design philosophy (visual/interaction expression of the above)
 

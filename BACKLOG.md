@@ -1,9 +1,13 @@
 # Backlog
 
 Organized by product version, not calendar week (see
-[docs/README.md](docs/README.md#versioning)). Version → feature-area
-mapping below is derived directly from `ROADMAP.md`'s existing Stage 2
-plan, just re-labeled — no new scope has been invented.
+[docs/README.md](docs/README.md#versioning)). `v0.1`-`v0.5`'s
+version → feature-area mapping is derived directly from `ROADMAP.md`'s
+original Stage 2 plan. **As of 2026-07-04, `OC_MASTER.md` is the
+strategic source of truth** ([ADR-0014](docs/ADR/0014-adopt-oc-master-as-strategic-source.md))
+— it adds real new scope (see "Later" below), and one item it explicitly
+decided (no native iOS/Android) removes scope `ROADMAP.md` previously
+had.
 
 **Rule: items only move between Now / Next / Later with Max's approval.**
 This file records what's planned, not a queue anyone can reshuffle
@@ -29,6 +33,14 @@ unilaterally.
       Code of Conduct text, Lord Obsidian's introductory material,
       safety/respect guidelines (see `TECH_DEBT.md`) — blocks the ritual
       from being real, not just technical wiring
+- [ ] **Open question, not decided:** can `Obsidian Codex.docx`'s actual
+      prose (real, on-brand Code of Conduct + rules text) be reused for
+      the item above? The text itself doesn't depend on the
+      Circle/Warden hierarchy it shipped alongside, but that hierarchy
+      was superseded — see `DECISIONS.md`, 2026-07-04.
+- [x] ~~Reconcile `OC_MASTER.md` pivot with existing build~~ — resolved
+      2026-07-04: existing foundation kept, new scope added as "Later"
+      below. See [ADR-0014](docs/ADR/0014-adopt-oc-master-as-strategic-source.md).
 
 ## Next
 
@@ -162,7 +174,51 @@ monitoring (Sentry).
 
 ### Unscheduled ideas (post-`v1.0`, per `ROADMAP.md`)
 
-- `v1.1` — full Marketplace
-- `v1.2` — iOS app
-- `v1.3` — Android app
+- `v1.1` — full Marketplace (the merch/tickets vitrine from `ARCHITECTURE.md`
+  §12 — a smaller scope than `OC_MASTER.md`'s marketplace vertical below)
+- ~~`v1.2` — iOS app~~ / ~~`v1.3` — Android app~~ — **cancelled.**
+  `OC_MASTER.md` explicitly decided PWA-only, no native apps, ever (App
+  Store/Google Play policy risk for 18+ content). See
+  [ADR-0014](docs/ADR/0014-adopt-oc-master-as-strategic-source.md).
 - `v2.0` — Desktop + scaling
+
+### New scope from `OC_MASTER.md` (2026-07-04) — needs real specification before any of this is buildable
+
+Added per [ADR-0014](docs/ADR/0014-adopt-oc-master-as-strategic-source.md).
+None of this has enough detail to implement yet — `OC_MASTER.md` gives
+strategic bullet points, not a data model, payment flow, or API design.
+Each needs its own planning pass (and likely its own ADR) before code,
+the same way Rooms/Reputation got planned before being built. **Do not
+start any of this from guesswork.**
+
+- **Purchase-triggered entry (Path 1)** — needs: a product catalog, an
+  order-verification mechanism linking a purchase to an invite, and a
+  decision on whether this reuses `Waitlist`/`User` or needs new models.
+- **Direct member-referral entry (Path 2)** — an invite that skips admin
+  review entirely, distinct from the existing reviewed-application flow
+  (`v0.1`/`v0.2`). Needs a decision on abuse/spam limits.
+- **Physical products e-commerce** — Standard/Premium/Extra Premium
+  tiers, the latter $20k-$100k (platinum/gold/diamond). Needs: product
+  data model, high-value payment handling, shipping/fulfillment,
+  inventory — a materially different scope than the existing
+  `MarketplaceItem` model (built for merch/tickets, not luxury goods).
+- **Practitioner services marketplace** — sessions, coaching, bookable
+  events with commission. `ARCHITECTURE.md`'s original marketplace scope
+  (merch/tickets/digital) doesn't cover service *bookings* or commission
+  splitting — needs real design (Stripe Connect was named in the
+  original `ARCHITECTURE.md` but never implemented).
+- **Courses / education** — beginner (~$50) and advanced content,
+  authored by vetted experts. Needs a real course/lesson data model —
+  `Post`/content models don't support structured, sequential courses.
+- **Books & media commission sales** — another storefront vertical.
+- **Mental health & wellness marketplace** — therapist/psychologist
+  booking + crisis resources. **Needs real care before any
+  implementation** — licensing verification, liability, and crisis-
+  resource accuracy are not things to build from a bullet point; this
+  is the single highest-stakes item on this list.
+- **Subscription tiers** (Free / ~$20-30 / ~$50 / product-subscription)
+  — no billing/tiering infrastructure exists in the codebase at all yet.
+- **AI-first moderation + reporting** — `User.report()`, an AI
+  violation-detection layer, and community-moderator roles recruited
+  from top-rated members. Currently zero moderation surface exists
+  beyond admin approve/decline.
