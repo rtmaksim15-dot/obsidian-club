@@ -11,16 +11,17 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 /**
- * The Initiation Ritual (PRODUCT.md §1 Stage 2). Only step 1 is a real,
- * checkable action right now — steps 2/3/5 need policy content Max
- * hasn't written yet, and step 4 needs Rooms (v0.4). See ADR-0013.
+ * The Initiation Ritual (PRODUCT.md §1 Stage 2). Steps 1 and 4 are real,
+ * checkable actions (v0.5: step 4 checks real Newcomers-room message
+ * history, now that Rooms exist) — steps 2/3/5 still need policy content
+ * Max hasn't written yet. See ADR-0013.
  */
 export default async function RitualPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/ritual");
 
   const profile = await prisma.userProfile.findUnique({ where: { userId: user.id } });
-  const status = getRitualStatus(user, profile);
+  const status = await getRitualStatus(user, profile);
 
   if (status.complete) {
     await grantAchievement(user.id, "initiation-complete");
@@ -64,11 +65,18 @@ export default async function RitualPage() {
           ))}
         </ol>
 
-        {status.steps.some((s) => s.id === "profile" && s.status === "todo") ? (
-          <a href={`/profile/${user.id}/edit`} className="btn-primary mt-10 inline-block">
-            Complete your profile
-          </a>
-        ) : null}
+        <div className="mt-10 flex flex-wrap gap-3">
+          {status.steps.some((s) => s.id === "profile" && s.status === "todo") ? (
+            <a href={`/profile/${user.id}/edit`} className="btn-primary inline-block">
+              Complete your profile
+            </a>
+          ) : null}
+          {status.steps.some((s) => s.id === "newcomerRoom" && s.status === "todo") ? (
+            <a href="/rooms/newcomers" className="btn-secondary inline-block">
+              Go to the Newcomers room
+            </a>
+          ) : null}
+        </div>
       </div>
     </main>
   );

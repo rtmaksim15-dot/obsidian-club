@@ -6,7 +6,7 @@
 > If you find a mismatch that ISN'T explained by a linked ADR, that's a
 > conflict: stop and flag it (see [docs/README.md](README.md)).
 
-Current version: **v0.4.0** (Community / Rooms). `package.json`'s
+Current version: **v0.5.0** (Reputation). `package.json`'s
 `version` field is the single source of truth for the current version
 number.
 
@@ -57,6 +57,7 @@ obsidian-club/
 │   │   ├── admin/rooms/route.ts         # admin creates thematic rooms — see docs/API/rooms.md
 │   │   ├── profile/route.ts             # self-edit only, see API/profile.md
 │   │   ├── rooms/route.ts, [slug]/route.ts, [slug]/messages/route.ts
+│   │   ├── users/[id]/review/route.ts   # peer reviews, see API/reviews.md
 │   │   └── uploadthing/core.ts, route.ts
 │   ├── icons/icon-192.png/route.tsx, icon-512.png/route.tsx
 │   ├── layout.tsx                       # fonts, metadata, Analytics
@@ -65,7 +66,7 @@ obsidian-club/
 │   ├── ui/Logo.tsx                      # OC monogram (placeholder, see TECH_DEBT)
 │   └── shared/WaitlistForm.tsx, Reveal.tsx, ApplicationsQueue.tsx,
 │       AvatarUploadButton.tsx, BottomNav.tsx, ComingSoon.tsx, ProfileEditForm.tsx,
-│       RoomChat.tsx
+│       RoomChat.tsx, ReviewForm.tsx
 ├── lib/
 │   ├── auth/
 │   │   ├── supabase-browser.ts          # Client Component Supabase client
@@ -76,6 +77,8 @@ obsidian-club/
 │   │   └── ritual.ts                    # getRitualStatus() — real, computed, see ADR-0013
 │   ├── rating/level-progress.ts         # getLevelProgress() — real criteria only, no fabricated metrics
 │   ├── rating/room-access.ts            # canAccessRoom() — level gate + newcomers' 30-day window
+│   ├── rating/rating-engine.ts          # recalculateRating() — ARCHITECTURE.md §5's weighted formula
+│   ├── rating/referral-lifecycle.ts     # syncReferralLifecycle() — joined→active, +10 Trust Score
 │   ├── db/prisma.ts
 │   └── utils/email.ts, ogIcon.tsx, codes.ts, uploadthing.ts, achievements.ts
 ├── prisma/schema.prisma, seed.ts        # seeds only documented rooms — see DECISIONS.md 2026-07-03
@@ -122,6 +125,7 @@ below.
 - `GET /api/rooms`, `GET /api/rooms/:slug`, `GET/POST
   /api/rooms/:slug/messages`, `POST /api/admin/rooms` — see
   [API/rooms.md](API/rooms.md).
+- `POST /api/users/:id/review` — see [API/reviews.md](API/reviews.md).
 - `GET/POST /api/uploadthing` — uploadthing's generated handler, not
   independently documented (framework-owned).
 
@@ -188,6 +192,44 @@ names specific thematic topics, and inventing them would mean guessing
 at real community content for an adult platform. `POST /api/admin/rooms`
 exists so admins can create thematic rooms with real topics as needed.
 See `DECISIONS.md`, 2026-07-03.
+
+## Rating engine (actual, `v0.5`)
+
+`lib/rating/rating-engine.ts#recalculateRating()` implements
+`ARCHITECTURE.md` §5's weighted formula exactly for the one
+fully-specified component (`reputation = stars × 6`, capping at the
+documented 30-point weight) and with **documented, reasonable defaults**
+for the others, since the source doc names what counts but not the exact
+curve:
+
+- `activity` (weight 20): `min(20, messageCount × 0.2 + postCount × 1)`.
+- `achievements` (weight 15): sum of earned achievements'
+  `ratingBonus`, capped at 15.
+- `referralQuality` (weight 20): sum of the inviter's `Referral.impactScore`
+  values, capped at 20.
+- `events` (weight 10) and `content` (weight 5): **always 0** — no real
+  Events (`v0.7`) or content-creation (`v0.6`) feature exists yet to
+  measure them from. This is an honest zero, not the full weight and not
+  a fabricated partial score.
+
+Every recalculation logs its delta to `RatingHistory` (shown on
+`/hall`). Reputation itself (`User.reputation`, the 0-5 star value that
+feeds the formula above) is a straight average of a member's visible
+`Review` ratings — see [API/reviews.md](API/reviews.md).
+
+**Trust Score** (`lib/rating/referral-lifecycle.ts#syncReferralLifecycle()`):
+implements `ARCHITECTURE.md` §5's `+10` per referral reaching `active`
+status (30+ days after the invitee joined) exactly as specified. The
+`-20`/`-50` deltas for invitee warnings/removals are **not implemented**
+— there's no member-warning or member-removal admin capability built
+yet to trigger them from (see [TECH_DEBT.md](../TECH_DEBT.md)).
+
+**No real cron/background job infrastructure exists.** Referral
+lifecycle transitions are checked opportunistically whenever the
+inviter's own Hall page loads, not on a schedule — naturally idempotent
+(a referral leaves the `joined` status once promoted, so re-checking
+can't double-credit it), but an inviter who never visits `/hall` won't
+have their referrals promoted until they do.
 
 ## Deployment status
 

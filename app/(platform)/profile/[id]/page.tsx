@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db/prisma";
+import { getCurrentUser } from "@/lib/auth/session";
+import ReviewForm from "@/components/shared/ReviewForm";
 
 const LEVEL_NAMES: Record<number, string> = {
   1: "Initiate",
@@ -11,15 +13,26 @@ const LEVEL_NAMES: Record<number, string> = {
 };
 
 /**
- * Basic member profile — v0.2 skeleton. PRODUCT.md's full spec (tabs for
- * stats/achievements/content/reviews) is BACKLOG.md's v0.3 scope; this is
- * just the header info against real data.
+ * Member profile — real header data plus (v0.5) real reviews. Still no
+ * full tab system (PRODUCT.md's stats/achievements/content/reviews tabs)
+ * — reviews render as a flat section, same pattern as the rest of the
+ * profile so far.
  */
 export default async function ProfilePage({ params }: { params: { id: string } }) {
-  const user = await prisma.user.findUnique({ where: { id: params.id } });
+  const [user, viewer, reviews] = await Promise.all([
+    prisma.user.findUnique({ where: { id: params.id } }),
+    getCurrentUser(),
+    prisma.review.findMany({
+      where: { reviewedId: params.id, isVisible: true },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+      include: { reviewer: { select: { id: true, displayName: true } } },
+    }),
+  ]);
   if (!user) notFound();
 
   const stars = Math.round(Number(user.reputation));
+  const isOwnProfile = viewer?.id === user.id;
 
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
@@ -54,6 +67,40 @@ export default async function ProfilePage({ params }: { params: { id: string } }
         </p>
 
         {user.bio ? <p className="text-body mt-6">{user.bio}</p> : null}
+
+        {viewer && !isOwnProfile ? (
+          <section className="mt-10">
+            <p className="text-label mb-3">Leave a Review</p>
+            <ReviewForm reviewedId={user.id} />
+          </section>
+        ) : null}
+
+        <section className="mt-10">
+          <p className="text-label mb-3">Reviews</p>
+          {reviews.length === 0 ? (
+            <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
+              No reviews yet.
+            </p>
+          ) : (
+            <ul className="space-y-3">
+              {reviews.map((r) => (
+                <li key={r.id} className="card">
+                  <div className="flex items-center justify-between">
+                    <p className="text-data">{r.reviewer.displayName}</p>
+                    <p aria-label={`${r.rating} out of 5 stars`}>
+                      {Array.from({ length: 5 }, (_, i) => (
+                        <span key={i} className={i < r.rating ? "star-filled" : "star-empty"}>
+                          ★
+                        </span>
+                      ))}
+                    </p>
+                  </div>
+                  {r.comment ? <p className="text-body mt-2 !text-base">{r.comment}</p> : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
     </main>
   );

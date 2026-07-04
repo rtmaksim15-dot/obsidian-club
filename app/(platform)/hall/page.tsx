@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { getRitualStatus } from "@/lib/auth/ritual";
 import { getLevelProgress } from "@/lib/rating/level-progress";
+import { syncReferralLifecycle } from "@/lib/rating/referral-lifecycle";
 
 const LEVEL_NAMES: Record<number, string> = {
   1: "Initiate",
@@ -14,26 +15,36 @@ const LEVEL_NAMES: Record<number, string> = {
 };
 
 /**
- * The Hall (`/hall`) — v0.3: real status card, progress-to-next-level,
- * referral link + stats, and notifications. Rooms/events/tasks blocks
- * stay out (no real Rooms/Events system exists yet — see
- * app/(platform)/layout.tsx's placeholder pages, v0.4/v0.7).
+ * The Hall (`/hall`) — status card, progress-to-next-level, referral
+ * link + stats, notifications, and (v0.5) recent rating history.
+ * Rooms/events/tasks blocks stay out where those features don't exist
+ * yet (Events is v0.7) — see app/(platform)/layout.tsx's placeholders.
  */
 export default async function HallPage() {
-  const user = await getCurrentUser();
+  let user = await getCurrentUser();
   if (!user) redirect("/login?next=/hall");
 
   const profile = await prisma.userProfile.findUnique({ where: { userId: user.id } });
-  const ritual = getRitualStatus(user, profile);
+  const ritual = await getRitualStatus(user, profile);
   if (!ritual.complete) redirect("/ritual");
 
-  const [notifications, referralCount] = await Promise.all([
+  // No real cron yet (see TECH_DEBT.md) — check referral lifecycle
+  // transitions opportunistically whenever the inviter loads their Hall.
+  await syncReferralLifecycle(user.id);
+  user = (await prisma.user.findUnique({ where: { id: user.id } }))!;
+
+  const [notifications, referralCount, ratingHistory] = await Promise.all([
     prisma.notification.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
       take: 5,
     }),
     prisma.referral.count({ where: { inviterId: user.id, status: { in: ["joined", "active"] } } }),
+    prisma.ratingHistory.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+    }),
   ]);
 
   const progress = getLevelProgress(user);
@@ -148,6 +159,27 @@ export default async function HallPage() {
                 <li key={n.id} className="card">
                   <p className="text-h2 !text-sm">{n.title}</p>
                   {n.body ? <p className="text-caption mt-1">{n.body}</p> : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        {/* Rating history */}
+        <section className="mt-10">
+          <p className="text-label mb-3">Recent Rating Changes</p>
+          {ratingHistory.length === 0 ? (
+            <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
+              No changes yet.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {ratingHistory.map((h) => (
+                <li key={h.id} className="text-caption flex items-center justify-between">
+                  <span style={{ color: "var(--color-text-secondary)" }}>{h.reason}</span>
+                  <span style={{ color: h.delta >= 0 ? "var(--color-success)" : "var(--color-error)" }}>
+                    {h.delta >= 0 ? `+${h.delta}` : h.delta}
+                  </span>
                 </li>
               ))}
             </ul>

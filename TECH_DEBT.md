@@ -222,6 +222,49 @@ new-message event. Correct, but wasteful once a room has real traffic —
 revisit with either a client-side user cache or a Realtime payload that
 includes what's needed (e.g. a Postgres view/function).
 
+## Newcomers' room 30-day window could permanently lock a member out of the Hall (`v0.5`)
+
+`lib/auth/ritual.ts`'s step 4 now requires posting in the `newcomers`
+room; `lib/rating/room-access.ts` closes that room 30 days after
+`User.joinedAt`. A member who doesn't post within their first 30 days
+loses access to the only room that can satisfy step 4 — permanently
+blocked from completing the ritual and reaching the Hall, with no
+built-in recovery path. **Needs a product decision**: a grace period, an
+exception letting ritual-incomplete members into the newcomers' room
+past 30 days, or something else. Not fixed — see
+[ADR-0013](docs/ADR/0013-initiation-ritual-step4-deferred.md)'s
+2026-07-04 update and `DECISIONS.md`.
+
+## Rating engine's underspecified curves are this session's defaults, not spec
+
+`ARCHITECTURE.md` §5 names what counts toward `activity` (messages,
+posts, views) and how referral quality and achievements factor in, but
+not the exact curves. `lib/rating/rating-engine.ts` implements
+reasonable, documented defaults (see the file's own comments and
+[docs/Architecture.md](docs/Architecture.md#rating-engine-actual-v05))
+— revisit once there's real usage data showing they reward or punish the
+wrong behavior. Likewise, `reputation` being a straight average of
+received reviews (not a weighted/decayed average) is a default, not a
+literal spec requirement — see [API/reviews.md](docs/API/reviews.md).
+
+## Trust Score's `-20`/`-50` deltas aren't wired
+
+`ARCHITECTURE.md` §5 specifies `-20` Trust Score for an invitee warning
+and `-50` for an invitee removal — not implemented, because there's no
+member-warning or member-removal admin capability yet to trigger them
+from. The `+10` referral-activation bonus **is** wired (`v0.5`). Needs a
+moderation/admin-action surface before these can be real.
+
+## No real cron/background job infrastructure
+
+Referral lifecycle transitions (`lib/rating/referral-lifecycle.ts`) only
+run opportunistically when the inviter loads `/hall` — an inviter who
+never visits won't have referrals promoted to `active`, and their Trust
+Score bonus stays unapplied, until they do. Same underlying gap as
+Realtime's manual-enablement issue above: this app has no scheduled-job
+mechanism at all yet. Revisit once deployed to Vercel (Vercel Cron is
+the natural fit) or once Supabase's `pg_cron` becomes relevant.
+
 ## Blocked on Max (accounts Claude cannot create)
 
 - Vercel project + domain (needed for any deployment at all)

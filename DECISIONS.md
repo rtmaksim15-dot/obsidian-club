@@ -269,3 +269,27 @@ ritual content gap) since it's a conservative default with no downside:
 building the creation mechanism and seeding nothing invented is strictly
 safer than guessing at topics, and normal admin discretion is exactly the
 kind of decision `docs/API/admin.md`-style tooling exists to enable.
+
+### 2026-07-04 — `v0.5` (Reputation) started on Max's "продолжай"
+
+Same precedent as `v0.3`/`v0.4`. Unlike those, this version's core
+mechanic — the rating formula — is fully quantified in `ARCHITECTURE.md`
+§5 (exact weights: reputation 30, activity 20, achievements 15, referral
+quality 20, events 10, content 5; Trust Score deltas: +10/-20/-50), so
+this version doesn't carry the same "content doesn't exist" risk the
+Ritual and thematic rooms did.
+
+### 2026-07-04 — Initiation Ritual step 4 made real, closing ADR-0013's own review trigger
+
+ADR-0013 (2026-07-02) explicitly flagged "revisit when Rooms ship" as
+the condition for turning step 4 (introduce yourself in the newcomers'
+room) from a deferred placeholder into a real check. Rooms shipped in
+`v0.4`; while extending the rating engine in `v0.5`, updated
+`getRitualStatus()` to check real `Message` history in the `newcomers`
+room instead. Didn't require re-confirming with Max the way steps 2/3/5
+still do, since this is a mechanical data check, not new invented
+content. Surfaced a new risk in doing so: the newcomers' room's 30-day
+access window (`lib/rating/room-access.ts`) could permanently lock out
+anyone who doesn't complete step 4 in time — not fixed, tracked in
+`TECH_DEBT.md` as a genuine product question (grace period? exception
+for ritual-incomplete members?), not something to default silently.

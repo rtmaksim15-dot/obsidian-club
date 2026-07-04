@@ -1,6 +1,6 @@
 # ADR-0013: Initiation Ritual step 4 ("introduce yourself in the newcomers' room") is auto-satisfied pending Rooms
 
-**Status:** Accepted
+**Status:** Superseded in part — see 2026-07-04 update below. Original decision (2026-07-02) kept intact as history.
 **Date:** 2026-07-02
 
 ## Context
@@ -67,3 +67,27 @@ every member who still needs to actually do this once Rooms ship.
   whether the deferral is simply honored permanently for anyone who
   joined before Rooms existed. This is a product decision for Max, not
   something to default silently either direction.
+
+## 2026-07-04 update — step 4 is now real (`v0.5`)
+
+Rooms shipped in `v0.4`, satisfying this ADR's own review trigger.
+`lib/auth/ritual.ts#getRitualStatus()` now checks live message history
+in the `newcomers` room (`Message` rows where `userId` matches and the
+room's slug is `newcomers`) instead of the `"deferred"` sentinel for
+step 4. This is a mechanical check against real data — not new invented
+content — so it didn't need a fresh round of Max's confirmation the way
+steps 2/3/5's actual policy text still does.
+
+**Retroactive-members question resolved by default, not by choice:**
+there are no real members yet (Supabase isn't provisioned — see
+`TECH_DEBT.md`), so there was nothing to retroactively migrate. This
+will need genuine attention if members are ever created directly against
+a database that predates this change.
+
+**New risk introduced, not fully resolved:** `lib/rating/room-access.ts`
+gates the `newcomers` room itself to a 30-day window from
+`User.joinedAt`. A member who doesn't complete step 4 within that window
+loses access to the only room that can satisfy it — a potential
+permanent deadlock out of the Hall. Not fixed here (would require a
+product decision: grace period? ritual-incomplete exception to the
+30-day gate? something else?) — tracked in `TECH_DEBT.md`.

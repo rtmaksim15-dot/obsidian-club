@@ -102,16 +102,34 @@ above.*
 - Not built: presence ("who's online"), message pagination beyond the
   latest 50, message edit/delete — see `TECH_DEBT.md`.
 
+### v0.5 — Reputation ✅ (built 2026-07-04, unverified end-to-end)
+
+(Source: `ROADMAP.md`, September Weeks 3–4)
+
+- [x] Star ratings / peer reviews — `POST /api/users/:id/review`
+      (`docs/API/reviews.md`), a form on `/profile/[id]`; reputation is a
+      real average of received reviews.
+- [x] Rating engine + weighting — `lib/rating/rating-engine.ts`
+      implements `ARCHITECTURE.md` §5's exact weights; underspecified
+      curves (activity, achievements) are documented defaults, not
+      literal spec. `events`/`content` components are honest zeros.
+- [x] Rating history log — real `RatingHistory` rows, shown on `/hall`.
+- [x] Referral "Trust Chain" — the `+10` Trust Score bonus for referrals
+      reaching `active` (30+ days) is real
+      (`lib/rating/referral-lifecycle.ts`). The `-20`/`-50` deltas for
+      invitee warnings/removals aren't wired — no moderation surface
+      exists yet to trigger them. See `TECH_DEBT.md`.
+- [x] **Bonus**: Initiation Ritual step 4 (introduce yourself in the
+      newcomers' room) is now real, closing
+      [ADR-0013](docs/ADR/0013-initiation-ritual-step4-deferred.md)'s own
+      review trigger now that Rooms exist. Surfaced a new risk: the
+      newcomers' room's 30-day window could permanently lock a member
+      out if they don't post in time — see `TECH_DEBT.md`.
+
 ## Later
 
 *Intentionally postponed — approved direction, not yet scheduled in
 detail. Derived from `ROADMAP.md`'s existing Stage 2 plan.*
-
-### v0.5 — Reputation
-
-(Source: `ROADMAP.md`, September Weeks 3–4) — star ratings, peer reviews,
-the rating engine + weighting (`ARCHITECTURE.md` §5), rating history log,
-the referral "Trust Chain" mechanics (see `docs/UX.md`).
 
 ### v0.6 — Content & Achievements
 

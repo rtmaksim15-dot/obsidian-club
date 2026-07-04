@@ -8,7 +8,64 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.4.0` is the current released version.
+Nothing yet — `v0.5.0` is the current released version.
+
+## [0.5.0] — 2026-07-04
+
+Reputation: real peer reviews, a rating engine implementing
+`ARCHITECTURE.md` §5's exact weighted formula, a rating history log, and
+the referral "Trust Chain"'s Trust Score bonus.
+
+### Added
+
+- `POST /api/users/:id/review` — peer reviews (`docs/API/reviews.md`),
+  submitted via a form on `/profile/[id]`; reputation recomputes as the
+  average of a member's visible received reviews.
+- `lib/rating/rating-engine.ts#recalculateRating()` — implements
+  `ARCHITECTURE.md` §5's component weights (reputation 30, activity 20,
+  achievements 15, referral quality 20, events 10, content 5).
+  Reputation's formula (`stars × 6`) is fully specified and implemented
+  exactly; activity/achievement/referral-quality curves are this
+  session's documented, reasonable defaults where the source doc names
+  what counts but not the exact curve. `events`/`content` are honest
+  zeros — no real Events (v0.7) or content-creation (v0.6) feature
+  exists yet to measure them from.
+- Every rating recalculation logs its delta to `RatingHistory`, now
+  shown on `/hall` ("Recent Rating Changes").
+- `lib/rating/referral-lifecycle.ts#syncReferralLifecycle()` — the
+  `+10` Trust Score bonus for a referral reaching `active` status (30+
+  days after the invitee joined), exactly as `ARCHITECTURE.md` §5
+  specifies. Checked opportunistically on Hall load — no real
+  cron/background job infrastructure exists yet.
+- Initiation Ritual step 4 (introduce yourself in the newcomers' room)
+  is now checked against real message history instead of the `v0.3`
+  `"deferred"` placeholder, now that Rooms exist (`v0.4`) — closes
+  [ADR-0013](docs/ADR/0013-initiation-ritual-step4-deferred.md)'s own
+  stated review trigger.
+
+### Changed
+
+- N/A.
+
+### Fixed
+
+- N/A.
+
+### Removed
+
+- N/A.
+
+### Known gaps / deliberate simplifications (see [TECH_DEBT.md](TECH_DEBT.md))
+
+Trust Score's `-20`/`-50` deltas (invitee warning/removal) aren't wired
+— no member-moderation admin capability exists yet to trigger them.
+**New risk surfaced by making ritual step 4 real**: the newcomers'
+room's 30-day access window could permanently lock a member out of
+completing the ritual if they don't post in time — needs a product
+decision (grace period? an access exception?), not fixed here. No real
+cron — referral lifecycle checks only run when the inviter visits
+`/hall`. Not verified end-to-end — still blocked on Max provisioning
+Supabase, Resend, and Uploadthing.
 
 ## [0.4.0] — 2026-07-03
 
