@@ -396,9 +396,23 @@ whether a component references it). See `DECISIONS.md`, 2026-07-04.
 ## Blocked on Max (accounts Claude cannot create)
 
 - Vercel project + domain (needed for any deployment at all)
-- Supabase project (needed for `DATABASE_URL`/`DIRECT_URL` **and** real
-  Auth — as of `v0.2`, this blocks login/admin/Hall/profile working
-  end-to-end, not just the database) **and** Realtime (see above, `v0.4`)
+- ~~Supabase Auth~~ — **resolved 2026-07-05**: Max provided the project
+  URL and both API keys (publishable/anon, secret/service-role), wired
+  into `.env.local` and verified live against the real project (see
+  `DECISIONS.md`). `getCurrentUser()`/`middleware.ts` now make real
+  Supabase Auth calls instead of degrading to "not configured."
+- **Still needed: the Postgres database password** (Project Settings →
+  Database → Connection string in the Supabase dashboard) — a separate
+  credential from the API keys. `DATABASE_URL`/`DIRECT_URL` are still
+  the placeholder `localhost:5432` values, so Prisma can't reach the
+  database at all yet (confirmed via `npx prisma db pull`: `P1001`).
+  This means every route/page that queries `User`/`Post`/`Room`/etc.
+  still fails past the Auth layer — e.g. `getCurrentUser()` can
+  authenticate a real Supabase session but then can't look up the
+  matching `public.users` row. **Also still needed once the DB is
+  connected:** enabling Realtime on the `messages` table (one-time
+  manual dashboard step, not a migration — see `v0.4`'s note above), and
+  running `npx prisma migrate deploy`/`db seed`.
 - Resend account + verified sending domain (needed for `RESEND_API_KEY`)
 - Uploadthing account (needed for `UPLOADTHING_SECRET`/`UPLOADTHING_APP_ID`)
 

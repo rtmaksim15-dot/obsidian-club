@@ -23,16 +23,32 @@ unilaterally.
 
 - [ ] Vercel project + deploy `v0.1.0` (blocked — needs Max's account, see
       `TECH_DEBT.md`)
-- [ ] Supabase project + real `DATABASE_URL`/`DIRECT_URL`, run first
-      migration (blocked — needs Max's account)
+- [x] ~~Supabase project + Auth connection~~ — resolved 2026-07-05: Max
+      provided the project URL + publishable/secret API keys, wired into
+      `.env.local`. Verified live against the real project (Auth
+      settings + admin users list both responded correctly, 0 users —
+      fresh project). See `DECISIONS.md`.
+- [ ] **Still blocked:** real `DATABASE_URL`/`DIRECT_URL` — needs the
+      project's Postgres **database password**, a separate credential
+      from the API keys above (Supabase dashboard → Project Settings →
+      Database → Connection string). Without it, Prisma can't reach the
+      database at all (`npx prisma db pull` confirms: still pointing at
+      the placeholder `localhost:5432`) — every DB-backed route/page
+      still fails past the Auth check. Run the first migration
+      (`npx prisma migrate deploy` or `db push`) once this lands.
 - [ ] Resend account + verified sending domain + real `RESEND_API_KEY`
       (blocked — needs Max's account)
 - [ ] Uploadthing account + real `UPLOADTHING_SECRET`/`UPLOADTHING_APP_ID`
       (blocked — needs Max's account; needed to verify avatar upload)
 - [ ] Set `NEXT_PUBLIC_APP_URL` in Vercel once the domain is live (see
       `TECH_DEBT.md`)
-- [ ] Once Supabase is live: set at least one real `User.isAdmin = true`
-      directly in the database (no admin-granting UI exists yet)
+- [ ] Once the database is connected: set at least one real
+      `User.isAdmin = true` directly in the database (no admin-granting
+      UI exists yet)
+- [ ] Once the database is connected: run `npx prisma db seed` to seed
+      the documented starter rooms (`general`, `newcomers`, 7 local
+      circles), and enable Realtime on the `messages` table in the
+      Supabase dashboard (one-time manual step, not a migration)
 - [ ] **Max to provide real content** for Initiation Ritual steps 2/3/5:
       Code of Conduct text, Lord Obsidian's introductory material,
       safety/respect guidelines (see `TECH_DEBT.md`) — blocks the ritual

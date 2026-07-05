@@ -495,3 +495,41 @@ remembering this option disappears once real users exist.
 
 No version bump for the planning/decision itself; the migration work is
 tracked as `v0.7` in `BACKLOG.md`.
+
+### 2026-07-05 (later) — First real Supabase credentials connected: Auth works, DB still doesn't
+
+Max provided a real Supabase project's URL and both API keys
+(`sb_publishable_...`, `sb_secret_...` — Supabase's newer key format,
+drop-in compatible with `@supabase/supabase-js` 2.110.0's `anon`/
+`service_role` usage). Wired into `.env.local` — **not** `.env`, which
+is git-committed and already pushed to the public GitHub repo; putting
+real secrets there would have leaked them. `.env` correctly stays
+placeholder-only per its own header comment.
+
+Verified the connection for real rather than just trusting the values
+were accepted:
+- `GET /auth/v1/settings` with the publishable key returned real project
+  config (email auth enabled, no OAuth providers configured) — confirms
+  the URL + publishable key are valid and reachable.
+- `GET /auth/v1/admin/users` with the secret key returned `200` with an
+  empty user list — confirms the secret key has real admin-level access
+  (exactly what `lib/auth/supabase-admin.ts#createAdminClient()` needs
+  for the approval flow's `generateLink()` call), and that this is a
+  genuinely fresh project (0 users), not a stale/wrong one.
+- Started the dev server: `/login` renders cleanly, and `fetch('/hall')`
+  (unauthenticated) now gets a real redirect from `middleware.ts`'s
+  actual Supabase `getUser()` call — no crash, no fallback-to-"not
+  configured" path anymore. Confirms Auth is live end-to-end at the
+  request layer.
+
+**What's still missing, and why this isn't "done":** the API keys don't
+include the Postgres database password — a separate credential
+(Supabase dashboard → Project Settings → Database → Connection string).
+`DATABASE_URL`/`DIRECT_URL` are still the committed `.env` placeholder
+(`localhost:5432`). Confirmed broken with `npx prisma db pull` (`P1001`,
+can't reach `localhost:5432`) rather than assuming — this means every
+page/route that calls Prisma (which is nearly all of them, past the
+auth check) still fails. `BACKLOG.md`'s "Now" and `TECH_DEBT.md` updated
+to reflect: Supabase Auth blocker is resolved, a new specifically-scoped
+"need the DB password" blocker replaces the old generic "need a Supabase
+project" one.
