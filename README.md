@@ -1,7 +1,7 @@
 # Obsidian Club
 
-A closed, premium community platform. Current version: **v0.6.0** (Content
-& Achievements) — see [CHANGELOG.md](CHANGELOG.md).
+A closed, premium community platform. Current version: **v0.7.0**
+(CLAUDE.md v2 Migration) — see [CHANGELOG.md](CHANGELOG.md).
 
 ## Documentation first
 
