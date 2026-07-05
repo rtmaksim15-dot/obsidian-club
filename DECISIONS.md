@@ -533,3 +533,55 @@ auth check) still fails. `BACKLOG.md`'s "Now" and `TECH_DEBT.md` updated
 to reflect: Supabase Auth blocker is resolved, a new specifically-scoped
 "need the DB password" blocker replaces the old generic "need a Supabase
 project" one.
+
+### 2026-07-05 (later still) — Database connected, schema pushed, real write verified
+
+Max provided the Postgres database password. Couldn't construct a
+working connection string from that alone: the project's direct host
+(`db.fsleaavvmvlpvfsevosw.supabase.co`) only resolves via IPv6 (checked
+with `dig` — no `A` record, only `AAAA`), and this environment has no
+IPv6 egress, so it's unreachable regardless of credentials. The
+IPv4-reachable alternative — Supabase's regional connection pooler
+(`aws-N-<region>.pooler.supabase.com`) — requires knowing the project's
+AWS region, which isn't exposed anywhere queryable (not in DNS, not in
+API response headers, not derivable from the new-format API keys since
+they aren't JWTs). Brute-forced 17 common regions via `prisma db pull`
+(distinguishing "tenant not found" — wrong region — from other errors)
+before giving up and asking Max to copy the exact string from the
+dashboard rather than keep guessing.
+
+Max returned with `aws-1-us-east-2` (note: `aws-1`, not `aws-0` — I'd
+tried `aws-0-us-east-2` during the brute-force pass and gotten a
+different, connection-level error, not "tenant not found," which in
+hindsight was a clue the numbering matters, not just the region).
+
+Set `DATABASE_URL`/`DIRECT_URL` in `.env.local` to the same session-pooler
+string (port `5432`, not the transaction-mode `6543` — session mode
+supports DDL/migrations, which `db push` needs). Both point at the same
+URL since there's no separately-reachable direct connection from here.
+
+**Discovered along the way:** the Prisma CLI only auto-loads `.env`, not
+`.env.local` (Next.js's own dev/build process handles `.env.local`
+fine, but the standalone `prisma` command doesn't) — every
+`db push`/`db pull`/`db seed` invocation needed
+`set -a && source .env.local && set +a &&` prefixed, or it silently
+fell back to `.env`'s committed placeholder and failed against
+`localhost:5432`. Documented in `TECH_DEBT.md` so this doesn't have to
+be rediscovered.
+
+Ran `npx prisma db push` (succeeded on the second attempt — the first
+hit a transient network failure, same pattern as the earlier GitHub
+push that also needed a retry; this sandbox's network appears
+intermittently flaky, not a credentials problem) — all 17 models are
+now real tables. Ran `npx prisma db seed` — 9 starter rooms created.
+**Verified with an actual write, not just a successful CLI command:**
+`POST /api/waitlist` against the running dev server returned `201`,
+confirmed the row existed via a direct Prisma query, then deleted it
+(it was a synthetic connectivity-check row, not real data).
+
+`BACKLOG.md`/`TECH_DEBT.md`/`docs/Architecture.md` updated: the database
+blocker is resolved. Remaining Supabase-side item: enabling Realtime on
+the `messages` table is still a manual dashboard step `db push` doesn't
+touch. No real members exist yet — the database is live and empty of
+users, waiting on an actual application to go through `/login` +
+admin approval.

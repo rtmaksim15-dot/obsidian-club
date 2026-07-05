@@ -102,14 +102,33 @@ offline behavior before this app is positioned as "feels like an app" per
 `CLAUDE.md`'s stated goal — currently tracked for `v0.2` or later in
 `BACKLOG.md`.
 
-## No database provisioned yet
+## Database is now live (2026-07-05) — schema pushed via `db push`, not `migrate`
 
-`DATABASE_URL`/`DIRECT_URL` in `.env.local`/`.env` are placeholders. Every
-`/api/waitlist` submission currently returns `503`. This is expected, not
-a bug — see [TECH_DEBT.md → blocked-on-Max](#blocked-on-max-accounts)
-below. No migrations have ever been run against a real database; the first
-real `prisma migrate dev` will need care (verify no schema drift from
-what's in `schema.prisma` now).
+`DATABASE_URL`/`DIRECT_URL` in `.env.local` point at the real Supabase
+project (`.env`, committed, correctly stays placeholder-only). Schema
+was applied with `npx prisma db push` (all 17 models created directly),
+**not** `prisma migrate dev`/`deploy` — there's no migration history
+(`prisma/migrations/`) yet, since `db push` doesn't create one. This is
+fine for a pre-launch project with no real data to preserve across
+schema changes, but means: (1) any future schema change also needs
+`db push` again (or a first `prisma migrate dev --create-only` pass to
+retroactively baseline a migration history before switching to
+`migrate deploy` for real deployments), and (2) there's no rollback
+history — see `docs/README.md`'s development rule about flagging
+gaps rather than silently working around them if this becomes a real
+problem later.
+
+**Operational gotcha discovered wiring this up:** the Prisma CLI
+(`npx prisma ...`) only auto-loads `.env`, **not** `.env.local` (that's
+a Next.js-only convention — the Next.js dev/build process reads
+`.env.local` fine, but the standalone Prisma CLI doesn't). Real
+secrets must never go in `.env` (committed, already public on GitHub),
+so every `prisma db push`/`db pull`/`db seed`/etc. invocation needs the
+`.env.local` values exported into the shell first:
+`set -a && source .env.local && set +a && npx prisma <command>`. Worth
+switching to a `prisma.config.ts` (Prisma's newer config format, which
+the CLI already nags about in every run) or a `dotenv-cli` wrapper
+script if this gets tedious.
 
 ## No email sending yet
 
@@ -401,18 +420,23 @@ whether a component references it). See `DECISIONS.md`, 2026-07-04.
   into `.env.local` and verified live against the real project (see
   `DECISIONS.md`). `getCurrentUser()`/`middleware.ts` now make real
   Supabase Auth calls instead of degrading to "not configured."
-- **Still needed: the Postgres database password** (Project Settings →
-  Database → Connection string in the Supabase dashboard) — a separate
-  credential from the API keys. `DATABASE_URL`/`DIRECT_URL` are still
-  the placeholder `localhost:5432` values, so Prisma can't reach the
-  database at all yet (confirmed via `npx prisma db pull`: `P1001`).
-  This means every route/page that queries `User`/`Post`/`Room`/etc.
-  still fails past the Auth layer — e.g. `getCurrentUser()` can
-  authenticate a real Supabase session but then can't look up the
-  matching `public.users` row. **Also still needed once the DB is
-  connected:** enabling Realtime on the `messages` table (one-time
-  manual dashboard step, not a migration — see `v0.4`'s note above), and
-  running `npx prisma migrate deploy`/`db seed`.
+- ~~Supabase database connection~~ — **resolved 2026-07-05**: Max
+  provided the database password and the correct session-pooler
+  connection string. `DATABASE_URL`/`DIRECT_URL` both point at
+  `aws-1-us-east-2.pooler.supabase.com:5432` (session mode — supports
+  DDL, unlike transaction-mode port `6543`; the project's direct
+  `db.<ref>.supabase.co` host only resolves via IPv6, unreachable from
+  this dev environment). `npx prisma db push` created all 17 tables;
+  `npx prisma db seed` created the 9 starter rooms. Verified with a real
+  write: `POST /api/waitlist` → confirmed via a direct Prisma query →
+  deleted the test row. The database is live, schema-complete, and
+  empty of real members. See `DECISIONS.md`.
+- **Still needed:** enabling Realtime on the `messages` table (one-time
+  manual dashboard step, not something `db push` configures — see
+  `v0.4`'s note above) — `/rooms/[slug]` chat won't push live updates
+  without it. Also: at least one real `User.isAdmin = true` (no
+  admin-granting UI exists, and no real members exist yet either, since
+  nobody has been through `/login`+approval against the live database).
 - Resend account + verified sending domain (needed for `RESEND_API_KEY`)
 - Uploadthing account (needed for `UPLOADTHING_SECRET`/`UPLOADTHING_APP_ID`)
 

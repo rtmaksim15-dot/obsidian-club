@@ -364,12 +364,19 @@ profile-complete REP bonus checks.
 
 ## Deployment status
 
-Not deployed. No Vercel project, no Supabase project, no Resend account,
-no Uploadthing account connected — all four require Max's own login (see
-[TECH_DEBT.md](../TECH_DEBT.md)). The app builds and runs correctly
-locally (`npm run build`, `npm run dev`); route protection has been
-verified to fail closed (redirect to `/login`) rather than crash in the
-absence of real Supabase credentials.
+Not deployed (no Vercel project/domain yet). **Supabase is connected as
+of 2026-07-05** — a real project (Auth + Postgres both live), see
+[TECH_DEBT.md](../TECH_DEBT.md). No Resend account, no Uploadthing
+account connected yet — both still require Max's own login. The app
+builds and runs correctly locally (`npm run build`, `npm run dev`)
+against the live database; route protection has been verified against
+real Supabase Auth (not just the "not configured" fallback path
+anymore) — `middleware.ts` correctly redirects unauthenticated visitors,
+and a real `POST /api/waitlist` write was confirmed round-tripping
+through Prisma into the live database. The database is schema-complete
+(all 17 models pushed) and seeded with the documented starter rooms, but
+has zero real members — nobody has been through `/login` + admin
+approval against it yet.
 
 ## Security posture (current, honest)
 

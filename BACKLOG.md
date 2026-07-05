@@ -28,27 +28,31 @@ unilaterally.
       `.env.local`. Verified live against the real project (Auth
       settings + admin users list both responded correctly, 0 users —
       fresh project). See `DECISIONS.md`.
-- [ ] **Still blocked:** real `DATABASE_URL`/`DIRECT_URL` — needs the
-      project's Postgres **database password**, a separate credential
-      from the API keys above (Supabase dashboard → Project Settings →
-      Database → Connection string). Without it, Prisma can't reach the
-      database at all (`npx prisma db pull` confirms: still pointing at
-      the placeholder `localhost:5432`) — every DB-backed route/page
-      still fails past the Auth check. Run the first migration
-      (`npx prisma migrate deploy` or `db push`) once this lands.
+- [x] ~~`DATABASE_URL`/`DIRECT_URL` — real Postgres connection~~ —
+      resolved 2026-07-05: Max provided the database password and the
+      correct session-pooler connection string (`aws-1-us-east-2`; the
+      project's direct `db.<ref>.supabase.co` host only resolves via
+      IPv6, unreachable from this environment, so the session pooler —
+      port `5432`, supports DDL unlike the transaction-mode `6543` — is
+      used for both `DATABASE_URL` and `DIRECT_URL`). Ran `npx prisma db
+      push`: all 17 models are now real tables in the live database. Ran
+      `npx prisma db seed`: 9 starter rooms created. Verified a real
+      write round-trip (`POST /api/waitlist` → confirmed via direct
+      Prisma query → cleaned up the test row). See `DECISIONS.md`.
+- [x] ~~Run `npx prisma db seed`~~ — done above, 9 rooms (`general`,
+      `newcomers`, 7 local circles).
+- [ ] Enable Realtime on the `messages` table in the Supabase dashboard
+      (one-time manual step, not a migration — needed for `/rooms/[slug]`
+      chat to actually push live updates)
+- [ ] Set at least one real `User.isAdmin = true` directly in the
+      database (no admin-granting UI exists yet; no real users exist
+      yet either — the database is live but empty of members)
 - [ ] Resend account + verified sending domain + real `RESEND_API_KEY`
       (blocked — needs Max's account)
 - [ ] Uploadthing account + real `UPLOADTHING_SECRET`/`UPLOADTHING_APP_ID`
       (blocked — needs Max's account; needed to verify avatar upload)
 - [ ] Set `NEXT_PUBLIC_APP_URL` in Vercel once the domain is live (see
       `TECH_DEBT.md`)
-- [ ] Once the database is connected: set at least one real
-      `User.isAdmin = true` directly in the database (no admin-granting
-      UI exists yet)
-- [ ] Once the database is connected: run `npx prisma db seed` to seed
-      the documented starter rooms (`general`, `newcomers`, 7 local
-      circles), and enable Realtime on the `messages` table in the
-      Supabase dashboard (one-time manual step, not a migration)
 - [ ] **Max to provide real content** for Initiation Ritual steps 2/3/5:
       Code of Conduct text, Lord Obsidian's introductory material,
       safety/respect guidelines (see `TECH_DEBT.md`) — blocks the ritual
