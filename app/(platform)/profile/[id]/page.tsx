@@ -2,15 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import ReviewForm from "@/components/shared/ReviewForm";
-
-const LEVEL_NAMES: Record<number, string> = {
-  1: "Initiate",
-  2: "Member",
-  3: "Senior Member",
-  4: "Mentor",
-  5: "Master",
-  6: "Council Member",
-};
+import { LEVEL_NAMES } from "@/lib/rating/levels";
 
 /**
  * Member profile — real header data plus (v0.5) real reviews. Still no

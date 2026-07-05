@@ -422,3 +422,76 @@ brand-guide infographics themselves were copied into the repo (large
 binaries; the durable content is captured in `LordObsidian.md` instead).
 No version bump for this pass — small, cross-cutting, not tied to a
 `ROADMAP.md` milestone.
+
+### 2026-07-04 (later same day) — Both flagged items resolved
+
+Asked Max the deliberately-not-decided portrait question via
+`AskUserQuestion`; answer: "Да, подключить." Wired the library-armchair/
+cigar/cane portrait into the Landing's "Lord Obsidian" card as
+`public/brand/lord-obsidian.jpg` (cropped + compressed from
+`Визуал/C3BA0C0F-...png` — chosen over the other portraits because it's
+the pose both identity-guide sheets already use as "the" hero shot, and
+it has no background elements). The NSFW-adjacent variant
+(`4D812A56-...png`) was excluded, per the flag raised earlier.
+
+Separately, Max pointed out a specific image in the identity guide
+(`Визуал/C733A838-...png`) as "there's a photo with a clear/precise logo
+you need to use" — cropped just the monogram lockup from it and replaced
+`components/ui/Logo.tsx`'s hand-drawn SVG entirely with that real image
+(`public/brand/oc-monogram.webp`). This is a **raster crop of a
+photographed mockup**, not a true vector export — closes the "hand-drawn
+approximation" gap `TECH_DEBT.md` had flagged, but doesn't close the
+underlying "need a real vector asset" item, which still stands for any
+future need to scale the mark losslessly (print, large format) or derive
+a simplified icon-scale version for `ogIcon.tsx`/`opengraph-image.tsx`.
+
+### 2026-07-05 — Expanded CLAUDE.md: full replacement, live migration (not a future-scope layer)
+
+Max shared a substantially expanded `CLAUDE.md` — Layer 1/2 reputation
+model (Title + REP point ledger), a 5-tab nav structure, OAuth/phone
+registration + role/interest onboarding, and a full Shop & Payments
+section (crypto primary, adult-friendly card processors secondary,
+escrow). Read it, confirmed understanding, and reported back the
+concrete conflicts with what's already live — level names, the
+reputation formula, nav labels — since this doc doesn't just add future
+scope like `OC_MASTER.md` did ([ADR-0014](docs/ADR/0014-adopt-oc-master-as-strategic-source.md)),
+it contradicts things already computing real numbers for users today.
+
+Asked directly: full replacement (migrate) or a v2 vision layered on an
+unchanged MVP? Answer: **"Полная замена, мигрируем."**
+
+Executed in this pass — full detail and rationale in
+[ADR-0015](docs/ADR/0015-claude-md-v2-full-replacement.md):
+- Level names renamed everywhere (Initiate/Keeper/Steward/Warden/Master/
+  Council), centralized into `lib/rating/levels.ts` (previously
+  duplicated in three files — worth doing regardless of the rename).
+- Reputation model replaced: `rating-engine.ts`'s weighted formula →
+  `rep-engine.ts`'s discrete point ledger (`User.rating`→`rep`,
+  `RatingHistory`→`RepHistory`, `User.influence` dropped — no equivalent
+  in the new model). Wired the REP triggers that are mechanically real
+  today (profile complete, verification passed, first community intro,
+  daily-login streaks, invited-member/invitee-Level-II/invitee-90-days);
+  recorded the rest of `CLAUDE.md`'s earn/lose table in code
+  (`REP_TABLE`) marked `wired: false` with the specific missing feature
+  named, rather than silently dropping the numbers.
+- Navigation restructured: `/content` split into `/feed` + `/library`,
+  `/shop` added as an honest placeholder, bottom nav relabeled
+  Feed/Shop/Community/Library/Profile.
+- Onboarding role (`MemberRole` enum) + free-text interest tags added to
+  the existing profile self-edit form (no fixed interest taxonomy exists
+  anywhere in the source docs, so a free-text tag input doesn't invent
+  one) — chose this over building a separate post-approval wizard, since
+  nothing in scope needed a multi-step flow yet.
+- "No external links in posts" — a literal specified rule, not future
+  scope — added as real validation on post create/edit.
+
+Deliberately not touched — real accounts or more design needed first,
+tracked in `TECH_DEBT.md`: phone/Google/Apple sign-in, all of Shop &
+Payments (crypto, card processors, escrow), algorithmic Feed ranking,
+video posts. Because no real Supabase project/user data exists yet (see
+`TECH_DEBT.md`'s "Now" blockers), the `User.rating`→`rep` and
+`RatingHistory`→`RepHistory` renames needed no data migration — worth
+remembering this option disappears once real users exist.
+
+No version bump for the planning/decision itself; the migration work is
+tracked as `v0.7` in `BACKLOG.md`.

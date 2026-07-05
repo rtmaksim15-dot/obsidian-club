@@ -10,7 +10,10 @@ const PROTECTED_PREFIXES = [
   "/rooms",
   "/profile",
   "/events",
-  "/content",
+  "/content", // kept protected — now just a redirect to /feed, see ADR-0015
+  "/feed",
+  "/library",
+  "/shop",
   "/marketplace",
   "/progress",
   "/admin",

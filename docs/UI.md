@@ -60,10 +60,10 @@ reimplement inline.
 
 ## Reusable React components (`components/`)
 
-- **`components/ui/Logo.tsx`** — the OC monogram, including the spear
-  glyph between O/C (see [LordObsidian.md](LordObsidian.md#symbolism-the-oc-monogram)).
-  **Placeholder** (outlined Cinzel glyphs, not the final vector asset) —
-  see [TECH_DEBT.md](../TECH_DEBT.md).
+- **`components/ui/Logo.tsx`** — the OC monogram, rendering the real
+  cropped brand image `public/brand/oc-monogram.webp` (see
+  [LordObsidian.md](LordObsidian.md#symbolism-the-oc-monogram)). **Raster,
+  not vector** — see [TECH_DEBT.md](../TECH_DEBT.md).
 - **`components/shared/WaitlistForm.tsx`** — the application form, calls
   `POST /api/waitlist`.
 - **`components/shared/Reveal.tsx`** — scroll-triggered fadeInUp. Exports

@@ -1,11 +1,14 @@
 # Philosophy
 
-> Source: `OC_MASTER.md` + the revised `CLAUDE.md` (2026-07-04,
-> `files.zip` — see [ADR-0014](ADR/0014-adopt-oc-master-as-strategic-source.md))
-> take priority; the original `CLAUDE.md` §11, 13, `PRODUCT.md` §1, 3–6,
-> and `DESIGN.md` §1 still apply where the newer docs are silent. Same
-> rule as [Vision.md](Vision.md): if this page and the source docs
-> disagree, the source docs are correct.
+> Source: the expanded `CLAUDE.md` (2026-07-05 —
+> see [ADR-0015](ADR/0015-claude-md-v2-full-replacement.md)) takes
+> priority over everything below; then `OC_MASTER.md` + the revised
+> `CLAUDE.md` (2026-07-04, `files.zip` — see
+> [ADR-0014](ADR/0014-adopt-oc-master-as-strategic-source.md)); the
+> original `CLAUDE.md` §11, 13, `PRODUCT.md` §1, 3–6, and `DESIGN.md` §1
+> still apply where the newer docs are silent. Same rule as
+> [Vision.md](Vision.md): if this page and the source docs disagree, the
+> source docs are correct.
 
 ## The one sentence everything else follows from
 
@@ -24,9 +27,12 @@ Even where entry is purchase-triggered, membership itself is earned,
 extended, and, when it must be, withdrawn — the purchase opens the door,
 it doesn't buy standing once inside.
 
-Everything rests on four things: **reputation, rating, influence, and
-trust**. These are not numbers to farm — they're the record of how a person
-conducts themselves, who they bring in, and what they give.
+Everything rests on three things: **reputation, REP, and Trust Score**
+(originally four — reputation, rating, influence, trust; `rating` became
+REP and `influence` was dropped in the 2026-07-05 migration, see
+[ADR-0015](ADR/0015-claude-md-v2-full-replacement.md)). These are not
+numbers to farm — they're the record of how a person conducts
+themselves, who they bring in, and what they give.
 
 ## Brand voice (`OC_MASTER.md`)
 

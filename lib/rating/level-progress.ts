@@ -1,4 +1,5 @@
 import type { User } from "@prisma/client";
+import { LEVEL_NAMES } from "./levels";
 
 export type ProgressCriterion = {
   label: string;
@@ -9,15 +10,6 @@ export type LevelProgress = {
   nextLevelName: string | null;
   criteria: ProgressCriterion[];
   isManualAppointment: boolean;
-};
-
-const LEVEL_NAMES: Record<number, string> = {
-  1: "Initiate",
-  2: "Member",
-  3: "Senior Member",
-  4: "Mentor",
-  5: "Master",
-  6: "Council Member",
 };
 
 /**
@@ -67,7 +59,7 @@ export function getLevelProgress(
     };
   }
 
-  // PRODUCT.md §2: Mentor/Master/Council are appointed, not earned via a
+  // PRODUCT.md §2: Warden/Master/Council are appointed, not earned via a
   // checklist ("назначается вручную" / "по личному приглашению") — no
   // progress bar to fabricate past Level III.
   return {

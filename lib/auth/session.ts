@@ -1,5 +1,6 @@
 import { createClient } from "./supabase-server";
 import { prisma } from "@/lib/db/prisma";
+import { touchDailyLogin } from "@/lib/rating/rep-engine";
 
 /**
  * Current authenticated member, joined against this app's own `User` row
@@ -25,5 +26,17 @@ export async function getCurrentUser() {
 
   if (!authUser) return null;
 
-  return prisma.user.findUnique({ where: { id: authUser.id } });
+  const user = await prisma.user.findUnique({ where: { id: authUser.id } });
+
+  // Daily-login REP (CLAUDE.md, 2026-07-05) — a non-critical side effect,
+  // never allowed to fail the actual auth check. `getCurrentUser` can run
+  // more than once per page load; `touchDailyLogin` is written to be
+  // safe under that.
+  if (user) {
+    touchDailyLogin(user.id).catch((err) =>
+      console.error("[session] Failed to touch daily-login streak:", err),
+    );
+  }
+
+  return user;
 }

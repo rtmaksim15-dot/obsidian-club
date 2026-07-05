@@ -6,9 +6,11 @@
 > If you find a mismatch that ISN'T explained by a linked ADR, that's a
 > conflict: stop and flag it (see [docs/README.md](README.md)).
 
-Current version: **v0.6.0** (Content & Achievements). `package.json`'s
+Current version: **v0.7.0** (CLAUDE.md v2 Migration). `package.json`'s
 `version` field is the single source of truth for the current version
-number.
+number. See [ADR-0015](ADR/0015-claude-md-v2-full-replacement.md) for
+why `v0.7` renamed levels, replaced the reputation engine, and
+restructured navigation mid-stream.
 
 ## Stack (as actually installed)
 
@@ -47,10 +49,13 @@ obsidian-club/
 │   │   ├── profile/[id]/page.tsx        # profile view (no tabs yet)
 │   │   ├── profile/[id]/edit/page.tsx   # self-edit only
 │   │   ├── admin/applications/page.tsx  # admin panel v1 — approve/decline
-│   │   ├── rooms/page.tsx               # real room list, locked rooms shown per DESIGN.md
+│   │   ├── rooms/page.tsx               # real room list ("Community" nav tab), locked rooms shown per DESIGN.md
 │   │   ├── rooms/[slug]/page.tsx        # room chat — real-time via Supabase Realtime
-│   │   ├── content/page.tsx             # real feed + library (v0.6, see below)
-│   │   ├── events/page.tsx              # "coming soon" placeholder (v0.7 builds the real thing)
+│   │   ├── feed/page.tsx                # posts/stories feed (v0.7 — split from /content)
+│   │   ├── library/page.tsx             # articles/lectures/courses/manifestos (v0.7 — split from /content)
+│   │   ├── content/page.tsx             # redirects to /feed (v0.7, kept for old links)
+│   │   ├── shop/page.tsx                # "coming soon" placeholder (v0.7) — Shop & Payments need real accounts, see TECH_DEBT.md
+│   │   ├── events/page.tsx              # "coming soon" placeholder (v0.8 builds the real thing), linked from /rooms
 │   │   └── marketplace|progress/        # still empty — later versions
 │   ├── api/
 │   │   ├── waitlist/route.ts
@@ -65,24 +70,25 @@ obsidian-club/
 │   ├── layout.tsx                       # fonts, metadata, Analytics
 │   └── globals.css                      # full DESIGN.md token system
 ├── components/
-│   ├── ui/Logo.tsx                      # OC monogram (placeholder, see TECH_DEBT)
+│   ├── ui/Logo.tsx                      # OC monogram — real cropped brand image (v0.6, see TECH_DEBT)
 │   └── shared/WaitlistForm.tsx, Reveal.tsx, ApplicationsQueue.tsx,
 │       AvatarUploadButton.tsx, BottomNav.tsx, ComingSoon.tsx, ProfileEditForm.tsx,
-│       RoomChat.tsx, ReviewForm.tsx, ContentComposer.tsx, LikeButton.tsx
+│       RoomChat.tsx, ReviewForm.tsx, ContentComposer.tsx, LikeButton.tsx, PostList.tsx
 ├── lib/
 │   ├── auth/
 │   │   ├── supabase-browser.ts          # Client Component Supabase client
 │   │   ├── supabase-server.ts           # Server Component / Route Handler client
 │   │   ├── supabase-admin.ts            # service-role client — server-only
-│   │   ├── session.ts                   # getCurrentUser()
+│   │   ├── session.ts                   # getCurrentUser() — also touches the daily-login REP streak (v0.7)
 │   │   ├── require-admin.ts             # requireAdmin()
-│   │   └── ritual.ts                    # getRitualStatus() — real, computed, see ADR-0013
+│   │   └── ritual.ts                    # getRitualStatus() — real, computed, see ADR-0013; awards first-community-intro REP (v0.7)
+│   ├── rating/levels.ts                 # LEVEL_NAMES — single source of truth for level display names (v0.7)
 │   ├── rating/level-progress.ts         # getLevelProgress() — real criteria only, no fabricated metrics
-│   ├── rating/level-progression.ts      # checkLevelUp() — real I→II/II→III auto-promotion (v0.6)
+│   ├── rating/level-progression.ts      # checkLevelUp() — real I→II/II→III auto-promotion (v0.6); awards invitee-Level-II REP to the inviter (v0.7)
 │   ├── rating/room-access.ts            # canAccessRoom() — level gate + newcomers' 30-day window
 │   ├── rating/content-rights.ts         # canCreatePostType() — PRODUCT.md §10's exact table (v0.6)
-│   ├── rating/rating-engine.ts          # recalculateRating() — ARCHITECTURE.md §5's weighted formula
-│   ├── rating/referral-lifecycle.ts     # syncReferralLifecycle() — joined→active, +10 Trust Score
+│   ├── rating/rep-engine.ts             # awardRep(), touchDailyLogin(), checkProfileCompleteBonus(), REP_TABLE (v0.7 — replaces rating-engine.ts)
+│   ├── rating/referral-lifecycle.ts     # syncReferralLifecycle() — joined→active, +10 Trust Score; invitee-active-90-days REP (v0.7)
 │   ├── db/prisma.ts
 │   └── utils/email.ts, ogIcon.tsx, codes.ts, uploadthing.ts, achievements.ts
 ├── prisma/schema.prisma, seed.ts        # seeds only documented rooms — see DECISIONS.md 2026-07-03
@@ -97,9 +103,9 @@ reserved for later versions. `lib/rating/` is no longer empty (see above).
 
 All 13 models from the original spec exist: `User`, `UserProfile`, `Room`,
 `Message`, `Post`, `Event`, `EventAttendee`, `Review`, `Referral`,
-`Achievement`, `UserAchievement`, `RatingHistory`, `MarketplaceItem`,
-`Notification`, plus `Waitlist`, plus two added in `v0.6`: `Like`,
-`Comment`.
+`Achievement`, `UserAchievement`, `RepHistory` (renamed from
+`RatingHistory` in `v0.7`), `MarketplaceItem`, `Notification`, plus
+`Waitlist`, plus two added in `v0.6`: `Like`, `Comment`.
 
 **Deviations from `ARCHITECTURE.md` §3/§10** (all documented, none
 silent):
@@ -114,6 +120,16 @@ silent):
   like-toggling and comment counts once the content feed became real.
   `Comment` exists in the schema (with `isDeleted` for soft-delete) but
   has no API routes yet — see [TECH_DEBT.md](../TECH_DEBT.md).
+- `User` reshaped in `v0.7` per [ADR-0015](ADR/0015-claude-md-v2-full-replacement.md):
+  `rating` (Int) renamed to `rep`, now a discrete point ledger rather
+  than a recomputed weighted score; `influence` dropped entirely (no
+  equivalent in the new CLAUDE.md reputation model); `reputation` (the
+  0-5 peer-review star average) unchanged in shape but now independent
+  of `rep` rather than one of its weighted inputs; added `role`
+  (`MemberRole` enum: dominant/submissive/switch/observer/newcomer),
+  `interests` (`String[]`, free-text — no fixed taxonomy is specified
+  anywhere), `currentStreak`/`longestStreak`/`lastLoginDate` (daily-login
+  REP streak tracking).
 
 `User.id` is expected to match the corresponding Supabase
 `auth.users.id` exactly (same UUID) — enforced by application code at
@@ -149,8 +165,9 @@ Conventions: [API/README.md](API/README.md)
 
 `middleware.ts` refreshes the Supabase session on every request and
 redirects unauthenticated visitors away from `/hall`, `/rooms`,
-`/profile`, `/events`, `/content`, `/marketplace`, `/progress`, `/ritual`,
-and `/admin` (page routes only — **not** `/api/admin/*` or `/api/profile`,
+`/profile`, `/events`, `/content`, `/feed`, `/library`, `/shop`,
+`/marketplace`, `/progress`, `/ritual`, and `/admin` (page routes only —
+**not** `/api/admin/*` or `/api/profile`,
 which must and do call `getCurrentUser()`/`requireAdmin()` themselves; see
 [API/README.md](API/README.md#auth-v02)). Both `middleware.ts` and
 `lib/auth/session.ts` degrade to "not logged in" rather than crashing
@@ -206,60 +223,88 @@ at real community content for an adult platform. `POST /api/admin/rooms`
 exists so admins can create thematic rooms with real topics as needed.
 See `DECISIONS.md`, 2026-07-03.
 
-## Rating engine (actual, `v0.5`/`v0.6`)
+## REP engine (actual, `v0.7` — replaces the `v0.5`/`v0.6` weighted rating engine)
 
-`lib/rating/rating-engine.ts#recalculateRating()` implements
-`ARCHITECTURE.md` §5's weighted formula exactly for the one
-fully-specified component (`reputation = stars × 6`, capping at the
-documented 30-point weight) and with **documented, reasonable defaults**
-for the others, since the source doc names what counts but not the exact
-curve:
+**Superseded in `v0.7`** — see [ADR-0015](ADR/0015-claude-md-v2-full-replacement.md).
+`lib/rating/rating-engine.ts#recalculateRating()`, which implemented
+`ARCHITECTURE.md` §5's weighted formula (reputation/activity/
+achievements/referralQuality/events/content components summed into a
+single score), **has been deleted**. The new CLAUDE.md (2026-07-05)
+specifies a materially different mechanic — REP, a discrete point
+ledger — not a refinement of the old formula, so this was a replacement,
+not an extension.
 
-- `activity` (weight 20): `min(20, messageCount × 0.2 + postCount × 1)` —
-  counts *all* published posts/stories, regardless of type.
-- `achievements` (weight 15): sum of earned achievements'
-  `ratingBonus`, capped at 15.
-- `referralQuality` (weight 20): sum of the inviter's `Referral.impactScore`
-  values, capped at 20.
-- `content` (weight 5, real as of `v0.6`): `min(5, curatedCount × 2)`,
-  where `curatedCount` is published `article`/`lecture`/`course`/
-  `manifesto` posts only — deliberately disjoint from `activity`'s
-  post count so the same post isn't scored twice under two buckets.
-- `events` (weight 10): **still always 0** — no real Events feature
-  exists yet (`v0.7`) to measure it from. Honest zero, not the full
-  weight.
+`lib/rating/rep-engine.ts#awardRep(userId, points, reason, source)`
+increments `User.rep` directly and logs the delta to `RepHistory` (shown
+on `/hall`) — the ledger *is* the score, there's nothing to recompute.
+`REP_TABLE` records CLAUDE.md's entire earn/lose table verbatim, each
+entry flagged `wired: true/false`. Wired today:
 
-Every recalculation logs its delta to `RatingHistory` (shown on
-`/hall`). Reputation itself (`User.reputation`, the 0-5 star value that
-feeds the formula above) is a straight average of a member's visible
-`Review` ratings — see [API/reviews.md](API/reviews.md).
+- `profileComplete` (+100, one-time) — `checkProfileCompleteBonus()`,
+  checked on profile save; "complete" means bio + avatar + city.
+- `verificationPassed` (+200) — on admin approval.
+- `firstCommunityIntro` (+100, one-time) — on the Initiation Ritual's
+  step 4 (first message in the newcomers' room).
+- `dailyLogin` (+5) / `streak7Day` (+50) / `streak30Day` (+300) —
+  `touchDailyLogin()`, called from `getCurrentUser()` on every
+  authenticated request; a conditional `updateMany` (not a naive
+  read-then-write) makes it safe against `getCurrentUser()` being
+  invoked more than once per page load.
+- `invitedNewMember` (+300, to the inviter) — on admin approval of a
+  referred applicant.
+- `inviteeReachedLevel2` (+500, to the inviter) — from
+  `checkLevelUp()`'s promotion logic.
+- `inviteeActive90Days` (+1000, to the inviter) — a new milestone in
+  `syncReferralLifecycle()`, distinct from the existing 30-day Trust
+  Score flip below.
+
+Not wired — real point values, no dependent feature exists yet (events,
+moderation/reporting, marketplace, editorial review, thank-you
+reactions, challenges, club missions, subscriptions/purchases): see
+[TECH_DEBT.md](../TECH_DEBT.md) for the full list, including the entire
+"lose" side of the table (no moderation system exists to trigger any of
+it).
+
+`User.reputation` (the 0-5 star value, a straight average of a member's
+visible `Review` ratings — see [API/reviews.md](API/reviews.md)) is
+**independent of REP** as of this version, not a weighted input to it.
+`User.influence` was dropped — no equivalent concept exists in the new
+model.
 
 **Trust Score** (`lib/rating/referral-lifecycle.ts#syncReferralLifecycle()`):
-implements `ARCHITECTURE.md` §5's `+10` per referral reaching `active`
-status (30+ days after the invitee joined) exactly as specified. The
-`-20`/`-50` deltas for invitee warnings/removals are **not implemented**
-— there's no member-warning or member-removal admin capability built
-yet to trigger them from (see [TECH_DEBT.md](../TECH_DEBT.md)).
+unchanged by the `v0.7` migration — still `ARCHITECTURE.md` §5's `+10`
+per referral reaching `active` status (30+ days after the invitee
+joined). The `-20`/`-50` deltas for invitee warnings/removals are **not
+implemented** — there's no member-warning or member-removal admin
+capability built yet to trigger them from (see
+[TECH_DEBT.md](../TECH_DEBT.md)).
 
-## Content & Achievements (actual, `v0.6`)
+## Content & Achievements (actual, `v0.6`, navigation split in `v0.7`)
 
-`/content` (`app/(platform)/content/page.tsx`) replaces the "coming soon"
-placeholder with a real feed (posts/stories) and library
-(articles/lectures/courses/manifestos), both filtered server-side to
-`Post.minLevel <= viewer.level` — out-of-reach posts are excluded
-entirely, not shown locked (unlike Rooms; no source doc describes a
-"locked post" teaser to build toward).
+Originally one page (`/content`), split in `v0.7` into `/feed`
+(`app/(platform)/feed/page.tsx` — posts/stories) and `/library`
+(`app/(platform)/library/page.tsx` — articles/lectures/courses/
+manifestos) to match CLAUDE.md's (2026-07-05) 5-tab nav structure — see
+[ADR-0015](ADR/0015-claude-md-v2-full-replacement.md). `/content` now
+redirects to `/feed`, kept in case it's linked externally. Both pages
+share `components/shared/PostList.tsx` (the post-card rendering) and
+`ContentComposer.tsx` (the create form, only offering types the caller
+can create). Both filter server-side to `Post.minLevel <= viewer.level`
+— out-of-reach posts are excluded entirely, not shown locked (unlike
+Rooms; no source doc describes a "locked post" teaser to build toward).
 
 `lib/rating/content-rights.ts#canCreatePostType()` gates *creation*
 against `PRODUCT.md` §10's exact table (post/story: Level 1+; article:
-Mentor/4+; lecture, course: Master/5+; manifesto: admin-only, no member
+Warden/4+; lecture, course: Master/5+; manifesto: admin-only, no member
 level grants it) — enforced server-side in `POST /api/posts`, not just
 hidden in `ContentComposer.tsx`'s type dropdown. Posts publish
 immediately on creation; no draft workflow is documented, so none was
 built. `Post.minLevel` (read-access gate) is set by the author at
 creation (default 1) and is independent of the creation-rights table —
 one controls who can *write* a type, the other who can *see* a specific
-post.
+post. As of `v0.7`, `POST`/`PATCH /api/posts` also reject content
+containing a URL (`http(s)://` or `www.`) — CLAUDE.md's literal "no
+external links in posts" rule.
 
 Likes are a real `Like` join table (`POST /api/posts/:id/like`, toggles,
 keeps `Post.likesCount` in sync via transaction) — added this version
@@ -292,6 +337,30 @@ inviter's own Hall page loads, not on a schedule — naturally idempotent
 (a referral leaves the `joined` status once promoted, so re-checking
 can't double-credit it), but an inviter who never visits `/hall` won't
 have their referrals promoted until they do.
+
+## Navigation & onboarding (actual, `v0.7`)
+
+Bottom nav (`components/shared/BottomNav.tsx`) restructured from
+Hall/Rooms/Content/Events/Profile to CLAUDE.md's (2026-07-05)
+Feed/Shop/Community/Library/Profile — see
+[ADR-0015](ADR/0015-claude-md-v2-full-replacement.md). "Community"
+points at the existing `/rooms` (groups/people-discovery/dating aren't
+built — `/rooms` now links to `/events` instead of Events having its own
+tab). "Profile" points at the existing `/hall` (the branded "Hall"
+self-view dashboard keeps its in-app name; the nav label is just
+CLAUDE.md's generic term). "Shop" is a new honest placeholder — no
+product catalog or payment infrastructure exists (see
+[TECH_DEBT.md](../TECH_DEBT.md)).
+
+Onboarding role (`User.role`, the `MemberRole` enum) and interest tags
+(`User.interests`, free-text — no fixed taxonomy is specified anywhere)
+are captured via the existing profile self-edit form
+(`/profile/[id]/edit`, `PATCH /api/profile`) rather than a separate
+post-approval wizard — CLAUDE.md describes these as onboarding-flow
+fields, but nothing in scope needed a dedicated multi-step flow yet.
+`locationCity` was made editable in the same form (previously set once,
+non-editably, at approval) since it's one of the three fields the
+profile-complete REP bonus checks.
 
 ## Deployment status
 

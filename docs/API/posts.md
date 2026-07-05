@@ -33,17 +33,29 @@ creation-rights table:
 | Type | Minimum level to create |
 |---|---|
 | `post`, `story` | Level 1 (Initiate) |
-| `article` | Mentor (Level 4)+ |
+| `article` | Warden (Level 4)+ |
 | `lecture`, `course` | Master (Level 5)+ |
 | `manifesto` | Admin only — no member level grants it |
+
+Rejects content (or title) containing a URL (`http(s)://` or `www.`) —
+`422` — per `CLAUDE.md`'s (2026-07-05) "no external links in posts"
+rule.
 
 Publishes immediately (`isPublished: true`, `publishedAt: now()`) — no
 draft workflow is documented anywhere, so none was built. `201` with
 `{ post: {...} }` on success. Grants the `first-post` achievement on a
-member's first published post and triggers
-`lib/rating/rating-engine.ts#recalculateRating()` (the `content`
-component only counts curated types — see
-[Architecture.md](../Architecture.md#content--achievements-actual-v06)).
+member's first published post. **As of `v0.7`, publishing no longer
+directly moves REP** — `CLAUDE.md`'s REP table only rewards posts via
+"useful post" (needs an upvote/quality mechanism, not built) or "article
+approved by editorial" (needs an editorial workflow, not built); see
+[Architecture.md](../Architecture.md#rep-engine-actual-v07-replaces-the-v05v06-weighted-rating-engine)
+and `TECH_DEBT.md`.
+
+> Note: `/feed` and `/library` (the pages, `v0.7`) query Prisma directly
+> server-side rather than calling this `GET` endpoint — same pattern as
+> `/rooms` (see [rooms.md](rooms.md)). This route exists for any other
+> client (mobile, future API consumers) and is what the composer's
+> `POST` actually calls.
 
 ## `GET /api/posts/:id`
 

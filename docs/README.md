@@ -64,8 +64,12 @@ documentation, not a new decision.
 
 From this point forward, work is organized by **product version**, not by
 calendar week. Pattern: `v0.1` = Landing, `v0.2` = Authentication, `v0.3` =
-Profile, `v0.4` = Community, `v0.5` = Reputation, etc. — pre-1.0 versions are
-iterative builds toward the public launch; `v1.0` is the January 2027 launch
-described in `ROADMAP.md`. `CHANGELOG.md` follows [Semantic
+Profile, `v0.4` = Community, `v0.5` = Reputation, `v0.6` = Content &
+Achievements, `v0.7` = CLAUDE.md v2 Migration, etc. — pre-1.0 versions are
+iterative builds toward the public launch; `v1.1` is the January 2027
+launch described in `ROADMAP.md` (renumbered up by one from `v1.0` when
+`v0.7` was inserted ahead of schedule — see
+[ADR-0015](ADR/0015-claude-md-v2-full-replacement.md) and
+`BACKLOG.md`). `CHANGELOG.md` follows [Semantic
 Versioning](https://semver.org/); every completed version updates the
 changelog, and touches ADR/`Architecture.md` if it changed the architecture.

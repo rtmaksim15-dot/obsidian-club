@@ -1,5 +1,6 @@
 import type { User, UserProfile } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
+import { awardRep, REP_TABLE } from "@/lib/rating/rep-engine";
 
 export type RitualStepStatus = "done" | "deferred" | "todo";
 
@@ -35,6 +36,23 @@ export async function getRitualStatus(user: User, profile: UserProfile | null): 
     (await prisma.message.count({
       where: { userId: user.id, room: { slug: "newcomers" } },
     })) > 0;
+
+  // CLAUDE.md (2026-07-05): "First community introduction" — +100 REP,
+  // one-time. Tracked via a RepHistory row (source key) rather than a
+  // new schema flag, same idempotency pattern as checkProfileCompleteBonus.
+  if (introducedInNewcomerRoom) {
+    const alreadyGranted = await prisma.repHistory.findFirst({
+      where: { userId: user.id, source: "first-community-intro" },
+    });
+    if (!alreadyGranted) {
+      await awardRep(
+        user.id,
+        REP_TABLE.earn.firstCommunityIntro.points,
+        "First community introduction",
+        "first-community-intro",
+      );
+    }
+  }
 
   const steps: RitualStatus["steps"] = [
     {

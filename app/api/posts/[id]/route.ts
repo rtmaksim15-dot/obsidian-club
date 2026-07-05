@@ -69,6 +69,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (content && content.length > 20000) {
     return NextResponse.json({ error: "Content is too long." }, { status: 422 });
   }
+  // CLAUDE.md (2026-07-05): no external links in posts — same rule as
+  // creation, see app/api/posts/route.ts.
+  if (content && /(https?:\/\/|www\.)\S+/i.test(content)) {
+    return NextResponse.json({ error: "External links aren't allowed in posts." }, { status: 422 });
+  }
 
   const updated = await prisma.post.update({
     where: { id: params.id },

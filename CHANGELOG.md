@@ -8,7 +8,58 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.6.0` is the current released version.
+Nothing yet — `v0.7.0` is the current released version.
+
+## [0.7.0] — 2026-07-05
+
+CLAUDE.md v2 Migration: an expanded `CLAUDE.md` Max shared this day
+directly conflicted with mechanics already live (level names, the
+reputation formula, navigation) — see
+[ADR-0015](docs/ADR/0015-claude-md-v2-full-replacement.md). Confirmed with
+Max this is a full replacement, not new scope on top, and migrated.
+
+### Changed
+
+- Level names renamed everywhere: Initiate/Member/Senior Member/Mentor/
+  Master/Council Member → Initiate/Keeper/Steward/Warden/Master/Council.
+  Centralized into `lib/rating/levels.ts` (was duplicated in three files).
+- Reputation model replaced: `lib/rating/rating-engine.ts`'s weighted
+  formula → `lib/rating/rep-engine.ts`'s discrete REP point ledger.
+  `User.rating` renamed to `rep`; `RatingHistory` renamed to
+  `RepHistory`; `User.influence` dropped (no equivalent in the new
+  model); `User.reputation` (peer-review stars) kept, now independent of
+  REP rather than a weighted input to it.
+- `/content` split into `/feed` (posts/stories) and `/library`
+  (articles/lectures/courses/manifestos); `/content` now redirects to
+  `/feed`. Bottom nav relabeled Feed/Shop/Community/Library/Profile
+  ("Community" → `/rooms`, "Profile" → `/hall`).
+
+### Added
+
+- `/shop` — honest "coming soon" placeholder (same pattern as `/events`).
+- `User.role` (`MemberRole` enum: dominant/submissive/switch/observer/
+  newcomer) and `User.interests` (free-text tags) — captured via the
+  existing profile self-edit form; `locationCity` made editable there
+  too (previously set once at approval).
+- `User.currentStreak`/`longestStreak`/`lastLoginDate` — daily-login
+  streak tracking, feeding the new REP daily-login/7-day/30-day bonuses.
+- Real REP triggers wired: profile-complete, verification-passed
+  (admin approval), first-community-introduction (Initiation Ritual
+  step 4), daily-login streaks, invited-new-member,
+  invitee-reached-Level-II, invitee-active-90-days. The rest of
+  `CLAUDE.md`'s earn/lose table is recorded in
+  `rep-engine.ts#REP_TABLE` but not wireable yet (no dependent feature
+  exists) — see `TECH_DEBT.md`.
+- "No external links in posts" validation on post create/edit — a
+  literal `CLAUDE.md` rule.
+- `docs/ADR/0015-claude-md-v2-full-replacement.md`.
+
+### Not done this pass (see `TECH_DEBT.md`/`BACKLOG.md`)
+
+Google/Apple/phone sign-in, Shop & Payments (crypto, adult-friendly card
+processor, escrow), algorithmic Feed ranking (For You/Following), video
+posts — all need real external accounts or a dedicated design pass
+before any code.
 
 ## [0.6.0] — 2026-07-04
 

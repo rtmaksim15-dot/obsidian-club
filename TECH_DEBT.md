@@ -6,23 +6,79 @@ Each item should eventually become a `BACKLOG.md` entry once it's actually
 scheduled; until then, it lives here as "known, not forgotten, not yet
 prioritized."
 
+## CLAUDE.md v2 migration gaps (2026-07-05, see ADR-0015)
+
+- **REP actions not wireable yet** — `lib/rating/rep-engine.ts#REP_TABLE`
+  records CLAUDE.md's entire earn/lose point table verbatim, each entry
+  flagged `wired: true/false`. The `false` ones are real point values with
+  no way to trigger them today, because the feature they depend on
+  doesn't exist: offline/major event attendance + event organizing (no
+  Events feature beyond a placeholder), useful-post marking (no
+  upvote/quality mechanism), article editorial approval (posts publish
+  immediately, no review queue), thank-you reactions (don't exist),
+  challenges/competitions/club missions (don't exist), monthly
+  membership/OC artifact purchases (no Shop/payments), and the entire
+  "lose" side — report confirmed, incorrect behaviour, event disruption,
+  spam, fraud, gross violation, exclusion (no moderation/reporting system
+  exists at all yet — this is the same gap `v0.5`'s Trust Score work
+  already flagged for the `-20`/`-50` deltas). **Fix:** wire each as its
+  dependent feature gets built — the point values are already correct,
+  just not triggerable.
+- **OAuth / phone sign-in not implemented** — CLAUDE.md specifies
+  email+password (built), phone+password, Google Sign-In, and Apple
+  Sign-In. Only email/password exists (`/login`, Supabase Auth). Google/
+  Apple need real OAuth app credentials registered with each provider,
+  plus enabling those providers in the Supabase Auth dashboard — both
+  need Max's accounts, same shape of blocker as the existing Vercel/
+  Supabase/Resend/Uploadthing items below. Phone auth needs an SMS
+  provider (Supabase supports Twilio/MessageBird/Vonage) — another
+  account Max would need to create.
+- **Shop & Payments — nothing beyond a placeholder** — `/shop` is an
+  honest "coming soon" page, same pattern as `/events`. CLAUDE.md
+  specifies: a real product catalog (Standard/Premium/Extra Premium
+  tiers — concepts, not actual SKUs to seed), crypto payments (USDT/BTC/
+  ETH) as primary, an adult-friendly card processor (Segpay/Epoch/CCBill
+  are named) as secondary, and escrow logic for marketplace bookings.
+  None of this is buildable without: real product data, a crypto payment
+  gateway integration, a merchant account with one of the named
+  processors (adult-content payment processing has real underwriting/
+  compliance requirements — this is not a "just add Stripe" swap), and a
+  real escrow/dispute design. **This is the single highest-effort and
+  highest-compliance-risk item from the new CLAUDE.md** — needs its own
+  planning pass with Max before any code, not a guess.
+- **Feed isn't algorithmic** — CLAUDE.md specifies "For You" (algorithmic,
+  ranked by rating + relevance + interests) and "Following" tabs.
+  `/feed` today is a single plain reverse-chronological list. Ranking by
+  "interests" is newly possible in principle (`User.interests` now
+  exists) but no ranking algorithm exists, and "Following" needs a
+  follow/follower relationship that doesn't exist in the schema at all.
+- **No video posts** — CLAUDE.md specifies photo/video (≤60s) post media.
+  `Post.mediaUrls` (a `Json` array) could hold video URLs mechanically,
+  but there's no upload pipeline, no transcoding/compression, no duration
+  enforcement, and no player UI. Uploadthing (already used for avatars)
+  could plausibly host raw files, but 60-second-limit enforcement and
+  compression are unsolved.
+
 ## Placeholder brand assets
 
-- **`components/ui/Logo.tsx`** — the OC monogram is drawn as outlined
-  Cinzel-glyph SVG text (stroke, double-contour) plus, as of 2026-07-04, a
-  spear glyph between O and C (see [docs/LordObsidian.md](docs/LordObsidian.md#symbolism-the-oc-monogram))
-  — still not Max's final vector brand asset. Visually close to spec but
-  not pixel-accurate.
+- **`components/ui/Logo.tsx`** — as of 2026-07-04, renders a real cropped
+  image (`public/brand/oc-monogram.webp`) taken from Max's identity-guide
+  artwork (`Визуал/C733A838-...png`, see
+  [docs/LordObsidian.md](docs/LordObsidian.md#symbolism-the-oc-monogram)),
+  replacing the earlier hand-drawn SVG. It's a **raster crop of a
+  photographed mockup, not a true vector asset** — fine at the sizes it's
+  used today (72–180px), but won't scale losslessly to, say, a print or
+  large-format use, and only exists shot against the identity guide's
+  dark textured background (no transparent/light-background version).
 - **`lib/utils/ogIcon.tsx`** (PWA icons) and
-  **`app/(landing)/opengraph-image.tsx`** (social share image) — a
-  simpler two-letter placeholder (no double-contour, no spear —
-  deliberately, these render small and a spear glyph wouldn't read at
-  icon sizes), generated at request/build time via `next/og` rather than
-  a real static asset.
-- **Fix:** swap all three for the real vector asset once Max provides
-  one. No structural change needed — `Logo.tsx`'s API can stay the same;
-  `ogIcon.tsx`/`opengraph-image.tsx` would switch from JSX-drawn glyphs to
-  loading the real asset.
+  **`app/(landing)/opengraph-image.tsx`** (social share image) — still
+  the old two-letter JSX-drawn placeholder (no double-contour, no spear),
+  generated at request/build time via `next/og`. Not yet switched to the
+  new cropped asset because these need a small, simplified icon-scale
+  mark, not the full monogram crop.
+- **Fix:** get a true vector (SVG/AI/EPS) export of the logo from Max —
+  removes the raster-scaling ceiling on `Logo.tsx` and gives `ogIcon.tsx`/
+  `opengraph-image.tsx` a real source to derive an icon-scale mark from.
 
 ## Favicon inconsistency
 

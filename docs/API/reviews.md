@@ -9,7 +9,7 @@ Implementation: `app/api/users/[id]/review/route.ts`. Called by
 {
   "rating": "integer 1-5, required",
   "comment": "string, optional",
-  "context": "string, optional — not yet surfaced in the UI; the schema supports it for when Events (v0.7) give reviews a real context"
+  "context": "string, optional — not yet surfaced in the UI; the schema supports it for when Events (v0.8) give reviews a real context"
 }
 ```
 
@@ -31,9 +31,13 @@ Implementation: `app/api/users/[id]/review/route.ts`. Called by
    specify an exact formula beyond "1-5 stars, depends on conduct..."; a
    plain average is this session's documented default, not a literal
    spec requirement.
-3. Calls `lib/rating/rating-engine.ts#recalculateRating()`, which
-   recomputes the member's overall `rating` per `ARCHITECTURE.md` §5's
-   weighted formula and logs the delta to `RatingHistory`.
+3. **As of `v0.7`, no longer moves REP** — `recalculateRating()` and the
+   weighted-rating formula it implemented are gone (see
+   [ADR-0015](../ADR/0015-claude-md-v2-full-replacement.md)); receiving a
+   review isn't one of CLAUDE.md's REP earn/lose actions. `reputation`
+   (step 2, above) and REP (`User.rep`,
+   [Architecture.md](../Architecture.md#rep-engine-actual-v07-replaces-the-v05v06-weighted-rating-engine))
+   are independent scores now.
 
 ## Known gaps (see [TECH_DEBT.md](../../TECH_DEBT.md))
 

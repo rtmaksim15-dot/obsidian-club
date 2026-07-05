@@ -5,14 +5,34 @@ import { useRouter } from "next/navigation";
 import AvatarUploadButton from "./AvatarUploadButton";
 
 type Props = {
-  user: { displayName: string; username: string; bio: string; avatarUrl: string | null };
+  user: {
+    displayName: string;
+    username: string;
+    bio: string;
+    avatarUrl: string | null;
+    locationCity: string;
+    role: string | null;
+    interests: string[];
+  };
 };
+
+const ROLES = [
+  { value: "", label: "Prefer not to say" },
+  { value: "dominant", label: "Dominant" },
+  { value: "submissive", label: "Submissive" },
+  { value: "switch", label: "Switch" },
+  { value: "observer", label: "Observer" },
+  { value: "newcomer", label: "Newcomer" },
+];
 
 export default function ProfileEditForm({ user }: Props) {
   const router = useRouter();
   const [displayName, setDisplayName] = useState(user.displayName);
   const [username, setUsername] = useState(user.username);
   const [bio, setBio] = useState(user.bio);
+  const [locationCity, setLocationCity] = useState(user.locationCity);
+  const [role, setRole] = useState(user.role ?? "");
+  const [interestsText, setInterestsText] = useState(user.interests.join(", "));
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -23,10 +43,15 @@ export default function ProfileEditForm({ user }: Props) {
     setError(null);
     setSaved(false);
 
+    const interests = interestsText
+      .split(",")
+      .map((i) => i.trim())
+      .filter(Boolean);
+
     const res = await fetch("/api/profile", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ displayName, username, bio }),
+      body: JSON.stringify({ displayName, username, bio, locationCity, role: role || undefined, interests }),
     });
 
     if (!res.ok) {
@@ -103,6 +128,45 @@ export default function ProfileEditForm({ user }: Props) {
             value={bio}
             onChange={(e) => setBio(e.target.value)}
             placeholder="A few words about you"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="locationCity" className="input-label">
+            City
+          </label>
+          <input
+            id="locationCity"
+            className="input"
+            value={locationCity}
+            onChange={(e) => setLocationCity(e.target.value)}
+            placeholder="Where you're based"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="role" className="input-label">
+            Role
+          </label>
+          <select id="role" className="input" value={role} onChange={(e) => setRole(e.target.value)}>
+            {ROLES.map((r) => (
+              <option key={r.value} value={r.value}>
+                {r.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label htmlFor="interests" className="input-label">
+            Interests
+          </label>
+          <input
+            id="interests"
+            className="input"
+            value={interestsText}
+            onChange={(e) => setInterestsText(e.target.value)}
+            placeholder="Comma-separated — rope, mentorship, travel…"
           />
         </div>
 

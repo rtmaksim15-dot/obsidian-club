@@ -4,10 +4,10 @@ import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import { canCreatePostType } from "@/lib/rating/content-rights";
 import { grantAchievement } from "@/lib/utils/achievements";
-import { recalculateRating } from "@/lib/rating/rating-engine";
 
 const PAGE_SIZE = 20;
 const VALID_TYPES: PostType[] = ["post", "story", "article", "lecture", "manifesto", "course"];
+const EXTERNAL_LINK_PATTERN = /(https?:\/\/|www\.)\S+/i;
 
 const postSelect = {
   id: true,
@@ -93,6 +93,12 @@ export async function POST(request: Request) {
   if (content.length > 20000) {
     return NextResponse.json({ error: "Content is too long." }, { status: 422 });
   }
+  // CLAUDE.md (2026-07-05): "No external links in posts (keeps content
+  // inside OC ecosystem)" — a literal, specified rule, not a fabricated
+  // one. Simple URL detection, not link-preview parsing.
+  if (EXTERNAL_LINK_PATTERN.test(content) || (title && EXTERNAL_LINK_PATTERN.test(title))) {
+    return NextResponse.json({ error: "External links aren't allowed in posts." }, { status: 422 });
+  }
 
   const minLevel = body.minLevel ?? 1;
   if (!Number.isInteger(minLevel) || minLevel < 1 || minLevel > 6) {
@@ -118,7 +124,11 @@ export async function POST(request: Request) {
       await grantAchievement(user.id, "first-post");
     }
 
-    await recalculateRating(user.id, "Published new content", "content");
+    // Note: publishing no longer directly awards REP — CLAUDE.md's
+    // (2026-07-05) REP table only rewards posts via "useful post" (needs
+    // an upvote/quality mechanism, not built) or "article approved by
+    // editorial" (needs an editorial workflow, not built). See
+    // lib/rating/rep-engine.ts#REP_TABLE and TECH_DEBT.md.
 
     return NextResponse.json({ post }, { status: 201 });
   } catch (err) {

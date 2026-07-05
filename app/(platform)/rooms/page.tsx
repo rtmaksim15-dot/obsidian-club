@@ -9,7 +9,7 @@ const GROUP_LABELS: Record<string, string> = {
   newcomers: "Newcomers",
   local: "Local Circles",
   thematic: "Thematic",
-  mentors: "Mentors",
+  mentors: "Wardens",
   masters: "Masters",
   council: "Council",
   level: "By Level",
@@ -39,7 +39,14 @@ export default async function RoomsPage() {
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
       <div className="mx-auto max-w-2xl">
         <p className="text-label mb-2">Community</p>
-        <h1 className="text-h1 mb-10">Rooms</h1>
+        <h1 className="text-h1 mb-4">Rooms</h1>
+        {/* CLAUDE.md's (2026-07-05) Community tab folds events, groups,
+            and people-discovery in as filters — only Events exists today
+            (as a placeholder), linked here rather than its own nav tab.
+            See ADR-0015 and TECH_DEBT.md. */}
+        <a href="/events" className="text-caption mb-10 inline-block text-ob-accent">
+          Events →
+        </a>
 
         {grouped.length === 0 ? (
           <p className="text-body">No rooms yet.</p>

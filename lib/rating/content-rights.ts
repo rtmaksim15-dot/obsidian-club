@@ -8,7 +8,7 @@ import type { PostType, User } from "@prisma/client";
 const MIN_LEVEL_BY_TYPE: Record<Exclude<PostType, "manifesto">, number> = {
   post: 1,
   story: 1,
-  article: 4, // Mentor+
+  article: 4, // Warden+
   lecture: 5, // Master+
   course: 5, // Master+
 };

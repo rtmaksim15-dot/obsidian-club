@@ -1,12 +1,16 @@
 # Vision
 
-> **Source, in priority order:** `OC_MASTER.md` + the revised `CLAUDE.md`
-> (Max's iCloud docs folder, delivered 2026-07-04 via `files.zip`) are now
-> the strategic source of truth — see
-> [ADR-0014](ADR/0014-adopt-oc-master-as-strategic-source.md). Where they're
-> silent, the original `CLAUDE.md`/`PRODUCT.md` (2026-06-29) still apply.
-> If this page ever seems to disagree with either, the source docs are
-> correct — flag the mismatch, don't silently trust this page.
+> **Source, in priority order:** an expanded `CLAUDE.md` (shared directly
+> in chat, 2026-07-05) is authoritative wherever it conflicts with
+> anything below — see
+> [ADR-0015](ADR/0015-claude-md-v2-full-replacement.md). Below that,
+> `OC_MASTER.md` + the revised `CLAUDE.md` (Max's iCloud docs folder,
+> delivered 2026-07-04 via `files.zip`) — see
+> [ADR-0014](ADR/0014-adopt-oc-master-as-strategic-source.md). Where both
+> are silent, the original `CLAUDE.md`/`PRODUCT.md` (2026-06-29) still
+> apply. If this page ever seems to disagree with any of these, the
+> source docs are correct — flag the mismatch, don't silently trust this
+> page.
 
 ## What Obsidian Club is
 
@@ -65,13 +69,14 @@ Full canonical detail (appearance, voice, values, symbolism) is in
 
 ## Member levels (overview — full mechanics in [UX.md](UX.md))
 
-The original `PRODUCT.md` names these six: Initiate, Member, Senior
-Member, Mentor, Master, Council Member — **already implemented**
-throughout this codebase (Hall, Ritual, rating engine). `OC_MASTER.md`
-marks level *naming* as **"TBD"** (giving "Initiate → Devotee → Master →
-Lord" only as an illustrative example, not a decision) — so the names in
-use may change later; that's an expected future update, not something
-to pre-empt by renaming anything now.
+**Decided as of 2026-07-05**: Initiate, Keeper, Steward, Warden, Master,
+Council — the expanded `CLAUDE.md`'s naming
+([ADR-0015](ADR/0015-claude-md-v2-full-replacement.md)), implemented
+throughout this codebase (Hall, Ritual, REP engine). This supersedes
+`PRODUCT.md`'s original six names (Initiate, Member, Senior Member,
+Mentor, Master, Council Member) and closes the "TBD" `OC_MASTER.md` had
+left open (it only offered "Initiate → Devotee → Master → Lord" as an
+illustrative, non-binding example).
 
 **Lord Obsidian sits outside this system.** Singular. Unreachable.
 
@@ -114,18 +119,28 @@ the codebase yet.
 
 ## Platform structure, at a glance (implemented pieces)
 
-- **The Hall** (`/hall`) — a personal status dashboard, not a feed
-- **Rooms** — general, thematic, level-gated, mentor/master/council-only,
-  and city-based local circles ✅ built (`v0.4`)
-- **Content** — stories, articles, podcasts, lectures, manifestos, video,
-  courses; a partly-free, partly-level-gated library — not yet built
-  (`v0.6`)
+- **The Hall** (`/hall`) — a personal status dashboard, not a feed; the
+  nav's "Profile" tab as of `v0.7`
+- **Rooms** (`/rooms`) — general, thematic, level-gated,
+  warden/master/council-only, and city-based local circles ✅ built
+  (`v0.4`); the nav's "Community" tab as of `v0.7`
+- **Feed** (`/feed`) — posts/stories, the ephemeral timeline ✅ built
+  (`v0.6`, split from `/content` in `v0.7`)
+- **Library** (`/library`) — articles, lectures, manifestos, courses; a
+  partly-free, partly-level-gated content library ✅ built (`v0.6`,
+  split from `/content` in `v0.7`). Podcasts, video, books, and wellness
+  content aren't built.
+- **Shop** (`/shop`) — Obsidian Club's own products plus a practitioner
+  marketplace, per `CLAUDE.md`'s (2026-07-05) Shop & Payments section —
+  placeholder only (`v0.7`); needs a real product catalog and payment
+  infrastructure, see `TECH_DEBT.md`
 - **Events** — closed parties, dinners, meetups, trips; each gated by
-  level, seat limit, dress code, and Trust Score — not yet built (`v0.7`)
-- **Marketplace** — merch, limited collections, tickets, digital
-  collections; a vitrine, not a storefront — not yet built (`v0.7`); the
-  broader `OC_MASTER.md` marketplace/e-commerce vision above is separate,
-  larger scope
+  level, seat limit, dress code, and Trust Score — not yet built (`v0.8`,
+  currently a placeholder linked from Rooms)
+- **Marketplace** (`ARCHITECTURE.md`'s original, smaller scope) — merch,
+  limited collections, tickets, digital collections; a vitrine, not a
+  storefront — not yet built (`v0.8`); the broader `CLAUDE.md`/
+  `OC_MASTER.md` Shop & Payments vision above is separate, larger scope
 
 ## Platform requirement: PWA only, no native apps
 

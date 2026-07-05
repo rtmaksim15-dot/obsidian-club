@@ -11,10 +11,12 @@
 > "documentation is the source of truth" rule as everywhere else in
 > `docs/`.
 >
-> The source images aren't committed to this repo (large binaries, and
-> one variant includes background art not appropriate to publish as a
-> web-servable asset) — they stay in the iCloud folder. This page is the
-> durable, text-form record of what they establish.
+> The full source images aren't committed to this repo (large binaries,
+> and one variant includes background art not appropriate to publish as
+> a web-servable asset) — they stay in the iCloud folder. Two specific
+> crops derived from them **are** committed as real web assets (see
+> "What changed" below) — this page is the durable, text-form record of
+> what the full source material establishes.
 
 ## Identity
 
@@ -70,8 +72,10 @@ Confirms and extends what `CLAUDE.md` already established
 - **The spear** (a small diamond/dagger glyph on the axis between O and
   C) — focus, control, direction. "The axis that holds strength (O) and
   community (C) in balance." **New in this pass** — not previously
-  documented; the monogram in `Logo.tsx` predates this detail (see
-  `TECH_DEBT.md`).
+  documented. `Logo.tsx` now renders the real cropped monogram artwork
+  (`public/brand/oc-monogram.webp`, cropped from
+  `Визуал/C733A838-...png`), which includes this spear natively — see
+  `TECH_DEBT.md`.
 
 ## Color palette & materials — confirmed match, no changes needed
 
@@ -105,20 +109,29 @@ pass (`app/(landing)/page.tsx`).
 
 ## What changed in the codebase this pass (2026-07-04)
 
-- `components/ui/Logo.tsx` — added the spear glyph between O and C.
-  Still a hand-drawn SVG approximation, not a final vector asset — see
-  `TECH_DEBT.md` (unchanged status, now slightly more complete).
+- `components/ui/Logo.tsx` — first added a hand-drawn spear glyph between
+  O and C (SVG approximation), then replaced entirely with a real
+  cropped image, `public/brand/oc-monogram.webp` (cropped + re-encoded
+  from `Визуал/C733A838-...png`, Max: "там есть фото с чётким логотипом
+  который тебе нужно использовать"). Still a **raster crop, not a true
+  vector asset** — see `TECH_DEBT.md`.
 - Landing hero — added the "POWER. DISCIPLINE. TRUST." tagline beneath
   the wordmark.
+- Landing's "Lord Obsidian — above all" card — added a real portrait,
+  `public/brand/lord-obsidian.jpg` (cropped/compressed from
+  `Визуал/C3BA0C0F-...png`, the library-armchair/cigar/cane shot — chosen
+  because it's the "hero" pose used in both identity-guide sheets, and
+  has no background elements unsuitable for a public page). Confirmed by
+  Max via `AskUserQuestion` (2026-07-04: "Да, подключить") before wiring
+  a real human-likeness image into the live product.
 
-## Not done this pass — needs Max's confirmation
+## Available, not (yet) used
 
-The source material includes real reference portraits (a consistent
-generated face used across many settings/poses) meant to be "the" visual
-Lord Obsidian. **None of these were wired into the live product** — which
-portrait (if any) should become a real, user-facing asset, and where it
-should appear (the Landing's "Lord Obsidian — above all" card? the
-`/ritual` page, once its content exists? admin-approval emails "from
-Lord Obsidian"?) is a real product/brand decision, not something to pick
-unilaterally. See the open question logged in `DECISIONS.md`
-(2026-07-04) and `BACKLOG.md`.
+The source material includes several more reference portraits (the same
+generated face across other settings/poses) beyond the one now wired in.
+They remain in the iCloud `Визуал/` folder, not committed here, as
+further options if Max wants a different pose in a different spot later
+(e.g. `/ritual`'s Lord Obsidian intro material once its text content
+exists, or admin-approval emails "from Lord Obsidian"). One variant
+(`4D812A56-...png`) includes background art not appropriate to publish as
+a web asset and should be excluded from any future selection.

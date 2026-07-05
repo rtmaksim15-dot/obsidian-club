@@ -21,6 +21,9 @@ export default async function ProfileEditPage({ params }: { params: { id: string
             username: user.username,
             bio: user.bio ?? "",
             avatarUrl: user.avatarUrl,
+            locationCity: user.locationCity ?? "",
+            role: user.role,
+            interests: user.interests,
           }}
         />
       </div>

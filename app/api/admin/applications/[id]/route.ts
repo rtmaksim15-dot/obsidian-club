@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth/require-admin";
 import { createAdminClient } from "@/lib/auth/supabase-admin";
 import { sendAccessGrantedEmail } from "@/lib/utils/email";
 import { generateReferralCode, generateUsernameFromEmail } from "@/lib/utils/codes";
+import { awardRep, REP_TABLE } from "@/lib/rating/rep-engine";
 
 type Body = { action?: "approve" | "decline" };
 
@@ -137,6 +138,21 @@ export async function PATCH(request: Request, { params }: { params: { id: string
           ]
         : []),
     ]);
+
+    // CLAUDE.md (2026-07-05) REP bonuses: +200 for the new member's
+    // verification passing, +300 to the inviter for a verified referral.
+    // Side effects, not the main job — never let these fail the request.
+    await awardRep(user.id, REP_TABLE.earn.verificationPassed.points, "Verification passed", "verification").catch(
+      (err) => console.error("[admin/applications] Failed to award verification-passed REP:", err),
+    );
+    if (inviter) {
+      await awardRep(
+        inviter.id,
+        REP_TABLE.earn.invitedNewMember.points,
+        "Invited a new member",
+        `invited-new-member:${user.id}`,
+      ).catch((err) => console.error("[admin/applications] Failed to award invited-new-member REP:", err));
+    }
 
     await sendAccessGrantedEmail(
       application.email,

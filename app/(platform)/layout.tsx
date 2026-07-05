@@ -7,7 +7,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
   return (
     <>
       <div className="pb-16 sm:pb-0">{children}</div>
-      {user ? <BottomNav profileHref={`/profile/${user.id}`} /> : null}
+      {user ? <BottomNav /> : null}
     </>
   );
 }

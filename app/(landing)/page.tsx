@@ -52,9 +52,9 @@ const INSIDE = [
 
 const LEVELS = [
   { rank: "I", name: "Initiate", line: "First light after the Rite of Initiation." },
-  { rank: "II", name: "Member", line: "A steady presence. Thematic rooms open." },
-  { rank: "III", name: "Senior Member", line: "A trusted contributor. The library, in full." },
-  { rank: "IV", name: "Mentor", line: "Guardian of newcomers. Keeper of the culture." },
+  { rank: "II", name: "Keeper", line: "A steady presence. Thematic rooms open." },
+  { rank: "III", name: "Steward", line: "A trusted contributor. The library, in full." },
+  { rank: "IV", name: "Warden", line: "Guardian of newcomers. Keeper of the culture." },
   { rank: "V", name: "Master", line: "Leader of a domain. The voice of the craft." },
   { rank: "VI", name: "Council", line: "By personal invitation. The stewardship of the club." },
 ];
@@ -159,6 +159,16 @@ export default function LandingPage() {
               boxShadow: "0 0 24px rgba(201,168,76,0.12)",
             }}
           >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/brand/lord-obsidian.jpg"
+              alt="Lord Obsidian"
+              width={720}
+              height={900}
+              loading="lazy"
+              className="mx-auto mb-5 h-40 w-32 rounded-ob object-cover"
+              style={{ border: "1px solid var(--color-gold-muted)" }}
+            />
             <p
               className="font-cinzel uppercase tracking-brand"
               style={{ color: "var(--color-gold)" }}

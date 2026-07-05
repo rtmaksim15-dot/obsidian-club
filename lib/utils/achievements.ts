@@ -2,38 +2,36 @@ import { prisma } from "@/lib/db/prisma";
 
 /**
  * Achievement definitions this app actually grants, keyed by slug.
- * Content per PRODUCT.md §7 "Личные достижения" — not invented.
+ * Content per PRODUCT.md §7 "Личные достижения" — not invented. As of
+ * ADR-0015 (2026-07-05), achievements no longer carry their own REP
+ * bonus — REP is earned directly from the actions in
+ * `lib/rating/rep-engine.ts#REP_TABLE`, not from badges.
  */
 const DEFINITIONS = {
   "initiation-complete": {
     name: "Прошёл Ритуал Инициации",
     description: "Completed the Initiation Ritual.",
     category: "personal" as const,
-    ratingBonus: 0,
   },
   "level-up-2": {
     name: "Поднялся с Уровня I до II",
-    description: "Promoted from Initiate to Member.",
+    description: "Promoted from Initiate to Keeper.",
     category: "personal" as const,
-    ratingBonus: 0,
   },
   "level-up-3": {
     name: "Поднялся с Уровня II до III",
-    description: "Promoted from Member to Senior Member.",
+    description: "Promoted from Keeper to Steward.",
     category: "personal" as const,
-    ratingBonus: 0,
   },
   "first-reputation-star": {
     name: "Первая звезда репутации",
     description: "Received your first review.",
     category: "personal" as const,
-    ratingBonus: 0,
   },
   "first-post": {
     name: "Создал первый материал",
     description: "Published your first piece of content.",
     category: "personal" as const,
-    ratingBonus: 0,
   },
 };
 

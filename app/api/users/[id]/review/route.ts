@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
-import { recalculateRating } from "@/lib/rating/rating-engine";
 import { grantAchievement } from "@/lib/utils/achievements";
 
 type Body = { rating?: number; comment?: string; context?: string };
@@ -67,7 +66,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
     await grantAchievement(reviewed.id, "first-reputation-star");
   }
 
-  await recalculateRating(reviewed.id, "Received a new review", "review");
+  // Note: receiving a review no longer moves REP directly — CLAUDE.md's
+  // (2026-07-05) REP table doesn't list "received a review" as an
+  // earn/lose action. `reputation` (the star average, above) and REP are
+  // independent scores as of ADR-0015.
 
   return NextResponse.json({ ok: true }, { status: 201 });
 }

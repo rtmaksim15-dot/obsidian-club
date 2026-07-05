@@ -1,30 +1,35 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { MessagesSquare, CalendarDays, BookOpen, LayoutGrid, User } from "lucide-react";
+import { Home, ShoppingBag, Users, BookOpen, User } from "lucide-react";
 
-// Mobile bottom navigation per DESIGN.md §8: [Зал] [Комнаты] [Контент]
-// [События] [Профиль]. Desktop keeps the platform usable without this
-// (pages are still directly reachable by URL) — DESIGN.md scopes this
-// nav to mobile ("Мобильная навигация (bottom bar)").
-export default function BottomNav({ profileHref }: { profileHref: string }) {
+// Mobile bottom navigation — CLAUDE.md's (2026-07-05) 5-tab structure:
+// Feed / Shop / Community / Library / Profile, replacing the original
+// DESIGN.md §8 layout (Hall/Rooms/Content/Events/Profile). See ADR-0015.
+// "Community" points at /rooms (Rooms is what's actually built; groups/
+// people-discovery/events-as-filter aren't — see /rooms's Events link
+// and TECH_DEBT.md). "Profile" points at /hall (the self-view dashboard
+// — "The Hall" stays the in-app/brand name; the nav label matches
+// CLAUDE.md's generic term). Desktop keeps the platform usable without
+// this (pages are still directly reachable by URL).
+const ITEMS = [
+  { href: "/feed", label: "Feed", icon: Home },
+  { href: "/shop", label: "Shop", icon: ShoppingBag },
+  { href: "/rooms", label: "Community", icon: Users },
+  { href: "/library", label: "Library", icon: BookOpen },
+  { href: "/hall", label: "Profile", icon: User },
+];
+
+export default function BottomNav() {
   const pathname = usePathname();
-
-  const items = [
-    { href: "/hall", label: "Hall", icon: LayoutGrid },
-    { href: "/rooms", label: "Rooms", icon: MessagesSquare },
-    { href: "/content", label: "Content", icon: BookOpen },
-    { href: "/events", label: "Events", icon: CalendarDays },
-    { href: profileHref, label: "Profile", icon: User },
-  ];
 
   return (
     <nav
       className="fixed inset-x-0 bottom-0 z-10 flex border-t border-ob-border bg-ob-dark sm:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
-      {items.map(({ href, label, icon: Icon }) => {
-        const active = pathname === href || (href !== "/hall" && pathname.startsWith(href));
+      {ITEMS.map(({ href, label, icon: Icon }) => {
+        const active = pathname === href || pathname.startsWith(href);
         return (
           <a
             key={label}

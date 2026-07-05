@@ -23,6 +23,15 @@ enum UserStatus {
   banned
 }
 
+// CLAUDE.md (2026-07-05)'s onboarding role selection — see ADR-0015.
+enum MemberRole {
+  dominant
+  submissive
+  switch
+  observer
+  newcomer
+}
+
 // PRODUCT.md §1 documents exactly these three application statuses, but
 // ARCHITECTURE.md §10's minimal waitlist table never included a status
 // column at all — see ADR-0012.
@@ -99,28 +108,32 @@ enum MarketplaceType {
 // ============================================================
 
 model User {
-  id              String     @id @default(uuid()) @db.Uuid
-  email           String     @unique
-  username        String     @unique
-  displayName     String     @map("display_name")
-  avatarUrl       String?    @map("avatar_url")
+  id              String      @id @default(uuid()) @db.Uuid
+  email           String      @unique
+  username        String      @unique
+  displayName     String      @map("display_name")
+  avatarUrl       String?     @map("avatar_url")
   bio             String?
-  locationCity    String?    @map("location_city")
-  locationCountry String?    @map("location_country")
+  locationCity    String?     @map("location_city")
+  locationCountry String?     @map("location_country")
   age             Int?
-  level           Int        @default(1) // 1-6
-  reputation      Decimal    @default(0) @db.Decimal(3, 2) // 0.00 - 5.00
-  rating          Int        @default(0)
-  influence       Int        @default(0)
-  trustScore      Int        @default(100) @map("trust_score")
-  status          UserStatus @default(pending)
-  isAdmin         Boolean    @default(false) @map("is_admin") // not in ARCHITECTURE.md's User table — see ADR-0011
-  invitedById     String?    @map("invited_by") @db.Uuid
-  referralCode    String?    @unique @map("referral_code")
-  referralCount   Int        @default(0) @map("referral_count")
-  joinedAt        DateTime?  @map("joined_at")
-  lastActiveAt    DateTime?  @map("last_active_at")
-  createdAt       DateTime   @default(now()) @map("created_at")
+  level           Int         @default(1) // 1-6
+  reputation      Decimal     @default(0) @db.Decimal(3, 2) // 0.00 - 5.00, peer-review star average — independent of REP as of the 2026-07-05 CLAUDE.md migration (see ADR-0015)
+  rep             Int         @default(0) // "REP" — a discrete point ledger (CLAUDE.md's earn/lose tables), replaces the old weighted `rating` score; see ADR-0015. Sum of RepHistory.delta
+  trustScore      Int         @default(100) @map("trust_score")
+  status          UserStatus  @default(pending)
+  isAdmin         Boolean     @default(false) @map("is_admin") // not in ARCHITECTURE.md's User table — see ADR-0011
+  role            MemberRole? // chosen at onboarding, CLAUDE.md's registration flow — see ADR-0015
+  interests       String[]    @default([]) // chosen at onboarding; not yet used to rank the Feed — see TECH_DEBT.md
+  currentStreak   Int         @default(0) @map("current_streak") // consecutive days logged in, for the daily-login REP bonus
+  longestStreak   Int         @default(0) @map("longest_streak")
+  lastLoginDate   DateTime?   @map("last_login_date") // date-only (not datetime) touch point for streak computation — see lib/rating/rep-engine.ts#touchDailyLogin
+  invitedById     String?     @map("invited_by") @db.Uuid
+  referralCode    String?     @unique @map("referral_code")
+  referralCount   Int         @default(0) @map("referral_count")
+  joinedAt        DateTime?   @map("joined_at")
+  lastActiveAt    DateTime?   @map("last_active_at")
+  createdAt       DateTime    @default(now()) @map("created_at")
 
   // self-referential invites
   invitedBy User?  @relation("UserInvites", fields: [invitedById], references: [id])
@@ -136,7 +149,7 @@ model User {
   referralsSent     Referral[]        @relation("ReferralInviter")
   referralsReceived Referral[]        @relation("ReferralInvited")
   userAchievements  UserAchievement[]
-  ratingHistory     RatingHistory[]
+  repHistory        RepHistory[]
   notifications     Notification[]
   marketplaceItems  MarketplaceItem[]
   likes             Like[]
@@ -343,7 +356,6 @@ model Achievement {
   description String?
   category    AchievementCategory
   icon        String?
-  ratingBonus Int                 @default(0) @map("rating_bonus")
   createdAt   DateTime            @default(now()) @map("created_at")
 
   users UserAchievement[]
@@ -363,10 +375,13 @@ model UserAchievement {
   @@map("user_achievements")
 }
 
-model RatingHistory {
+// Renamed from RatingHistory (pre-2026-07-05) — same ledger, now backing
+// REP directly (User.rep = sum of delta) rather than logging a derived
+// weighted-formula score. See ADR-0015.
+model RepHistory {
   id        String   @id @default(uuid()) @db.Uuid
   userId    String   @map("user_id") @db.Uuid
-  delta     Int // +/- сколько
+  delta     Int // +/- сколько REP
   reason    String?
   source    String? // откуда пришло изменение
   createdAt DateTime @default(now()) @map("created_at")
@@ -374,7 +389,7 @@ model RatingHistory {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@map("rating_history")
+  @@map("rep_history")
 }
 
 // ============================================================

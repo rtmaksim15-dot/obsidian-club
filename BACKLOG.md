@@ -7,7 +7,11 @@ original Stage 2 plan. **As of 2026-07-04, `OC_MASTER.md` is the
 strategic source of truth** ([ADR-0014](docs/ADR/0014-adopt-oc-master-as-strategic-source.md))
 — it adds real new scope (see "Later" below), and one item it explicitly
 decided (no native iOS/Android) removes scope `ROADMAP.md` previously
-had.
+had. **As of 2026-07-05, an expanded `CLAUDE.md` further supersedes
+`PRODUCT.md`/`ARCHITECTURE.md`'s level names, reputation model, and
+navigation structure specifically** ([ADR-0015](docs/ADR/0015-claude-md-v2-full-replacement.md))
+— this one required live migration, not just new scope on top, since it
+conflicts with mechanics that were already built.
 
 **Rule: items only move between Now / Next / Later with Max's approval.**
 This file records what's planned, not a queue anyone can reshuffle
@@ -41,12 +45,20 @@ unilaterally.
 - [x] ~~Reconcile `OC_MASTER.md` pivot with existing build~~ — resolved
       2026-07-04: existing foundation kept, new scope added as "Later"
       below. See [ADR-0014](docs/ADR/0014-adopt-oc-master-as-strategic-source.md).
-- [ ] **Open question, not decided:** which (if any) of the Lord
-      Obsidian reference portraits from `Визуал/` (see
-      [docs/LordObsidian.md](docs/LordObsidian.md)) should become a real,
-      user-facing image, and where (Landing's "Lord Obsidian" card?
-      `/ritual`? approval emails?). See `DECISIONS.md`/`TECH_DEBT.md`,
-      2026-07-04.
+- [x] ~~Which Lord Obsidian reference portrait (if any) becomes a real
+      user-facing image, and where~~ — resolved 2026-07-04: Max confirmed
+      "Да, подключить"; the library-armchair/cigar/cane portrait is now
+      on the Landing's "Lord Obsidian" card
+      (`public/brand/lord-obsidian.jpg`). See `DECISIONS.md`,
+      `docs/LordObsidian.md`.
+- [ ] Google/Apple OAuth + phone sign-in (needs Max's OAuth app
+      credentials with each provider, plus an SMS provider account for
+      phone auth — see `TECH_DEBT.md`'s CLAUDE.md-v2-migration section)
+- [ ] Shop & Payments — real product catalog, crypto payment gateway,
+      an adult-friendly card-processor merchant account (Segpay/Epoch/
+      CCBill), escrow design. Needs its own planning pass with Max before
+      any code — see `TECH_DEBT.md` (flagged as the single
+      highest-effort, highest-compliance-risk item in `CLAUDE.md`)
 
 ## Next
 
@@ -172,39 +184,72 @@ a feed, so this wasn't superseded by the pivot.
   pagination beyond 20, progressive (non-initiation) rituals/tasks —
   `PRODUCT.md` doesn't specify what those are yet.
 
+### v0.7 — CLAUDE.md v2 Migration ✅ (built 2026-07-05, unverified end-to-end)
+
+**Inserted ahead of the original `ROADMAP.md` sequence** — not sourced
+from `ROADMAP.md` like `v0.1`-`v0.6`, but from the expanded `CLAUDE.md`
+Max shared 2026-07-05 ([ADR-0015](docs/ADR/0015-claude-md-v2-full-replacement.md)).
+Every version from here down is renumbered up by one from the original
+plan (old `v0.7`→`v0.8`, `v0.8`→`v0.9`, `v0.9`→`v1.0`, `v1.0`→`v1.1`) to
+make room — see each section below for its original name.
+
+- [x] Level renaming — Initiate/Keeper/Steward/Warden/Master/Council,
+      centralized in `lib/rating/levels.ts`.
+- [x] REP reputation model — `lib/rating/rep-engine.ts` replaces the
+      weighted `rating-engine.ts`; `User.rep` (was `rating`) is a
+      discrete point ledger, `RepHistory` (was `RatingHistory`).
+      `User.influence` dropped (no equivalent in the new model). Wired:
+      profile-complete, verification-passed, first-community-intro,
+      daily-login + 7/30-day streaks, invited-new-member,
+      invitee-reached-Level-II, invitee-active-90-days. The rest of
+      `CLAUDE.md`'s earn/lose table is recorded but not wireable yet —
+      see `TECH_DEBT.md`.
+- [x] Navigation restructure — `/feed` + `/library` (split from
+      `/content`, which now redirects to `/feed`), `/shop` placeholder
+      added, bottom nav relabeled Feed/Shop/Community/Library/Profile.
+- [x] Onboarding — `User.role` (`MemberRole` enum) and free-text
+      `User.interests` added to the profile self-edit form;
+      `locationCity` made editable there too.
+- [x] "No external links in posts" — real validation on post create/edit.
+- Not built (needs real accounts or more design — see `TECH_DEBT.md`):
+  Google/Apple/phone sign-in, Shop & Payments (crypto, card processor,
+  escrow), algorithmic Feed ranking, video posts.
+
 ## Later
 
 *Intentionally postponed — approved direction, not yet scheduled in
-detail. Derived from `ROADMAP.md`'s existing Stage 2 plan.*
+detail. Derived from `ROADMAP.md`'s existing Stage 2 plan (renumbered up
+by one to make room for `v0.7` above — see that section).*
 
-### v0.7 — Events & Marketplace
+### v0.8 — Events & Marketplace (originally `v0.7`)
 
 (Source: `ROADMAP.md`, October Weeks 3–4) — events (list + detail +
 registration, level/Trust-Score gating), admin panel v2, basic
 marketplace vitrine.
 
-### v0.8 — Beta Hardening
+### v0.9 — Beta Hardening (originally `v0.8`)
 
 (Source: `ROADMAP.md`, November) — closed beta (20–50 members from the
 waitlist), load testing, security audit (RLS, rate limiting — see
 `TECH_DEBT.md`), Stripe integration, PWA finalization (offline, push
 notifications — see `TECH_DEBT.md`'s service-worker gap).
 
-### v0.9 — Launch Preparation
+### v1.0 — Launch Preparation (originally `v0.9`)
 
 (Source: `ROADMAP.md`, December) — final QA, first invitation wave,
 branded error pages (404/500), onboarding/Initiation Ritual flow,
 monitoring (Sentry).
 
-### v1.0 — Public Launch
+### v1.1 — Public Launch (originally `v1.0`)
 
 (Source: `ROADMAP.md`, January 2027) — first wave of 100–200 members.
 
-### Unscheduled ideas (post-`v1.0`, per `ROADMAP.md`)
+### Unscheduled ideas (post-`v1.1`, per `ROADMAP.md`)
 
-- `v1.1` — full Marketplace (the merch/tickets vitrine from `ARCHITECTURE.md`
-  §12 — a smaller scope than `OC_MASTER.md`'s marketplace vertical below)
-- ~~`v1.2` — iOS app~~ / ~~`v1.3` — Android app~~ — **cancelled.**
+- `v1.2` — full Marketplace (the merch/tickets vitrine from `ARCHITECTURE.md`
+  §12 — a smaller scope than `OC_MASTER.md`'s marketplace vertical below;
+  originally `v1.1` before the `v0.7` insertion above)
+- ~~iOS app~~ / ~~Android app~~ — **cancelled.**
   `OC_MASTER.md` explicitly decided PWA-only, no native apps, ever (App
   Store/Google Play policy risk for 18+ content). See
   [ADR-0014](docs/ADR/0014-adopt-oc-master-as-strategic-source.md).

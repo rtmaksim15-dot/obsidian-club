@@ -5,15 +5,7 @@ import { getRitualStatus } from "@/lib/auth/ritual";
 import { getLevelProgress } from "@/lib/rating/level-progress";
 import { syncReferralLifecycle } from "@/lib/rating/referral-lifecycle";
 import { checkLevelUp } from "@/lib/rating/level-progression";
-
-const LEVEL_NAMES: Record<number, string> = {
-  1: "Initiate",
-  2: "Member",
-  3: "Senior Member",
-  4: "Mentor",
-  5: "Master",
-  6: "Council Member",
-};
+import { LEVEL_NAMES } from "@/lib/rating/levels";
 
 /**
  * The Hall (`/hall`) — status card, progress-to-next-level, referral
@@ -36,14 +28,14 @@ export default async function HallPage() {
   await checkLevelUp(user.id);
   user = (await prisma.user.findUnique({ where: { id: user.id } }))!;
 
-  const [notifications, referralCount, ratingHistory, publishedContentCount] = await Promise.all([
+  const [notifications, referralCount, repHistory, publishedContentCount] = await Promise.all([
     prisma.notification.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
       take: 5,
     }),
     prisma.referral.count({ where: { inviterId: user.id, status: { in: ["joined", "active"] } } }),
-    prisma.ratingHistory.findMany({
+    prisma.repHistory.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
       take: 5,
@@ -79,24 +71,25 @@ export default async function HallPage() {
         </a>
 
         {/* Status */}
-        <div className="card-profile mt-10 grid grid-cols-2 gap-6 sm:grid-cols-4">
+        <div className="card-profile mt-10 grid grid-cols-3 gap-6">
           <div>
             <p className="text-label">Reputation</p>
             <p className="text-data mt-1">{Number(user.reputation).toFixed(1)} ★</p>
           </div>
           <div>
-            <p className="text-label">Rating</p>
-            <p className="text-data mt-1">{user.rating}</p>
-          </div>
-          <div>
-            <p className="text-label">Influence</p>
-            <p className="text-data mt-1">{user.influence}</p>
+            <p className="text-label">REP</p>
+            <p className="text-data mt-1">{user.rep}</p>
           </div>
           <div>
             <p className="text-label">Trust Score</p>
             <p className="text-data mt-1">{user.trustScore}</p>
           </div>
         </div>
+        {user.currentStreak > 0 ? (
+          <p className="text-caption mt-3" style={{ color: "var(--color-text-secondary)" }}>
+            {user.currentStreak}-day login streak (best: {user.longestStreak})
+          </p>
+        ) : null}
 
         {/* Progress */}
         <section className="mt-10">
@@ -169,16 +162,16 @@ export default async function HallPage() {
           )}
         </section>
 
-        {/* Rating history */}
+        {/* REP history */}
         <section className="mt-10">
-          <p className="text-label mb-3">Recent Rating Changes</p>
-          {ratingHistory.length === 0 ? (
+          <p className="text-label mb-3">Recent REP Changes</p>
+          {repHistory.length === 0 ? (
             <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
               No changes yet.
             </p>
           ) : (
             <ul className="space-y-2">
-              {ratingHistory.map((h) => (
+              {repHistory.map((h) => (
                 <li key={h.id} className="text-caption flex items-center justify-between">
                   <span style={{ color: "var(--color-text-secondary)" }}>{h.reason}</span>
                   <span style={{ color: h.delta >= 0 ? "var(--color-success)" : "var(--color-error)" }}>
