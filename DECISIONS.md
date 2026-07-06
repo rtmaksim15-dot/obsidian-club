@@ -627,3 +627,45 @@ checked current state before doing anything, confirmed the account
 already existed exactly as specified, and reported that back rather
 than re-running the creation script (which would have failed anyway,
 since the waitlist entry is no longer `pending`).
+
+### 2026-07-06 — Real Supabase connection, first admin account, GitHub, Google Sign-In
+
+Max connected the project to real infrastructure across several
+requests: (1) a real Supabase project (URL + publishable/secret keys) —
+wired into `.env.local`, not `.env` (the latter is committed and already
+pushed to GitHub, so real secrets never go there — flagged this
+explicitly since the literal request said ".env"). (2) The Postgres
+password — constructing `DATABASE_URL`/`DIRECT_URL` required finding the
+right connection string: the direct `db.<ref>.supabase.co` host resolves
+IPv6-only (unreachable from this environment), and the pooler host
+needs the correct AWS region, which isn't discoverable from the project
+URL/keys/DNS — tried 17 common regions via `prisma db pull`'s
+distinguishable "tenant not found" error, all failed; asked Max to pull
+the real connection string from the dashboard instead of continuing to
+guess. He returned with `aws-1-us-east-2` (my brute-force had only tried
+`aws-0-us-east-2`) — `prisma db push` then succeeded, creating every
+table in the real database. (3) GitHub: pushed to
+`rtmaksim15-dot/obsidian-club`; the repo wasn't empty (GitHub's own
+default README from creation) — merged histories
+(`--allow-unrelated-histories -X ours`) rather than force-pushing over
+it. Used a one-time Personal Access Token for the push only, never
+stored in `.git/config`; told Max to rotate it since it was pasted in
+plaintext chat. (4) Approved the real waitlist application for
+`lord.obsidian.oc@gmail.com` (submitted through the actual landing page
+— name "Lord Obsidian", San Francisco) as the project's first admin
+account (`isAdmin: true`, `role: dominant`, per Max's request) — via a
+one-off script replicating `PATCH /api/admin/applications/:id`'s
+approve logic exactly, since no admin existed yet to call the real
+endpoint with (a genuine bootstrap chicken-and-egg case, not a shortcut
+around the real flow). (5) Google Sign-In: Max provided a real OAuth
+Client ID/Secret and had already enabled the provider in the Supabase
+dashboard himself by the time the code was verified — confirmed via a
+direct `GET /auth/v1/authorize?provider=google` request correctly
+redirecting to Google's consent screen with the right client ID.
+Built `app/auth/callback/route.ts` (PKCE exchange) and the "Continue
+with Google" button on `/login`. The Google credentials themselves
+never touch this app's code/env — Supabase's own dashboard holds them;
+our code only calls `signInWithOAuth`.
+
+Bumped to `v0.7.1` — infrastructure-connection milestone, not a new
+feature version.

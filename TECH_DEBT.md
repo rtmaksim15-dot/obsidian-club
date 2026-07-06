@@ -24,15 +24,26 @@ prioritized."
   already flagged for the `-20`/`-50` deltas). **Fix:** wire each as its
   dependent feature gets built — the point values are already correct,
   just not triggerable.
-- **OAuth / phone sign-in not implemented** — CLAUDE.md specifies
-  email+password (built), phone+password, Google Sign-In, and Apple
-  Sign-In. Only email/password exists (`/login`, Supabase Auth). Google/
-  Apple need real OAuth app credentials registered with each provider,
-  plus enabling those providers in the Supabase Auth dashboard — both
-  need Max's accounts, same shape of blocker as the existing Vercel/
-  Supabase/Resend/Uploadthing items below. Phone auth needs an SMS
-  provider (Supabase supports Twilio/MessageBird/Vonage) — another
-  account Max would need to create.
+- **Google Sign-In — ✅ built 2026-07-06.** Max provided a real Google
+  OAuth Client ID/Secret and enabled the provider in the Supabase Auth
+  dashboard himself (confirmed working via a direct `GET
+  /auth/v1/authorize?provider=google` request — Supabase correctly
+  redirects to Google's consent screen with our client ID). Code side:
+  `app/auth/callback/route.ts` (exchanges the PKCE `code` for a session)
+  and a "Continue with Google" button on `/login`
+  (`supabase.auth.signInWithOAuth`). The Google Client ID/Secret
+  themselves live only in Supabase's own dashboard config, not in this
+  app's `.env.local` — Supabase handles the provider handshake, our code
+  never touches Google's credentials directly. **Not yet click-tested in
+  a real browser** — the automated preview tool can't complete a
+  cross-origin OAuth redirect through Google's actual consent screen, so
+  this needs a manual click-through to fully confirm.
+- **Apple Sign-In / phone sign-in — still not implemented.** Apple needs
+  its own real OAuth credentials (Apple Developer account, Services ID)
+  and enabling in the Supabase dashboard — same shape of blocker Google
+  was until 2026-07-06. Phone auth needs an SMS provider (Supabase
+  supports Twilio/MessageBird/Vonage) — another account Max would need
+  to create.
 - **Shop & Payments — nothing beyond a placeholder** — `/shop` is an
   honest "coming soon" page, same pattern as `/events`. CLAUDE.md
   specifies: a real product catalog (Standard/Premium/Extra Premium

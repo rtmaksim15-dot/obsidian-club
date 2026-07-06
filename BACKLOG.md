@@ -81,9 +81,15 @@ unilaterally.
       on the Landing's "Lord Obsidian" card
       (`public/brand/lord-obsidian.jpg`). See `DECISIONS.md`,
       `docs/LordObsidian.md`.
-- [ ] Google/Apple OAuth + phone sign-in (needs Max's OAuth app
-      credentials with each provider, plus an SMS provider account for
-      phone auth — see `TECH_DEBT.md`'s CLAUDE.md-v2-migration section)
+- [x] ~~Google OAuth~~ — resolved 2026-07-06: Max provided a real
+      Client ID/Secret and enabled the provider in the Supabase
+      dashboard himself; `app/auth/callback/route.ts` + a "Continue
+      with Google" button on `/login` are wired and confirmed reachable
+      (`/auth/v1/authorize?provider=google` correctly redirects to
+      Google). See `TECH_DEBT.md`.
+- [ ] Apple OAuth + phone sign-in (needs Max's Apple Developer account/
+      Services ID, plus an SMS provider account for phone auth — see
+      `TECH_DEBT.md`)
 - [ ] Shop & Payments — real product catalog, crypto payment gateway,
       an adult-friendly card-processor merchant account (Segpay/Epoch/
       CCBill), escrow design. Needs its own planning pass with Max before

@@ -8,7 +8,41 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.7.0` is the current released version.
+Nothing yet — `v0.7.1` is the current released version.
+
+## [0.7.1] — 2026-07-06
+
+First connection to real infrastructure: a live Supabase project (Auth +
+Postgres), the first real member account, GitHub, and Google Sign-In.
+No architecture changes — this is the "actually connected," not "still
+just code," milestone `TECH_DEBT.md` had flagged since `v0.2`.
+
+### Added
+
+- Real Supabase project connected: `NEXT_PUBLIC_SUPABASE_URL`,
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (Auth),
+  and `DATABASE_URL`/`DIRECT_URL` (Postgres, via the session pooler —
+  the project's direct `db.*.supabase.co` host is IPv6-only and
+  unreachable from this environment) in `.env.local`. `prisma db push`
+  ran successfully — all tables now exist in the real database.
+- Repository pushed to GitHub
+  ([rtmaksim15-dot/obsidian-club](https://github.com/rtmaksim15-dot/obsidian-club)).
+- The first real member account: approved the real waitlist application
+  for `lord.obsidian.oc@gmail.com` (submitted through the actual landing
+  page), with `isAdmin: true` and `role: dominant` per Max's request —
+  the project's first admin, created via a one-off script replicating
+  the approval route's logic exactly (no admin existed yet to call the
+  real endpoint with).
+- Google Sign-In: `app/auth/callback/route.ts` (PKCE code exchange) and
+  a "Continue with Google" button on `/login`. Max provided a real
+  Google OAuth Client ID/Secret and enabled the provider in the Supabase
+  dashboard himself.
+
+### Not done this pass (see `TECH_DEBT.md`)
+
+Apple Sign-In, phone sign-in, Realtime enablement on the `messages`
+table (still a one-time manual Supabase dashboard step), Resend/
+Uploadthing accounts, Vercel deployment.
 
 ## [0.7.0] — 2026-07-05
 
