@@ -431,12 +431,15 @@ whether a component references it). See `DECISIONS.md`, 2026-07-04.
   write: `POST /api/waitlist` → confirmed via a direct Prisma query →
   deleted the test row. The database is live, schema-complete, and
   empty of real members. See `DECISIONS.md`.
+- ~~At least one real `User.isAdmin = true`~~ — **resolved 2026-07-06**:
+  see `BACKLOG.md` and `DECISIONS.md` — the real waitlist application
+  for `lord.obsidian.oc@gmail.com` was approved directly (no admin
+  existed yet to use the real endpoint — a genuine bootstrap case),
+  with `isAdmin: true` and `role: dominant` per Max's request.
 - **Still needed:** enabling Realtime on the `messages` table (one-time
   manual dashboard step, not something `db push` configures — see
   `v0.4`'s note above) — `/rooms/[slug]` chat won't push live updates
-  without it. Also: at least one real `User.isAdmin = true` (no
-  admin-granting UI exists, and no real members exist yet either, since
-  nobody has been through `/login`+approval against the live database).
+  without it.
 - Resend account + verified sending domain (needed for `RESEND_API_KEY`)
 - Uploadthing account (needed for `UPLOADTHING_SECRET`/`UPLOADTHING_APP_ID`)
 

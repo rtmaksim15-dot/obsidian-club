@@ -585,3 +585,45 @@ the `messages` table is still a manual dashboard step `db push` doesn't
 touch. No real members exist yet — the database is live and empty of
 users, waiting on an actual application to go through `/login` +
 admin approval.
+
+### 2026-07-06 — First real member: bootstrap admin account (Lord Obsidian)
+
+Max asked to approve the real waitlist application for
+`lord.obsidian.oc@gmail.com` — already sitting in the live database as a
+genuine submission through the landing page's own form (name "Lord
+Obsidian," age 46, San Francisco, source "I built it"), not something I
+created — with `isAdmin: true` and `role: dominant`.
+
+**The real approval endpoint (`PATCH /api/admin/applications/:id`)
+requires an existing admin to call it** (`requireAdmin()`) — and there
+were zero admins in the database. A genuine bootstrap chicken-and-egg
+case, not a shortcut: wrote a one-off script (run once via `tsx`, not
+committed to the repo) that replicates the endpoint's approve branch
+line-for-line — same Supabase Auth `generateLink()` invite call, same
+`User`/`UserProfile`/`Notification` transaction, same
+`verificationPassed` REP award — with exactly two additions:
+`isAdmin: true` and `role: "dominant"`. `reviewedBy` was set to the new
+user's own id (known upfront, since Supabase generates the auth user id
+before the Prisma transaction runs) rather than left null, since there
+was no other admin id to attribute the review to — a self-approved
+bootstrap account, which is the honest description of what a "first
+admin, created because none existed" really is.
+
+Did **not** invent anything beyond what was asked: level stayed at 1
+(Initiate) — PRODUCT.md's level system is earned/appointed, and nothing
+in the request said to grant a level, so none was granted just because
+this happens to be an admin account. `isAdmin` and `level` are
+deliberately separate concepts in this schema (see
+[ADR-0011](docs/ADR/0011-isadmin-field.md)) — being staff doesn't imply
+being Council.
+
+Verified: real Supabase Auth user created (got back a genuine invite
+`action_link` — no email sent since `RESEND_API_KEY` still isn't set,
+same documented no-op-safely pattern as everywhere else); `User` row
+confirmed via direct query (`isAdmin: true`, `role: "dominant"`,
+`status: "active"`, `rep: 200`); waitlist entry confirmed `approved`.
+Max then repeated the exact same request in a follow-up message —
+checked current state before doing anything, confirmed the account
+already existed exactly as specified, and reported that back rather
+than re-running the creation script (which would have failed anyway,
+since the waitlist entry is no longer `pending`).

@@ -44,9 +44,19 @@ unilaterally.
 - [ ] Enable Realtime on the `messages` table in the Supabase dashboard
       (one-time manual step, not a migration — needed for `/rooms/[slug]`
       chat to actually push live updates)
-- [ ] Set at least one real `User.isAdmin = true` directly in the
-      database (no admin-granting UI exists yet; no real users exist
-      yet either — the database is live but empty of members)
+- [x] ~~Set at least one real `User.isAdmin = true`~~ — resolved
+      2026-07-06: approved the real waitlist application for
+      `lord.obsidian.oc@gmail.com` (submitted through the actual landing
+      page form — name "Lord Obsidian", San Francisco) directly via a
+      one-off script replicating `PATCH /api/admin/applications/:id`'s
+      approve logic exactly (no admin existed yet to call the real
+      endpoint with — a genuine bootstrap chicken-and-egg case), with
+      `isAdmin: true` and `role: dominant` added per Max's request. Real
+      Supabase Auth user created via `generateLink()`; `User`/
+      `UserProfile`/`Notification` rows, REP's `verificationPassed`
+      bonus, and the waitlist status flip all wrote successfully. Level
+      left at 1 (Initiate) — not asked to change, so not invented. See
+      `DECISIONS.md`.
 - [ ] Resend account + verified sending domain + real `RESEND_API_KEY`
       (blocked — needs Max's account)
 - [ ] Uploadthing account + real `UPLOADTHING_SECRET`/`UPLOADTHING_APP_ID`
