@@ -45,13 +45,18 @@ export default async function ProfilePage({ params }: { params: { id: string } }
           {LEVEL_NAMES[user.level] ?? `Level ${user.level}`}
         </p>
 
-        <p className="mt-3" aria-label={`${stars} out of 5 stars`}>
-          {Array.from({ length: 5 }, (_, i) => (
-            <span key={i} className={i < stars ? "star-filled" : "star-empty"}>
-              ★
-            </span>
-          ))}
-        </p>
+        <div className="mt-3 flex items-center gap-4">
+          <p aria-label={`${stars} out of 5 stars`}>
+            {Array.from({ length: 5 }, (_, i) => (
+              <span key={i} className={i < stars ? "star-filled" : "star-empty"}>
+                ★
+              </span>
+            ))}
+          </p>
+          <p className="text-data" style={{ color: "var(--color-text-secondary)" }}>
+            {user.rep} REP
+          </p>
+        </div>
 
         <p className="text-caption mt-4" style={{ color: "var(--color-text-secondary)" }}>
           {[user.locationCity, user.locationCountry].filter(Boolean).join(", ") || "Location not shared"}

@@ -31,6 +31,11 @@ yarn-error.log*
 # vercel
 .vercel
 
+# claude.ai/design sync tooling — local generated artifacts, not project
+# source (includes its own vendored node_modules)
+.ds-sync/
+ds-bundle/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

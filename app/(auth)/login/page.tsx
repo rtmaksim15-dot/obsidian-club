@@ -5,13 +5,24 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Logo from "@/components/ui/Logo";
 import { createClient } from "@/lib/auth/supabase-browser";
 
+// Gates the "Continue with Apple" button on a real, working backend —
+// Supabase's Apple provider needs a paid Apple Developer account, a
+// Services ID, and a signed key configured in its own dashboard (none
+// of which exist yet, see TECH_DEBT.md). Rendering a clickable button
+// that's guaranteed to fail would be a real, live-visitor-facing bug,
+// not just an internal placeholder — so this stays disabled until Max
+// sets NEXT_PUBLIC_APPLE_SIGNIN_ENABLED=true once it's actually wired up
+// in the Supabase dashboard, the same "degrade gracefully, don't crash
+// or half-work" rule applied to every other unconfigured integration.
+const appleSignInEnabled = process.env.NEXT_PUBLIC_APPLE_SIGNIN_ENABLED === "true";
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(
-    searchParams.get("error") === "oauth" ? "Google sign-in failed. Try again." : null
+    searchParams.get("error") === "oauth" ? "Sign-in failed. Try again." : null
   );
   const [submitting, setSubmitting] = useState(false);
 
@@ -36,12 +47,12 @@ function LoginForm() {
     router.refresh();
   }
 
-  async function handleGoogleSignIn() {
+  async function handleOAuthSignIn(provider: "google" | "apple") {
     setError(null);
     const supabase = createClient();
     const next = searchParams.get("next") || "/hall";
     await supabase.auth.signInWithOAuth({
-      provider: "google",
+      provider,
       options: {
         redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
       },
@@ -108,7 +119,7 @@ function LoginForm() {
 
       <button
         type="button"
-        onClick={handleGoogleSignIn}
+        onClick={() => handleOAuthSignIn("google")}
         className="btn-secondary mt-8 flex w-full max-w-sm items-center justify-center gap-3"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
@@ -131,6 +142,39 @@ function LoginForm() {
         </svg>
         Continue with Google
       </button>
+
+      {appleSignInEnabled ? (
+        <button
+          type="button"
+          onClick={() => handleOAuthSignIn("apple")}
+          className="btn-secondary mt-4 flex w-full max-w-sm items-center justify-center gap-3"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+            <path d="M16.365 1.43c0 1.14-.415 2.06-1.246 2.99-.94.94-2.11 1.55-3.33 1.44-.09-1.1.41-2.06 1.23-2.98.9-.94 2.14-1.5 3.34-1.45zM20.5 17.28c-.51 1.17-.75 1.69-1.4 2.72-.9 1.44-2.18 3.24-3.75 3.25-1.4.01-1.76-.92-3.66-.91-1.9.01-2.3.93-3.7.92-1.57-.02-2.78-1.63-3.68-3.07-2.53-4.03-2.8-8.77-1.24-11.28.79-1.28 2.28-2.09 3.85-2.13 1.6-.04 2.6.94 3.6.94.98 0 2.31-1.16 3.9-.99.66.03 2.51.27 3.7 2.03-3.19 1.75-2.67 6.28.28 7.52z" />
+          </svg>
+          Continue with Apple
+        </button>
+      ) : (
+        <div
+          className="mt-4 flex w-full max-w-sm cursor-not-allowed items-center justify-center gap-3 opacity-40"
+          style={{
+            fontFamily: "var(--font-cinzel)",
+            fontSize: "0.8125rem",
+            fontWeight: 600,
+            letterSpacing: "0.15em",
+            textTransform: "uppercase",
+            padding: "0.875rem 2rem",
+            border: "1px solid var(--color-border)",
+            borderRadius: "2px",
+          }}
+          title="Apple Sign-In isn't configured yet"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+            <path d="M16.365 1.43c0 1.14-.415 2.06-1.246 2.99-.94.94-2.11 1.55-3.33 1.44-.09-1.1.41-2.06 1.23-2.98.9-.94 2.14-1.5 3.34-1.45zM20.5 17.28c-.51 1.17-.75 1.69-1.4 2.72-.9 1.44-2.18 3.24-3.75 3.25-1.4.01-1.76-.92-3.66-.91-1.9.01-2.3.93-3.7.92-1.57-.02-2.78-1.63-3.68-3.07-2.53-4.03-2.8-8.77-1.24-11.28.79-1.28 2.28-2.09 3.85-2.13 1.6-.04 2.6.94 3.6.94.98 0 2.31-1.16 3.9-.99.66.03 2.51.27 3.7 2.03-3.19 1.75-2.67 6.28.28 7.52z" />
+          </svg>
+          Continue with Apple
+        </div>
+      )}
 
       <p className="text-caption mt-10 text-center" style={{ color: "var(--color-text-secondary)" }}>
         Haven&apos;t applied yet?{" "}

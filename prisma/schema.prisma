@@ -61,6 +61,16 @@ enum PostType {
   course
 }
 
+// CLAUDE.md (restored, 2026-07-08): "Houses System" — thematic houses
+// within the club, each with its own culture/content/community. "active"
+// means the house is real and open; "coming_soon" is shown, not hidden
+// (same "locked, not hidden" intent as Rooms), for houses named in the
+// roadmap but not yet built out.
+enum HouseStatus {
+  active
+  coming_soon
+}
+
 enum EventType {
   party
   dinner
@@ -173,6 +183,30 @@ model UserProfile {
 }
 
 // ============================================================
+// HOUSES
+// ============================================================
+
+// A House ties a room (community) and posts (content) to one shared
+// culture/vertical — CLAUDE.md's "Houses System." `tagline`/`description`
+// are deliberately nullable: only what Max has actually specified
+// (e.g. House of Rope's "Shibari / Kinbaku") gets filled in — no
+// invented lore or curriculum text. See ADR-0016.
+model House {
+  id          String      @id @default(uuid()) @db.Uuid
+  name        String
+  slug        String      @unique
+  tagline     String?
+  description String?
+  status      HouseStatus @default(coming_soon)
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  rooms Room[]
+  posts Post[]
+
+  @@map("houses")
+}
+
+// ============================================================
 // ROOMS / MESSAGES
 // ============================================================
 
@@ -185,9 +219,11 @@ model Room {
   minLevel    Int      @default(1) @map("min_level")
   city        String?
   country     String?
+  houseId     String?  @map("house_id") @db.Uuid
   isActive    Boolean  @default(true) @map("is_active")
   createdAt   DateTime @default(now()) @map("created_at")
 
+  house    House?    @relation(fields: [houseId], references: [id])
   messages Message[]
 
   @@map("rooms")
@@ -227,10 +263,12 @@ model Post {
   isPublished Boolean   @default(false) @map("is_published")
   viewsCount  Int       @default(0) @map("views_count")
   likesCount  Int       @default(0) @map("likes_count")
+  houseId     String?   @map("house_id") @db.Uuid
   createdAt   DateTime  @default(now()) @map("created_at")
   publishedAt DateTime? @map("published_at")
 
   author   User      @relation(fields: [authorId], references: [id])
+  house    House?    @relation(fields: [houseId], references: [id])
   likes    Like[]
   comments Comment[]
 
@@ -413,6 +451,25 @@ model MarketplaceItem {
   seller User @relation(fields: [sellerId], references: [id])
 
   @@map("marketplace_items")
+}
+
+// The Vault (CLAUDE.md, restored version) — replaces the old "Shop"
+// concept entirely (Max, 2026-07-09): access opens through reputation,
+// not a direct purchase. Deliberately has no `price`/`currency` field —
+// that's what distinguishes it from `MarketplaceItem` (the older,
+// purchase-based model, kept as-is; whether it's retired too is still
+// open, see ADR-0016). No items are seeded — CLAUDE.md names the
+// concept but no actual catalog, so none is invented; real items get
+// created via `POST /api/admin/vault-items` once Max defines them.
+model VaultItem {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  description String?
+  minRep      Int      @default(0) @map("min_rep")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("vault_items")
 }
 
 model Notification {

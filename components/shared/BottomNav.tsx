@@ -1,20 +1,23 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Home, ShoppingBag, Users, BookOpen, User } from "lucide-react";
+import { Home, Vault, Users, BookOpen, User } from "lucide-react";
 
 // Mobile bottom navigation — CLAUDE.md's (2026-07-05) 5-tab structure:
-// Feed / Shop / Community / Library / Profile, replacing the original
+// Feed / Vault / Community / Library / Profile, replacing the original
 // DESIGN.md §8 layout (Hall/Rooms/Content/Events/Profile). See ADR-0015.
-// "Community" points at /rooms (Rooms is what's actually built; groups/
-// people-discovery/events-as-filter aren't — see /rooms's Events link
-// and TECH_DEBT.md). "Profile" points at /hall (the self-view dashboard
-// — "The Hall" stays the in-app/brand name; the nav label matches
-// CLAUDE.md's generic term). Desktop keeps the platform usable without
-// this (pages are still directly reachable by URL).
+// "Vault" was "Shop" until 2026-07-09 — Max confirmed The Vault (the
+// restored CLAUDE.md's reputation-gated concept, replacing a direct-
+// purchase shop entirely) fully replaces it, not a rename in name only —
+// see ADR-0016. "Community" points at /rooms (Rooms is what's actually
+// built; groups/people-discovery/events-as-filter aren't — see /rooms's
+// Events link and TECH_DEBT.md). "Profile" points at /hall (the
+// self-view dashboard — "The Hall" stays the in-app/brand name; the nav
+// label matches CLAUDE.md's generic term). Desktop keeps the platform
+// usable without this (pages are still directly reachable by URL).
 const ITEMS = [
   { href: "/feed", label: "Feed", icon: Home },
-  { href: "/shop", label: "Shop", icon: ShoppingBag },
+  { href: "/vault", label: "Vault", icon: Vault },
   { href: "/rooms", label: "Community", icon: Users },
   { href: "/library", label: "Library", icon: BookOpen },
   { href: "/hall", label: "Profile", icon: User },

@@ -8,7 +8,48 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.7.1` is the current released version.
+Nothing yet — `v0.9.0` is the current released version.
+
+## [0.9.0] — 2026-07-09
+
+Vault Mechanic, House Content UI & Apple Sign-In.
+
+### Added
+
+- Real Vault mechanic: `VaultItem` model (`minRep`-gated, no price —
+  unlike the older `MarketplaceItem`). `/vault` shows real items
+  locked/unlocked by `user.rep`. `POST /api/admin/vault-items` for Max
+  to add real items — none seeded.
+- House content-tagging UI: `ContentComposer.tsx` gained a house
+  picker; `POST /api/posts` validates the optional `houseId`.
+- Apple Sign-In: "Continue with Apple" button on `/login`, reusing the
+  provider-agnostic `/auth/callback` as-is. Gated behind
+  `NEXT_PUBLIC_APPLE_SIGNIN_ENABLED` (default `false`) until Max
+  configures real Apple Developer credentials.
+
+### Not done this pass
+
+`MarketplaceItem` retirement decision, Signature Rope Collection,
+phone sign-in.
+
+## [0.8.0] — 2026-07-08/09
+
+Houses, Vault & Profile — the restored `CLAUDE.md`'s next priorities.
+
+### Added
+
+- Houses System: `House` model, `houseId` on `Room`/`Post`, House of
+  Rope (Phase 1) seeded with a linked room and its first two real
+  articles ("What Is Shibari?", "Getting Started in House of Rope").
+  `/houses` + `/houses/[slug]` built. See
+  [ADR-0016](docs/ADR/0016-houses-system.md).
+- The Vault fully replaces Shop — `/shop` deleted, `/vault` placeholder
+  added, bottom nav updated.
+- `/profile` — a stable, ID-less redirect to the caller's own
+  `/profile/[id]`; REP now displays there alongside reputation stars.
+- Fixed the Google OAuth registration gap — a first-time sign-in with
+  no matching member now creates a pending `Waitlist` application
+  instead of a dead end.
 
 ## [0.7.1] — 2026-07-06
 

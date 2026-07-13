@@ -13,7 +13,8 @@ const PROTECTED_PREFIXES = [
   "/content", // kept protected — now just a redirect to /feed, see ADR-0015
   "/feed",
   "/library",
-  "/shop",
+  "/vault",
+  "/houses",
   "/marketplace",
   "/progress",
   "/admin",
@@ -75,10 +76,15 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Run on everything except static assets, images, and the generated
-     * PWA icon/OG routes — matches how ARCHITECTURE.md scopes middleware
-     * to real navigable pages, not asset requests.
+     * Run on everything except static assets, images, the generated
+     * PWA icon/OG routes, and the OAuth callback — matches how
+     * ARCHITECTURE.md scopes middleware to real navigable pages, not
+     * asset requests. `/auth/callback` is excluded so this middleware's
+     * own session-refresh cookie handling can never interfere with the
+     * callback route establishing a brand-new session — it has nothing
+     * useful to do there anyway (not a protected route, no existing
+     * session to refresh).
      */
-    "/((?!_next/static|_next/image|favicon.ico|icons/|opengraph-image).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icons/|opengraph-image|auth/callback).*)",
   ],
 };

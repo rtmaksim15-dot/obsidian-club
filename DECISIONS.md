@@ -669,3 +669,51 @@ our code only calls `signInWithOAuth`.
 
 Bumped to `v0.7.1` — infrastructure-connection milestone, not a new
 feature version.
+
+### 2026-07-08/09 — Houses System, House of Rope content, Vault mechanic, Apple Sign-In UI
+
+Read the restored `CLAUDE.md` (a third generation of the file, found at
+the iCloud folder root). Verified two of its claims directly against
+the live database rather than trusting them: Realtime was confirmed
+genuinely enabled on `messages`/`notifications`/`posts`/`rooms`; Google
+OAuth "works" was only half true — a real session was established
+(`auth.users` had a genuine `rtmaksim15@gmail.com` row with a populated
+`last_sign_in_at`), but that user had no matching `public.users` row, so
+the app still treated them as logged out. Asked Max directly how an
+unrecognized Google sign-in should behave in a closed, no-open-registration
+club — confirmed: create a pending application, same as the landing
+page's waitlist form.
+
+Built the Houses System (`House` model, House of Rope as Phase 1, real
+content — a general shibari/kinbaku overview and a safety-first
+"getting started" orientation, deliberately not actual tie-technique
+instructions) and, once Max confirmed "The Vault полностью заменяет
+Shop," a real Vault mechanic (`VaultItem`, REP-gated, no price) plus a
+house content-tagging UI in `ContentComposer.tsx`. Apple Sign-In UI was
+built reusing the same provider-agnostic OAuth callback Google already
+proved out, but kept behind `NEXT_PUBLIC_APPLE_SIGNIN_ENABLED` since
+Apple credentials don't exist yet — a real visitor seeing a
+guaranteed-to-fail button would be a live bug, not just an internal gap.
+
+Full rationale in [ADR-0016](docs/ADR/0016-houses-system.md). Bumped to
+`v0.9.0`.
+
+### 2026-07-13 — Recovered lost commits: a fresh clone was missing everything after v0.7.1
+
+Starting work on Vercel deployment prep, discovered the working
+directory was a **fresh clone** of the GitHub repo, and `origin/main`
+was still at `v0.7.1` — none of the work described above (the Google
+OAuth registration-gap fix, Houses System, House of Rope content, Vault
+mechanic, house-tagging UI, Apple Sign-In UI, `/profile` REP display)
+had ever been pushed. It only existed in a previous sandbox session's
+local git history, which was discarded without a push. The real
+Supabase database was unaffected (confirmed House of Rope, the admin
+account, and the two seeded articles all survived — only the *code*
+was gone, not the data).
+
+Reconstructed every file from this session's own record of what was
+written, re-validated the schema against the (already-correct) live
+database, re-ran `prisma db seed` (idempotent — no duplicates), and
+committed + **pushed** this time. Lesson for future sessions: commit
+alone isn't durable across a sandbox reset — push after every
+meaningful unit of work, not just at explicit "push this" requests.

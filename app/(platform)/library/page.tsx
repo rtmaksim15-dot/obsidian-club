@@ -57,6 +57,11 @@ export default async function LibraryPage({
   });
 
   const allowedTypes = LIBRARY_TYPES.filter((t) => canCreatePostType(user, t));
+  const houses = await prisma.house.findMany({
+    where: { status: "active" },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
 
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
@@ -79,7 +84,7 @@ export default async function LibraryPage({
           ))}
         </div>
 
-        <ContentComposer allowedTypes={allowedTypes} />
+        <ContentComposer allowedTypes={allowedTypes} houses={houses} />
 
         <PostList posts={posts} />
       </div>

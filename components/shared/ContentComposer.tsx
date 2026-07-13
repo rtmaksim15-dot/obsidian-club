@@ -17,21 +17,24 @@ const LABELS: Record<string, string> = {
 // Only types the toggle applies to need a title; short-form types don't.
 const TITLED_TYPES = new Set(["article", "lecture", "course", "manifesto"]);
 
-type Props = { allowedTypes: string[] };
+type Props = { allowedTypes: string[]; houses?: { id: string; name: string }[] };
 
 /**
  * Post composer — the type dropdown only lists types the caller is
  * actually allowed to create (`canCreatePostType`, PRODUCT.md §10). If a
  * member has no creation rights at their level, this isn't rendered at
- * all (see page.tsx).
+ * all (see page.tsx). `houses` is optional and only has entries once a
+ * real House exists (House of Rope, see ADR-0016) — lets a member tag
+ * their post to a house so it shows up on that house's page.
  */
-export default function ContentComposer({ allowedTypes }: Props) {
+export default function ContentComposer({ allowedTypes, houses = [] }: Props) {
   const router = useRouter();
   const options: AllowedType[] = allowedTypes.map((type) => ({ type, label: LABELS[type] ?? type }));
 
   const [type, setType] = useState(options[0]?.type ?? "post");
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [houseId, setHouseId] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,7 +51,12 @@ export default function ContentComposer({ allowedTypes }: Props) {
     const res = await fetch("/api/posts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type, title: title.trim() || undefined, content: trimmed }),
+      body: JSON.stringify({
+        type,
+        title: title.trim() || undefined,
+        content: trimmed,
+        houseId: houseId || undefined,
+      }),
     });
 
     if (!res.ok) {
@@ -60,6 +68,7 @@ export default function ContentComposer({ allowedTypes }: Props) {
 
     setTitle("");
     setContent("");
+    setHouseId("");
     setSubmitting(false);
     router.refresh();
   }
@@ -91,6 +100,22 @@ export default function ContentComposer({ allowedTypes }: Props) {
           placeholder="Title"
           maxLength={200}
         />
+      ) : null}
+
+      {houses.length > 0 ? (
+        <select
+          className="input"
+          value={houseId}
+          onChange={(e) => setHouseId(e.target.value)}
+          style={{ width: "auto" }}
+        >
+          <option value="">No house</option>
+          {houses.map((h) => (
+            <option key={h.id} value={h.id}>
+              {h.name}
+            </option>
+          ))}
+        </select>
       ) : null}
 
       <textarea

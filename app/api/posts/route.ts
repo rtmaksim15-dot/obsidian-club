@@ -55,7 +55,7 @@ export async function GET(request: Request) {
   return NextResponse.json({ posts });
 }
 
-type Body = { type?: string; title?: string; content?: string; minLevel?: number };
+type Body = { type?: string; title?: string; content?: string; minLevel?: number; houseId?: string };
 
 // POST /api/posts — create + publish immediately (no draft workflow is
 // documented in PRODUCT.md, so this doesn't invent one). Creation rights
@@ -105,6 +105,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid minimum level." }, { status: 422 });
   }
 
+  let houseId: string | null = null;
+  if (body.houseId) {
+    const house = await prisma.house.findUnique({ where: { id: body.houseId } });
+    if (!house || house.status !== "active") {
+      return NextResponse.json({ error: "Invalid house." }, { status: 422 });
+    }
+    houseId = house.id;
+  }
+
   try {
     const post = await prisma.post.create({
       data: {
@@ -113,6 +122,7 @@ export async function POST(request: Request) {
         title: title || null,
         content,
         minLevel,
+        houseId,
         isPublished: true,
         publishedAt: new Date(),
       },

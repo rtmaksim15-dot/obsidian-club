@@ -251,40 +251,77 @@ make room — see each section below for its original name.
   Google/Apple/phone sign-in, Shop & Payments (crypto, card processor,
   escrow), algorithmic Feed ranking, video posts.
 
+### v0.8 — Houses, Vault & Profile ✅ (built 2026-07-08/09, unverified end-to-end)
+
+**Inserted ahead of the `ROADMAP.md` sequence again**, sourced from the
+restored `CLAUDE.md` (2026-07-08). Every version from here down is
+renumbered up by one again (old `v0.8` Events & Marketplace → `v0.9`, ...).
+
+- [x] Fixed the Google OAuth registration gap — a first-time sign-in
+      with no matching member creates a pending `Waitlist` application
+      (`/apply?status=pending`) instead of a dead end.
+- [x] Houses System — `House` model, `houseId` on `Room`/`Post`, House
+      of Rope (Phase 1) seeded with a linked room and its first two real
+      articles ("What Is Shibari?", "Getting Started in House of
+      Rope"). `/houses` + `/houses/[slug]` built. See
+      [ADR-0016](docs/ADR/0016-houses-system.md).
+- [x] The Vault fully replaces Shop — `/shop` deleted, `/vault`
+      placeholder added, bottom nav updated.
+- [x] `/profile` — a stable, ID-less redirect to the caller's own
+      `/profile/[id]`; REP now displays there alongside reputation stars.
+
+### v0.9 — Vault Mechanic, House Content UI & Apple Sign-In ✅ (built 2026-07-09, unverified end-to-end)
+
+- [x] Real Vault mechanic — `VaultItem` model (`minRep`-gated, no
+      price), `/vault` shows real items locked/unlocked by `user.rep`,
+      `POST /api/admin/vault-items` for Max to add real ones. No
+      catalog invented — honestly empty until items exist.
+- [x] House content-tagging UI — `ContentComposer.tsx` gained a house
+      picker; `POST /api/posts` validates the optional `houseId`.
+      Members can tag their own posts to House of Rope directly, not
+      just via `prisma/seed.ts`.
+- [x] Apple Sign-In UI — button on `/login`, reuses the existing
+      provider-agnostic `/auth/callback` as-is. Gated behind
+      `NEXT_PUBLIC_APPLE_SIGNIN_ENABLED` (default `false`) — not
+      clickable until Max configures real Apple Developer credentials
+      in the Supabase dashboard (full steps in `TECH_DEBT.md`).
+- Not built: `MarketplaceItem` retirement decision, Signature Rope
+  Collection, phone sign-in.
+
 ## Later
 
 *Intentionally postponed — approved direction, not yet scheduled in
 detail. Derived from `ROADMAP.md`'s existing Stage 2 plan (renumbered up
-by one to make room for `v0.7` above — see that section).*
+by two to make room for `v0.8`/`v0.9` above — see that section).*
 
-### v0.8 — Events & Marketplace (originally `v0.7`)
+### v1.0 — Events & Marketplace (originally `v0.7`, then `v0.8`)
 
 (Source: `ROADMAP.md`, October Weeks 3–4) — events (list + detail +
 registration, level/Trust-Score gating), admin panel v2, basic
 marketplace vitrine.
 
-### v0.9 — Beta Hardening (originally `v0.8`)
+### v1.1 — Beta Hardening (originally `v0.8`, then `v0.9`)
 
 (Source: `ROADMAP.md`, November) — closed beta (20–50 members from the
 waitlist), load testing, security audit (RLS, rate limiting — see
 `TECH_DEBT.md`), Stripe integration, PWA finalization (offline, push
 notifications — see `TECH_DEBT.md`'s service-worker gap).
 
-### v1.0 — Launch Preparation (originally `v0.9`)
+### v1.2 — Launch Preparation (originally `v0.9`, then `v1.0`)
 
 (Source: `ROADMAP.md`, December) — final QA, first invitation wave,
 branded error pages (404/500), onboarding/Initiation Ritual flow,
 monitoring (Sentry).
 
-### v1.1 — Public Launch (originally `v1.0`)
+### v1.3 — Public Launch (originally `v1.0`, then `v1.1`)
 
 (Source: `ROADMAP.md`, January 2027) — first wave of 100–200 members.
 
-### Unscheduled ideas (post-`v1.1`, per `ROADMAP.md`)
+### Unscheduled ideas (post-`v1.3`, per `ROADMAP.md`)
 
-- `v1.2` — full Marketplace (the merch/tickets vitrine from `ARCHITECTURE.md`
+- `v1.4` — full Marketplace (the merch/tickets vitrine from `ARCHITECTURE.md`
   §12 — a smaller scope than `OC_MASTER.md`'s marketplace vertical below;
-  originally `v1.1` before the `v0.7` insertion above)
+  originally `v1.1`, then `v1.2` before this round's insertion)
 - ~~iOS app~~ / ~~Android app~~ — **cancelled.**
   `OC_MASTER.md` explicitly decided PWA-only, no native apps, ever (App
   Store/Google Play policy risk for 18+ content). See

@@ -44,9 +44,14 @@ export default async function RoomsPage() {
             and people-discovery in as filters — only Events exists today
             (as a placeholder), linked here rather than its own nav tab.
             See ADR-0015 and TECH_DEBT.md. */}
-        <a href="/events" className="text-caption mb-10 inline-block text-ob-accent">
-          Events →
-        </a>
+        <div className="mb-10 flex gap-5">
+          <a href="/events" className="text-caption inline-block text-ob-accent">
+            Events →
+          </a>
+          <a href="/houses" className="text-caption inline-block text-ob-accent">
+            Houses →
+          </a>
+        </div>
 
         {grouped.length === 0 ? (
           <p className="text-body">No rooms yet.</p>

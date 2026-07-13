@@ -6,6 +6,42 @@ Each item should eventually become a `BACKLOG.md` entry once it's actually
 scheduled; until then, it lives here as "known, not forgotten, not yet
 prioritized."
 
+## Houses / Vault / Apple Sign-In gaps (2026-07-08/09, see ADR-0016)
+
+- **8 more houses have no names yet** — CLAUDE.md says "9 more houses
+  (leather, protocol, impact etc.)" as examples, not a decided list.
+  Don't seed placeholder houses for these; wait for Max to name them.
+- **Vault catalog is empty** — `VaultItem` model + `/vault` +
+  `POST /api/admin/vault-items` are real, but no items exist. Max adds
+  real ones once he defines a catalog.
+- **`MarketplaceItem` vs `VaultItem`** — whether the older,
+  purchase-based marketplace model gets retired in favor of the Vault is
+  still an open question; Max's instruction was specifically about Shop.
+- **Signature Rope Collection** — not started, no design exists yet
+  (numbered/certificated limited collections, transfer registry).
+- **Apple Sign-In — UI built, blocked on real credentials.** Code side
+  reuses everything Google already proved works: a "Continue with
+  Apple" button on `/login`, and the same provider-agnostic
+  `app/auth/callback/route.ts`. **Deliberately not clickable yet** —
+  gated behind `NEXT_PUBLIC_APPLE_SIGNIN_ENABLED` (default `false`),
+  since Apple's provider isn't configured in Supabase and a real
+  visitor clicking a guaranteed-to-fail button would be a real bug. To
+  turn it on, Max needs:
+  1. An Apple Developer Program membership ($99/year).
+  2. A **Services ID** in the Apple Developer portal, "Sign in with
+     Apple" enabled, with this app's real domain +
+     `https://fsleaavvmvlpvfsevosw.supabase.co/auth/v1/callback`
+     registered as the return URL.
+  3. A **Sign in with Apple key** (`.p8` file) + its **Key ID** + the
+     Apple **Team ID**.
+  4. Enable the Apple provider in **Supabase Dashboard → Authentication
+     → Providers → Apple**, using the Services ID as Client ID and the
+     key/Key ID/Team ID to generate the client secret.
+  5. Set `NEXT_PUBLIC_APPLE_SIGNIN_ENABLED=true` (`.env.local` and
+     Vercel env vars) to reveal the real button.
+  **Phone sign-in** — still not implemented; needs an SMS provider
+  (Supabase supports Twilio/MessageBird/Vonage).
+
 ## CLAUDE.md v2 migration gaps (2026-07-05, see ADR-0015)
 
 - **REP actions not wireable yet** — `lib/rating/rep-engine.ts#REP_TABLE`
@@ -24,26 +60,29 @@ prioritized."
   already flagged for the `-20`/`-50` deltas). **Fix:** wire each as its
   dependent feature gets built — the point values are already correct,
   just not triggerable.
-- **Google Sign-In — ✅ built 2026-07-06.** Max provided a real Google
-  OAuth Client ID/Secret and enabled the provider in the Supabase Auth
-  dashboard himself (confirmed working via a direct `GET
-  /auth/v1/authorize?provider=google` request — Supabase correctly
-  redirects to Google's consent screen with our client ID). Code side:
+- **Google Sign-In — ✅ built 2026-07-06, two real-login bugs found + fixed.**
+  Max provided a real Google OAuth Client ID/Secret and enabled the
+  provider in the Supabase Auth dashboard himself. Code side:
   `app/auth/callback/route.ts` (exchanges the PKCE `code` for a session)
   and a "Continue with Google" button on `/login`
-  (`supabase.auth.signInWithOAuth`). The Google Client ID/Secret
-  themselves live only in Supabase's own dashboard config, not in this
-  app's `.env.local` — Supabase handles the provider handshake, our code
-  never touches Google's credentials directly. **Not yet click-tested in
-  a real browser** — the automated preview tool can't complete a
-  cross-origin OAuth redirect through Google's actual consent screen, so
-  this needs a manual click-through to fully confirm.
-- **Apple Sign-In / phone sign-in — still not implemented.** Apple needs
-  its own real OAuth credentials (Apple Developer account, Services ID)
-  and enabling in the Supabase dashboard — same shape of blocker Google
-  was until 2026-07-06. Phone auth needs an SMS provider (Supabase
-  supports Twilio/MessageBird/Vonage) — another account Max would need
-  to create.
+  (`supabase.auth.signInWithOAuth`). **Bug 1 (cookie loss)**: the
+  callback route initially wrote cookies through
+  `lib/auth/supabase-server.ts#createClient()` (built for Server
+  Components), which doesn't attach to a `NextResponse` constructed and
+  returned manually — session established, but the cookie never reached
+  the browser, so the next request to `/hall` bounced back to `/login`.
+  Fixed by collecting cookies and applying them directly to whichever
+  redirect response is actually returned. **Confirmed fixed** —
+  verified in the database: `auth.users` has a real
+  `rtmaksim15@gmail.com` row with `provider: "google"` and a populated
+  `last_sign_in_at`. **Bug 2 (no membership on first sign-in)**: that
+  same Google-authenticated user had no matching `public.users` row —
+  the app still saw them as logged out. Since the club has no open
+  registration, this was a real product question, not just a bug —
+  Max confirmed: create a pending application, same as the landing
+  page's waitlist form. Fixed: a first-time sign-in with no matching
+  member now creates a real `Waitlist` row (`source: "Google OAuth"`)
+  and lands on `/apply?status=pending`.
 - **Shop & Payments — nothing beyond a placeholder** — `/shop` is an
   honest "coming soon" page, same pattern as `/events`. CLAUDE.md
   specifies: a real product catalog (Standard/Premium/Extra Premium
