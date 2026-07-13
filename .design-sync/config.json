@@ -1,0 +1,44 @@
+{
+  "projectId": "0cb3f34a-2c57-4765-b9f7-a70ceb426076",
+  "shape": "package",
+  "pkg": "obsidian-club",
+  "globalName": "ObsidianClub",
+  "srcDir": "components",
+  "tsconfig": "tsconfig.json",
+  "buildCmd": "node .design-sync/build-css.mjs",
+  "readmeHeader": ".design-sync/conventions.md",
+  "cssEntry": ".design-sync/.cache/ds.css",
+  "extraEntries": ["./.design-sync/shims/next-nav-provider.tsx"],
+  "provider": { "component": "NextNavProvider" },
+  "overrides": {
+    "BottomNav": { "cardMode": "single", "viewport": "390x130" },
+    "ApplicationsQueue": { "cardMode": "column" }
+  },
+  "dtsPropsFor": {
+    "LikeButton": "postId: string;\n  initialCount: number;\n  initialLiked: boolean;",
+    "ComingSoon": "title: string;\n  note: string;",
+    "ContentComposer": "/** Post types the current member is allowed to create; the type dropdown lists only these. */\n  allowedTypes: string[];",
+    "ReviewForm": "reviewedId: string;",
+    "ApplicationsQueue": "initial: Array<{\n    id: string;\n    name: string | null;\n    email: string;\n    age: number | null;\n    city: string | null;\n    source: string | null;\n    referralCode: string | null;\n    createdAt: string;\n  }>;",
+    "PostList": "posts: Array<{\n    id: string;\n    title: string | null;\n    content: string | null;\n    type: \"post\" | \"story\" | \"article\" | \"lecture\" | \"manifesto\" | \"course\";\n    likesCount: number;\n    author: { id: string; displayName: string; avatarUrl: string | null; level: number };\n    likes: { userId: string }[];\n    _count: { comments: number };\n  }>;",
+    "ProfileEditForm": "user: {\n    displayName: string;\n    username: string;\n    bio: string;\n    avatarUrl: string | null;\n    locationCity: string;\n    role: string | null;\n    interests: string[];\n  };",
+    "RoomChat": "room: { id: string; slug: string; name: string; description: string | null };\n  currentUserId: string;\n  initialMessages: Array<{\n    id: string;\n    content: string;\n    replyToId: string | null;\n    createdAt: string;\n    user: { id: string; displayName: string; avatarUrl: string | null; level: number };\n  }>;",
+    "Reveal": "children: React.ReactNode;\n  className?: string;",
+    "RevealGroup": "children: React.ReactNode;\n  className?: string;"
+  },
+  "componentSrcMap": {
+    "LikeButton": "components/shared/LikeButton.tsx",
+    "WaitlistForm": "components/shared/WaitlistForm.tsx",
+    "ComingSoon": "components/shared/ComingSoon.tsx",
+    "PostList": "components/shared/PostList.tsx",
+    "ApplicationsQueue": "components/shared/ApplicationsQueue.tsx",
+    "ContentComposer": "components/shared/ContentComposer.tsx",
+    "ReviewForm": "components/shared/ReviewForm.tsx",
+    "ProfileEditForm": "components/shared/ProfileEditForm.tsx",
+    "BottomNav": "components/shared/BottomNav.tsx",
+    "RoomChat": "components/shared/RoomChat.tsx",
+    "AvatarUploadButton": "components/shared/AvatarUploadButton.tsx",
+    "Reveal": "components/shared/Reveal.tsx",
+    "RevealGroup": "components/shared/Reveal.tsx"
+  }
+}
