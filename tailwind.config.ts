@@ -46,9 +46,14 @@ const config: Config = {
           "0%, 100%": { boxShadow: "0 0 8px var(--color-accent-glow)" },
           "50%": { boxShadow: "0 0 16px var(--color-accent-glow)" },
         },
+        obDrift: {
+          "0%, 100%": { opacity: "0.55", transform: "scale(1)" },
+          "50%": { opacity: "0.85", transform: "scale(1.06)" },
+        },
       },
       animation: {
         "fade-in-up": "fadeInUp 0.6s ease both",
+        "ob-drift": "obDrift 12s ease-in-out infinite",
       },
     },
   },

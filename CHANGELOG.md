@@ -8,7 +8,48 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.9.0` is the current released version.
+Nothing yet — `v0.10.0` is the current released version.
+
+## [0.10.0] — 2026-07-13
+
+Landing Page redesign (agency-approved design handoff).
+
+### Added
+
+- Full landing page (`app/(landing)/page.tsx`) recreated pixel-for-pixel
+  from the approved design handoff: fixed nav, hero with poster image +
+  ambient glow, Founder/Ethos section (blurred/vignetted portrait), Five
+  Principles grid, Admission steps, and the application form section —
+  all using existing design-system tokens/classes.
+- `HeroInviteForm`: hero's email-only field funnels to the full
+  application (scrolls to `#apply`, carries the email down) rather than
+  submitting on its own — the API's 18+ age check is a real compliance
+  gate, and a bare email has no age to check. Max's call; see
+  DECISIONS.md.
+- `ApplicationForm` (replaces `WaitlistForm`): adds a "Why you belong
+  here" field, wired to `Waitlist.reason` (new column).
+- Brand assets `oc-logo.jpg`, `hero-library.png`, `founder-bust.jpg` in
+  `public/images/`.
+
+### Fixed
+
+- **Row Level Security was disabled on `waitlist`.** The anon key (public,
+  shipped to the browser for Supabase Auth) could have read every
+  application's name/email/age/city directly via the Supabase REST API,
+  bypassing Prisma entirely. Enabled RLS and added an `INSERT`-only
+  policy for `anon`; no `SELECT`/`UPDATE`/`DELETE` policy exists, so
+  anon can submit but never read. Confirmed the app's own write path
+  (Prisma via `DATABASE_URL`, which has `BYPASSRLS`) still works.
+- **Landing page monogram was a hand-drawn SVG approximation**, not the
+  real brand mark. Deleted it everywhere (nav, footer, Principles grid,
+  Apply header) and replaced with a real crop + alpha-matte cutout of the
+  design package's `oc-logo.jpg` (`components/ui/LogoMark.tsx`,
+  `public/images/logo-mark.png`). Also fixed the two other
+  placeholder-logo spots this surfaced: the PWA app icons and the social
+  share (`opengraph-image`) card were drawing plain "O"/"C" text via
+  `next/og`, not any real asset; `app/favicon.ico` was still the default
+  `create-next-app` scaffold icon. All three now use the real cutout. See
+  DECISIONS.md for the small-favicon legibility tradeoff.
 
 ## [0.9.0] — 2026-07-09
 

@@ -109,36 +109,47 @@ prioritized."
   could plausibly host raw files, but 60-second-limit enforcement and
   compression are unsolved.
 
-## Placeholder brand assets
+## Placeholder brand assets — fixed 2026-07-14, one caveat remains
 
-- **`components/ui/Logo.tsx`** — as of 2026-07-04, renders a real cropped
-  image (`public/brand/oc-monogram.webp`) taken from Max's identity-guide
-  artwork (`Визуал/C733A838-...png`, see
-  [docs/LordObsidian.md](docs/LordObsidian.md#symbolism-the-oc-monogram)),
-  replacing the earlier hand-drawn SVG. It's a **raster crop of a
-  photographed mockup, not a true vector asset** — fine at the sizes it's
-  used today (72–180px), but won't scale losslessly to, say, a print or
-  large-format use, and only exists shot against the identity guide's
-  dark textured background (no transparent/light-background version).
+- **`components/ui/Logo.tsx`** — unchanged, still `public/brand/
+  oc-monogram.webp`, a **raster crop, not a true vector asset**. Fine at
+  the sizes it's used (72–180px on `/login`, `/apply`); won't scale
+  losslessly to print/large-format. Out of scope for the 2026-07-14
+  landing-page logo fix (that work targeted the landing page's inline-SVG
+  monogram specifically — see DECISIONS.md), but the same "get a true
+  vector export from Max" fix would resolve this one too.
+- **`app/(landing)/page.tsx`'s monogram** (nav, footer, Principles grid,
+  Apply header) — was an inline hand-drawn SVG approximation (circle +
+  arc + rotated square). Deleted (`components/ui/Monogram.tsx` removed
+  entirely); replaced with `components/ui/LogoMark.tsx`, a real crop +
+  alpha-matte cutout of `public/images/oc-logo.jpg` (the approved design
+  package's actual logo), saved as `public/images/logo-mark.png`.
+  **Caveat inherited from the source render**: the "black" O reads
+  correctly only against a near-black background (its shading was baked
+  assuming a black backdrop — there's no separate flat fill to recover).
+  Verified it blends correctly against this site's actual dark tones
+  (`#0A0908`, `#111009`); would look wrong (thin bright ring, not solid
+  black) on a light or mid-tone background.
 - **`lib/utils/ogIcon.tsx`** (PWA icons) and
-  **`app/(landing)/opengraph-image.tsx`** (social share image) — still
-  the old two-letter JSX-drawn placeholder (no double-contour, no spear),
-  generated at request/build time via `next/og`. Not yet switched to the
-  new cropped asset because these need a small, simplified icon-scale
-  mark, not the full monogram crop.
-- **Fix:** get a true vector (SVG/AI/EPS) export of the logo from Max —
-  removes the raster-scaling ceiling on `Logo.tsx` and gives `ogIcon.tsx`/
-  `opengraph-image.tsx` a real source to derive an icon-scale mark from.
+  **`app/(landing)/opengraph-image.tsx`** (social share image) — were
+  the old two-letter JSX-drawn placeholder. `ogIcon.tsx` deleted; PWA
+  icons are now static files (`public/icons/icon-192.png`,
+  `icon-512.png`) generated once from the real cutout. `opengraph-image.
+  tsx` now embeds the real `public/images/logo.png` lockup instead of
+  drawing text.
 
-## Favicon inconsistency
+## Favicon — fixed 2026-07-14
 
-`app/favicon.ico` is still the default `create-next-app` scaffold icon
-(not the OC monogram) — it takes priority over the custom
-`/icons/icon-192.png` route for the actual browser tab icon, so the tab
-icon currently doesn't match the brand. **Fix:** replace with an
-`app/icon.tsx` (using the same `renderIcon()` helper) once the real brand
-asset exists, or at minimum swap in a monogram-based `.ico` sooner if this
-becomes visibly embarrassing before then.
+`app/favicon.ico` was the default `create-next-app` scaffold icon (not
+even an OC placeholder). Replaced with a real `.ico` (16/32/48/64/256,
+generated from the same cutout). At 16–48px the thin double-line O
+essentially disappears with no treatment (too little "ink" per pixel at
+that scale), so the favicon variant specifically uses a brightness/
+contrast-boosted pass over the same real pixels (a levels adjustment,
+not a redraw) — the 192/512 PWA icons and everywhere else keep the
+faithful, unboosted cutout. Still fairly subtle at 16px; a dedicated
+small-icon mark from Max (bolder strokes) would read better, but this is
+the real asset, boosted for legibility, not an invented shape.
 
 ## PWA: manifest exists, service worker doesn't
 
@@ -191,7 +202,19 @@ blocked-on-Max category as above.
 endpoints. `/api/waitlist` is public and currently has none — once a real
 database is connected, it's open to spam/abuse. **Should be prioritized
 before or immediately after the database goes live**, not deferred
-indefinitely.
+indefinitely. (Note: this is unrelated to the RLS fix below — RLS
+controls direct Postgres/Supabase-client access; `/api/waitlist` itself
+is still unthrottled.)
+
+## `waitlist` RLS — fixed 2026-07-13, worth a second look
+
+RLS was fully disabled on `waitlist` (found while verifying the Landing
+Page redesign's application form — see DECISIONS.md). Fixed: RLS
+enabled, one `INSERT`-only policy for `anon`, no read policy for
+anyone but the service role / `DATABASE_URL`'s role. Worth periodically
+confirming this hasn't regressed (e.g. via `prisma db push`, which
+doesn't manage RLS and won't warn if a future schema change on this
+table needs new policies).
 
 ## No automated tests
 

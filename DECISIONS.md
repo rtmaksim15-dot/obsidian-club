@@ -717,3 +717,89 @@ database, re-ran `prisma db seed` (idempotent — no duplicates), and
 committed + **pushed** this time. Lesson for future sessions: commit
 alone isn't durable across a sandbox reset — push after every
 meaningful unit of work, not just at explicit "push this" requests.
+
+### 2026-07-13 — Landing Page redesign: reconciling the handoff against the live schema
+
+Max supplied an agency-approved design handoff (`design_handoff_obsidian_
+club_landing/`) with a literal task list that said to insert applications
+into an "`applications`" table with columns `(name, reason,
+invitation_code, created_at)`. No such table exists — the club's single
+application-intake table is `Waitlist` (mapped `waitlist`), which the
+handoff's own README explicitly says to reuse ("wire to `POST
+/api/waitlist`... the existing `WaitlistForm` component already does
+this"). Cross-checked the handoff's actual form fields against
+`Waitlist`'s columns: `name`/`email`/`age`/`city`/`source` already
+existed; the design's "Invitation code" field already maps to the
+existing `referralCode` column. Only "Why you belong here" was genuinely
+new — added as `Waitlist.reason`. Treated the task list's "applications"
+naming as informal shorthand (it mirrors `/api/admin/applications`'s URL,
+which already reads from `Waitlist`), not an instruction to fork a second
+table.
+
+Found and fixed a real vulnerability while verifying RLS per the task
+list: `waitlist` had **RLS disabled entirely**, not just "missing an
+anon-insert policy" as asked. Since `NEXT_PUBLIC_SUPABASE_ANON_KEY` is
+public or in the browser bundle, anyone could have called Supabase's
+REST API directly and dumped every applicant's name/email/age/city —
+independent of the app's own Prisma-based write path, which never
+touched RLS at all (its `DATABASE_URL` role has `BYPASSRLS`). Enabled
+RLS and scoped the policy to `INSERT`-only for `anon`; verified the
+Prisma path still writes successfully.
+
+Asked Max how the hero's email-only quick-capture should behave, since
+wiring it to `/api/waitlist` unchanged would 422 (the API requires a
+name and 18+ age — a deliberate compliance check, not incidental
+validation) and the design prototype's own success state for it is
+purely client-side with no real backend. Max decided: the hero never
+submits on its own — clicking "Request Invitation" scrolls to the real
+application form at `#apply` and carries the typed email down with it.
+The 18+ gate stays intact on the one path that actually creates a
+`Waitlist` row.
+
+Bumped to `v0.10.0`.
+
+### 2026-07-14 — Real logo everywhere, and a small-favicon tradeoff
+
+Max flagged the landing page's OC monogram (nav, footer, Principles grid,
+Apply header) as a "hand-drawn vector approximation" — correct: it was an
+inline SVG (circle + arc + rotated square) I'd built as a stand-in, not
+the real brand mark. Deleted `components/ui/Monogram.tsx` entirely.
+
+Cropped the monogram out of the design package's `oc-logo.jpg` (rows
+99–555, cols 220–895) and cut out its background via an alpha matte
+(distance from the sampled background color, not a hand-traced mask) —
+saved as `public/images/logo-mark.png`, used by the new
+`components/ui/LogoMark.tsx`. One inherent limitation surfaced during
+this: the source render shows the "black" O only via specular
+highlights against a black backdrop — there's no separate flat-black
+fill baked into the pixels. Alpha-matting it necessarily keeps only
+those highlight pixels, so the cutout **only reads correctly on a
+near-black background** (verified against this site's actual `#0A0908`/
+`#111009` — matches the source almost exactly); on a lighter background
+the "black" ring would look like a thin bright ring instead. Not a
+mistake in the extraction — there's no hidden data to recover — so this
+is a real constraint on where `LogoMark` can be used, not just here.
+
+While auditing "every instance" per Max's instruction, found two more
+placeholder-logo spots that had never been on anyone's radar as
+"the same bug": `lib/utils/ogIcon.tsx` (PWA `icon-192`/`icon-512`) and
+`app/(landing)/opengraph-image.tsx` (social share card) were both
+drawing plain "O"/"C" text via `next/og` — literally commented
+"Placeholder until a real vector asset is supplied." And
+`app/favicon.ico` was still the unmodified `create-next-app` default
+(the Vercel triangle), not even a placeholder attempt. Fixed all three:
+deleted `ogIcon.tsx` and the two dynamic icon routes, replaced with
+static `public/icons/icon-192.png`/`icon-512.png` generated once from
+the real cutout; `opengraph-image.tsx` now embeds the real
+`public/images/logo.png` lockup; `favicon.ico` regenerated from the same
+source.
+
+The favicon needed one more real-asset-only adjustment: at 16–48px the
+thin double-line O all but disappears (too little "ink" per pixel at
+that scale for a naive resize). Rather than redraw a bolder shape —
+which Max explicitly ruled out — applied a brightness/contrast boost to
+the same cutout's pixels (a levels adjustment, not a redraw) for the
+favicon variant only; the 192/512 PWA icons and every on-page use keep
+the faithful, unboosted cutout. Still subtle at 16px, flagged in
+TECH_DEBT.md as something a dedicated small-icon mark from Max would
+improve, but not a shape invented from scratch.

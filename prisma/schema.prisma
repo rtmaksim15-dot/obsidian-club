@@ -502,6 +502,10 @@ model Waitlist {
   age          Int?
   city         String?
   source       String?
+  // "Why you belong here" — free-text from the full application form
+  // (Landing Page redesign, 2026-07). Optional: the hero-only email
+  // capture never sets it.
+  reason       String?
   referralCode String?        @map("referral_code")
   invitedBy    String?        @map("invited_by") @db.Uuid
   // Status tracking + a minimal review audit trail — additive beyond

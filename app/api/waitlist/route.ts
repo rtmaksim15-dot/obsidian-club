@@ -11,6 +11,7 @@ type WaitlistPayload = {
   age?: string;
   city?: string;
   source?: string;
+  reason?: string;
   referralCode?: string;
 };
 
@@ -29,6 +30,7 @@ export async function POST(request: Request) {
   const age = body.age ? Number(body.age) : NaN;
   const city = body.city?.trim() || null;
   const source = body.source?.trim() || null;
+  const reason = body.reason?.trim() || null;
   const referralCode = body.referralCode?.trim() || null;
 
   if (!name) {
@@ -43,7 +45,7 @@ export async function POST(request: Request) {
 
   try {
     await prisma.waitlist.create({
-      data: { email, name, age, city, source, referralCode },
+      data: { email, name, age, city, source, reason, referralCode },
     });
   } catch (err) {
     // Duplicate application: treat as success (idempotent, no email
