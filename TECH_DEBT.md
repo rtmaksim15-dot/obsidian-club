@@ -247,19 +247,27 @@ when this env var isn't set — meaning OpenGraph/canonical URLs will
 resolve incorrectly (to localhost) if deployed without setting it. **Must
 be set in Vercel's environment variables at deploy time.**
 
-## Initiation Ritual: 4 of 5 steps need content/features that don't exist (`v0.3`)
+## Initiation Ritual: step 5 still needs content that doesn't exist
 
-`PRODUCT.md` §1 Stage 2's 5-step ritual is now real infrastructure
-(`/ritual`, `lib/auth/ritual.ts`, gates the Hall) — but only step 1
-(complete profile) is actually actionable. Steps 2 (Code of Conduct), 3
-(Lord Obsidian's intro material), and 5 (safety/respect rules) need real
-policy/narrative content **Max hasn't written anywhere** in the source
-doc package; step 4 (newcomers' room) needs Rooms (`v0.4`). All four
-render as honest "pending" states, never faked complete. See
-`DECISIONS.md` (2026-07-02) and
-[ADR-0013](docs/ADR/0013-initiation-ritual-step4-deferred.md). **Needs
-Max to provide the actual Code of Conduct / Lord Obsidian's introduction
-/ safety guidelines text** before steps 2/3/5 can become real.
+`PRODUCT.md` §1 Stage 2's 5-step ritual is real infrastructure (`/ritual`,
+`lib/auth/ritual.ts`, gates the Hall). Steps 1 (complete profile), 2
+(Code of Conduct), 3 (Lord Obsidian's intro material), and 4 (newcomers'
+room) are all real and actionable as of 2026-07-15. Only step 5
+(safety/respect rules) still renders an honest "pending" state — **needs
+Max to provide the actual safety-guidelines text** before it can become
+real; nothing here is faked complete in the meantime. See `DECISIONS.md`
+(2026-07-02, 2026-07-15) and
+[ADR-0013](docs/ADR/0013-initiation-ritual-step4-deferred.md).
+
+Steps 2/3 (`app/(platform)/ritual/code-of-conduct/page.tsx`,
+`app/(platform)/ritual/introduction/page.tsx`) store real per-user
+acceptance state in `UserProfile.ritualProgress` (a JSON field, no schema
+migration needed) — `{step}: true` plus a `{step}At` ISO timestamp,
+written by `POST /api/ritual/progress`. Any member whose `ritualProgress`
+predates this change (stored `"deferred"` for these two keys, from the
+old `INITIAL_RITUAL_PROGRESS`) is correctly re-surfaced as `"todo"` —
+they never actually read or accepted anything, since the content didn't
+exist yet.
 
 ## "Steady activity" / "high activity" have no defined metric
 

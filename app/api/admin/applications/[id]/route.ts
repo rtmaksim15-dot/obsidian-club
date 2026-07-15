@@ -8,14 +8,15 @@ import { awardRep, REP_TABLE } from "@/lib/rating/rep-engine";
 
 type Body = { action?: "approve" | "decline" };
 
-// Ritual steps that need real policy/community content Max hasn't written
-// yet (Code of Conduct, Lord Obsidian's intro material, safety rules) —
-// or a feature that doesn't exist yet (the newcomers' room, which needs
-// Rooms, v0.4) start life explicitly "deferred", never silently faked as
-// complete. See ADR-0013.
+// "safetyRules" needs policy content Max hasn't written yet, so it starts
+// explicitly "deferred", never silently faked as complete (see ADR-0013).
+// "newcomerRoom" is computed live from message history
+// (lib/auth/ritual.ts) and ignores this seed value entirely. Code of
+// Conduct and Lord Obsidian's introduction are real as of 2026-07-15 —
+// deliberately NOT seeded here anymore, so new members see them as a
+// genuine "todo" from day one instead of a permanently-satisfied
+// "deferred" (see lib/auth/ritual.ts).
 const INITIAL_RITUAL_PROGRESS = {
-  codeOfConduct: "deferred",
-  introMaterial: "deferred",
   newcomerRoom: "deferred",
   safetyRules: "deferred",
 };

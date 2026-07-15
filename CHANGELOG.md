@@ -8,7 +8,36 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.10.0` is the current released version.
+Nothing yet — `v0.11.0` is the current released version.
+
+## [0.11.0] — 2026-07-15
+
+Initiation Ritual: real Code of Conduct + Lord Obsidian's introduction.
+
+### Added
+
+- `/ritual/code-of-conduct`: the five laws (Roman numerals in
+  `ob-accent` red, Cinzel headers, Cormorant body), gated by a real
+  "I Accept the Code" action — writes `ritualProgress.codeOfConduct`
+  plus an acceptance timestamp via `POST /api/ritual/progress`.
+- `/ritual/introduction`: Lord Obsidian's introduction, italic serif
+  treatment matching the landing page's Founder section, signature
+  block right-aligned. Marks the step complete automatically once the
+  member scrolls to the end (`IntersectionObserver` on a sentinel after
+  the signature), not on a click — matches the task's "scrolled to end"
+  requirement.
+- `POST /api/ritual/progress`: the one place a member can self-report
+  ritual progress, restricted to exactly these two steps (never
+  `newcomerRoom`, which stays computed live from message history, or
+  `safetyRules`, which has no content yet).
+
+### Changed
+
+- `lib/auth/ritual.ts`: `codeOfConduct`/`introMaterial` no longer honor
+  the old `"deferred"` sentinel — any member whose `ritualProgress`
+  predates this change is correctly re-surfaced as `"todo"`, since they
+  never actually read/accepted anything (the content didn't exist yet).
+  `safetyRules` is unaffected — still genuinely deferred pending content.
 
 ## [0.10.0] — 2026-07-13
 

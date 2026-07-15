@@ -11,10 +11,9 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 /**
- * The Initiation Ritual (PRODUCT.md §1 Stage 2). Steps 1 and 4 are real,
- * checkable actions (v0.5: step 4 checks real Newcomers-room message
- * history, now that Rooms exist) — steps 2/3/5 still need policy content
- * Max hasn't written yet. See ADR-0013.
+ * The Initiation Ritual (PRODUCT.md §1 Stage 2). Steps 1, 2, 3 and 4 are
+ * real, checkable actions — 5 ("safety & respect guidelines") still needs
+ * policy content Max hasn't written yet. See ADR-0013.
  */
 export default async function RitualPage() {
   const user = await getCurrentUser();
@@ -69,6 +68,16 @@ export default async function RitualPage() {
           {status.steps.some((s) => s.id === "profile" && s.status === "todo") ? (
             <a href={`/profile/${user.id}/edit`} className="btn-primary inline-block">
               Complete your profile
+            </a>
+          ) : null}
+          {status.steps.some((s) => s.id === "codeOfConduct" && s.status === "todo") ? (
+            <a href="/ritual/code-of-conduct" className="btn-primary inline-block">
+              Read the Code of Conduct
+            </a>
+          ) : null}
+          {status.steps.some((s) => s.id === "introMaterial" && s.status === "todo") ? (
+            <a href="/ritual/introduction" className="btn-primary inline-block">
+              Read Lord Obsidian&rsquo;s introduction
             </a>
           ) : null}
           {status.steps.some((s) => s.id === "newcomerRoom" && s.status === "todo") ? (

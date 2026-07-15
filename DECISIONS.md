@@ -803,3 +803,51 @@ favicon variant only; the 192/512 PWA icons and every on-page use keep
 the faithful, unboosted cutout. Still subtle at 16px, flagged in
 TECH_DEBT.md as something a dedicated small-icon mark from Max would
 improve, but not a shape invented from scratch.
+
+### 2026-07-15 — Google OAuth verified end-to-end; Initiation Ritual steps 2/3 are real
+
+**OAuth test.** Max added `lord.obsidian.oc@gmail.com` as a test user in
+the (unverified/Testing) Google Cloud OAuth consent screen, then signed
+in through `/login`'s "Continue with Google." Verified directly against
+the database rather than trusting the redirect alone: Supabase Auth
+linked the new Google identity to the *same* existing `auth.users.id`
+(this email was already the bootstrapped admin — `auth.identities`
+gained a `provider: google` row against the unchanged user id, no
+duplicate `waitlist` entry was created). Landed on `/ritual`, not `/hall`
+— correct, since the initiation ritual gate is independent of the OAuth
+gate, and this account had never completed it. Confirmed session
+persistence and `/profile` load. The "new user → pending waitlist" path
+this task also asked about only fires for emails absent from
+`public.users`; this account doesn't exercise that branch, by design —
+noted rather than guessed past.
+
+**Ritual content.** Max supplied the real Code of Conduct (five laws)
+and Lord Obsidian's introduction text. Built `/ritual/code-of-conduct`
+and `/ritual/introduction` as real, gated steps rather than static copy
+dropped into the existing "Content pending" cards — each writes genuine
+per-user completion state (`UserProfile.ritualProgress`, a JSON field,
+no migration needed) via a new `POST /api/ritual/progress`, restricted
+to exactly these two step ids.
+
+This forced a small but deliberate behavior change: `ritualProgress`
+already stored `codeOfConduct: "deferred"` / `introMaterial: "deferred"`
+for any member created before this change (from the old
+`INITIAL_RITUAL_PROGRESS` — content didn't exist yet, so everything
+started deferred, ADR-0013's pattern). Now that the content is real,
+honoring "deferred" as a satisfying state for these two steps would mean
+no one ever actually has to read/accept them. Changed
+`lib/auth/ritual.ts` so `codeOfConduct`/`introMaterial` only resolve
+`"done"` on a literal `true`, correctly re-surfacing any pre-existing
+member as `"todo"` — consistent with the project's stance that nothing
+gets silently marked complete. `safetyRules` is untouched (still no
+content), and `newcomerRoom` was never affected (computed live from
+message history, ignores the stored value entirely).
+
+Verified the full loop against the same admin account used for the
+OAuth test: accepted the Code, scrolled the Introduction to its end
+(confirmed the `IntersectionObserver`-driven auto-completion fired,
+`ritualProgress` gained `codeOfConduct: true` / `introMaterial: true`
+plus ISO timestamps), then **reverted that test data** — the acceptance
+was mine, driven for verification, not Max's genuine consent to a
+document whose own text says "a decision on violations, if any, is
+final." Left `safetyRules`/`newcomerRoom` untouched by the revert.
