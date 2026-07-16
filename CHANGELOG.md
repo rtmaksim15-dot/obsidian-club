@@ -8,7 +8,44 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.12.0` is the current released version.
+Nothing yet — `v0.13.0` is the current released version.
+
+## [0.13.0] — 2026-07-16
+
+REP system completion + The Vault.
+
+### Added
+
+- **REP display + history** (`/profile/[id]`): total REP was already
+  shown; added a full event ledger (reason, source, date, signed delta)
+  — visible only to the profile's own owner, same reasoning as the
+  review form only showing on other people's profiles, inverted.
+- **New REP sources**: `houseJoined` (+10, one-time per house),
+  `firstPost` (+5, one-time ever), `housePost` (+2 per house-tagged
+  post, daily cap 10 — the 6th+ house post in a day earns nothing).
+  `invitedNewMember` changed 300 -> 15 (Max's explicit call — replaces,
+  doesn't stack with, the old figure).
+- **Real House membership**: `HouseMembership` model + `POST /api/
+  houses/:slug/join` + a "Join House" button on `/houses/[slug]`,
+  showing "Member since" once joined. Distinct from posting/viewing
+  content in a house, which anyone could already do without joining.
+- **Admin REP adjustment** (`/admin/rep`): +/- amount with a required
+  reason, logged with `source: "admin-adjustment"` so it's always
+  distinguishable from a mechanically-earned event. Same 404-for-non-
+  admins pattern as `/admin/applications`.
+- **The Vault redesigned as a grid** (`/vault`): image placeholder (a
+  generic icon — no real per-item artwork exists yet; `VaultItem.
+  imageUrl` is there for when it does), exact "Unlocks at N REP — you
+  have M" copy for locked items, a "Claim" CTA for unlocked items
+  (honestly disabled — there's no redemption/fulfillment backend, same
+  pattern as the disabled Apple Sign-In button). Seeded 3 explicitly
+  -named test items (thresholds 10/50/150) to exercise the gating logic.
+
+### Changed
+
+- `app/api/posts/route.ts`: publishing now awards `firstPost`/`housePost`
+  REP where it applies (previously posting never awarded REP at all —
+  see the removed comment this replaces).
 
 ## [0.12.0] — 2026-07-16
 

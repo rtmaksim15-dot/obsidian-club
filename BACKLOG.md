@@ -288,6 +288,23 @@ renumbered up by one again (old `v0.8` Events & Marketplace → `v0.9`, ...).
 - Not built: `MarketplaceItem` retirement decision, Signature Rope
   Collection, phone sign-in.
 
+### v0.13 — REP System Completion + The Vault ✅ (built 2026-07-16)
+
+- [x] REP event history on `/profile/[id]` (owner-only) — reason,
+      source, date, signed delta, alongside the already-displayed total.
+- [x] New REP sources: House join (+10, real `HouseMembership`, once
+      per house), first post ever (+5), post tagged to a house (+2,
+      daily cap 10). `invitedNewMember` changed 300 → 15 per Max's call
+      — see DECISIONS.md.
+- [x] Admin REP adjustment — `/admin/rep`, +/- with a required reason,
+      logged as `source: "admin-adjustment"`.
+- [x] Vault redesigned as a grid — image placeholder, exact "Unlocks at
+      N REP" copy, disabled "Claim" CTA on unlocked items (no
+      redemption backend yet). Seeded 3 explicitly-named test items
+      (10/50/150 REP) to exercise the gating logic end-to-end.
+- Not built: real Vault artwork/catalog (still Max's call), Claim
+  redemption/fulfillment flow.
+
 ## Later
 
 *Intentionally postponed — approved direction, not yet scheduled in

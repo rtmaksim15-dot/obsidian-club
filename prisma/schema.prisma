@@ -164,6 +164,7 @@ model User {
   marketplaceItems  MarketplaceItem[]
   likes             Like[]
   comments          Comment[]
+  houseMemberships  HouseMembership[]
 
   @@map("users")
 }
@@ -200,10 +201,28 @@ model House {
   status      HouseStatus @default(coming_soon)
   createdAt   DateTime    @default(now()) @map("created_at")
 
-  rooms Room[]
-  posts Post[]
+  rooms       Room[]
+  posts       Post[]
+  memberships HouseMembership[]
 
   @@map("houses")
+}
+
+// Real membership (join) in a House — distinct from merely viewing or
+// posting content tagged with a house, which anyone can already do. A
+// member joins at most once per house (+10 REP, one-time — see
+// lib/rating/rep-engine.ts#REP_TABLE.earn.houseJoined), 2026-07-16.
+model HouseMembership {
+  id       String   @id @default(uuid()) @db.Uuid
+  userId   String   @map("user_id") @db.Uuid
+  houseId  String   @map("house_id") @db.Uuid
+  joinedAt DateTime @default(now()) @map("joined_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  house House @relation(fields: [houseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, houseId])
+  @@map("house_memberships")
 }
 
 // ============================================================
@@ -465,6 +484,9 @@ model VaultItem {
   id          String   @id @default(uuid()) @db.Uuid
   name        String
   description String?
+  // Real artwork doesn't exist per item yet — the Vault grid renders a
+  // generic placeholder box when this is null (every item today).
+  imageUrl    String?  @map("image_url")
   minRep      Int      @default(0) @map("min_rep")
   isActive    Boolean  @default(true) @map("is_active")
   createdAt   DateTime @default(now()) @map("created_at")

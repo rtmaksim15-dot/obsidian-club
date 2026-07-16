@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import { canCreatePostType } from "@/lib/rating/content-rights";
 import { grantAchievement } from "@/lib/utils/achievements";
+import { awardRep, awardRepWithDailyCap, REP_TABLE } from "@/lib/rating/rep-engine";
 
 const PAGE_SIZE = 20;
 const VALID_TYPES: PostType[] = ["post", "story", "article", "lecture", "manifesto", "course"];
@@ -132,13 +133,21 @@ export async function POST(request: Request) {
     const publishedCount = await prisma.post.count({ where: { authorId: user.id, isPublished: true } });
     if (publishedCount === 1) {
       await grantAchievement(user.id, "first-post");
+      await awardRep(user.id, REP_TABLE.earn.firstPost.points, "First post", "first-post");
     }
 
-    // Note: publishing no longer directly awards REP — CLAUDE.md's
-    // (2026-07-05) REP table only rewards posts via "useful post" (needs
-    // an upvote/quality mechanism, not built) or "article approved by
-    // editorial" (needs an editorial workflow, not built). See
-    // lib/rating/rep-engine.ts#REP_TABLE and TECH_DEBT.md.
+    // REP system + Vault (2026-07-16): posting *tagged with a house*
+    // earns REP too (separate from the one-time first-post bonus above),
+    // capped per day so it can't be farmed by spamming one house.
+    if (houseId) {
+      await awardRepWithDailyCap(
+        user.id,
+        REP_TABLE.earn.housePost.points,
+        "Posted in a House",
+        "house-post",
+        10,
+      );
+    }
 
     return NextResponse.json({ post }, { status: 201 });
   } catch (err) {

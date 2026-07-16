@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireAdmin } from "@/lib/auth/require-admin";
 
-type Body = { name?: string; description?: string; minRep?: number };
+type Body = { name?: string; description?: string; minRep?: number; imageUrl?: string };
 
 // POST /api/admin/vault-items — creates a real Vault item, gated by a
 // REP threshold. Exists so Max can add real items once he defines them
@@ -30,7 +30,12 @@ export async function POST(request: Request) {
   }
 
   const item = await prisma.vaultItem.create({
-    data: { name, description: body.description?.trim() || null, minRep },
+    data: {
+      name,
+      description: body.description?.trim() || null,
+      imageUrl: body.imageUrl?.trim() || null,
+      minRep,
+    },
   });
   return NextResponse.json({ item }, { status: 201 });
 }

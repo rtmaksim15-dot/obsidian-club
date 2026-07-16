@@ -88,6 +88,16 @@ Full technique guides, vetted instructor recommendations, and structured learnin
   },
 ];
 
+// Vault test items (REP system + Vault task, 2026-07-16) — Max explicitly
+// asked to seed 3 test items at these thresholds to exercise the
+// REP-gating logic. Named/described as test data on purpose, not real
+// catalog content (which still doesn't exist — see ADR-0016).
+const VAULT_TEST_ITEMS: { name: string; description: string; minRep: number }[] = [
+  { name: "Test Item — 10 REP", description: "Placeholder Vault item for REP-gating testing.", minRep: 10 },
+  { name: "Test Item — 50 REP", description: "Placeholder Vault item for REP-gating testing.", minRep: 50 },
+  { name: "Test Item — 150 REP", description: "Placeholder Vault item for REP-gating testing.", minRep: 150 },
+];
+
 async function main() {
   for (const room of ROOMS) {
     await prisma.room.upsert({
@@ -155,6 +165,13 @@ async function main() {
   } else {
     console.log("Skipped House of Rope articles — admin account not found yet.");
   }
+
+  for (const item of VAULT_TEST_ITEMS) {
+    const existing = await prisma.vaultItem.findFirst({ where: { name: item.name } });
+    if (existing) continue;
+    await prisma.vaultItem.create({ data: item });
+  }
+  console.log(`Seeded ${VAULT_TEST_ITEMS.length} Vault test item(s).`);
 }
 
 main()

@@ -922,3 +922,57 @@ silently fixing or silently ignoring it; see TECH_DEBT.md for the
 recommended next step (enable RLS ordered by exposure severity —
 `users`/`messages` first — with `messages`' SELECT policy designed
 before it's flipped on).
+
+### 2026-07-16 — REP system completion + The Vault: two product decisions asked upfront
+
+Before writing any code, checked the task's two REP-source asks against
+what's actually wired today and found real conflicts, so asked Max
+directly rather than guessing:
+
+1. **"House join +10"** — no membership concept existed at all (no
+   table, no button; any member could already tag posts with a house
+   without "joining" anything). Two paths existed: treat a first
+   house-tagged post as an implicit join, or build a real
+   `HouseMembership` model + explicit "Join House" action. Max chose the
+   real membership model. Built `HouseMembership` (unique on
+   `[userId, houseId]`), `POST /api/houses/:slug/join` (idempotent — a
+   repeat join just confirms, never re-awards), and a button on
+   `/houses/[slug]` that flips to "Member since {date}" once joined.
+   Deliberately doesn't gate the room/content below it — that's still
+   level-based via `canAccessRoom` — joining is a rewarded affirmative
+   action, not a new access prerequisite.
+
+2. **Referral REP conflict** — `invitedNewMember` already awards +300
+   REP to the inviter on approval (wired since `v0.2`, sourced from an
+   earlier, more detailed CLAUDE.md that predates this session's
+   condensed version). This task asked for +15 for the same event. Max
+   confirmed +15 replaces the 300, not stacks with it — changed
+   `REP_TABLE.earn.invitedNewMember.points` directly, no dual-award
+   logic needed.
+
+**Verified against reality, not the task's framing, before building**:
+the task said "REP sources live now: house join +10, first post +5" as
+if already active. Neither was — `first-post` only granted an
+achievement badge (per ADR-0015, achievements stopped carrying REP
+back on 2026-07-05), and house join didn't exist as a concept at all.
+Built both as genuinely new sources rather than assuming they needed no
+work.
+
+**Full loop tested on the real admin account**, since it's the only one
+with working credentials in this environment: used the new `/admin/rep`
+tool to drop `lord.obsidian.oc@gmail.com` from 210 REP to exactly 15,
+confirmed `/vault` showed the 10-REP test item unlocked and the 50/150
+ones locked with the exact "Unlocks at N REP — you have 15" copy (the
+task's literal test scenario), then restored 210. Joined House of Rope
+for real (confirmed `+10`, membership row, "Member since" UI), posted
+6 times tagged to it in a row to confirm the daily cap (5 posts earned
+REP, the 6th correctly earned none — `10 REP` total from `house-post`
+that day), then deleted the test posts and reverted every REP delta
+this testing introduced (`house-joined`, all `house-post` rows) back to
+the pre-test 210. Net effect on the account: zero — same discipline as
+the ritual-acceptance test revert (DECISIONS.md, 2026-07-15) and the
+waitlist/referral revert (2026-07-16, admin panel task). The two
+`admin-adjustment` REP History rows from the 15-REP Vault test
+(`-195`/`+195`) were left in place — they're an honest, real record of
+the admin-adjustment feature actually being exercised, not fake data,
+and they net to zero.

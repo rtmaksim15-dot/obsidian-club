@@ -56,9 +56,19 @@ happens to touch one of these tables next.
 - **8 more houses have no names yet** — CLAUDE.md says "9 more houses
   (leather, protocol, impact etc.)" as examples, not a decided list.
   Don't seed placeholder houses for these; wait for Max to name them.
-- **Vault catalog is empty** — `VaultItem` model + `/vault` +
-  `POST /api/admin/vault-items` are real, but no items exist. Max adds
-  real ones once he defines a catalog.
+- **Vault catalog is still not real** — as of 2026-07-16, `/vault` has
+  3 seeded items, but they're explicitly-named test items (`"Test Item —
+  10 REP"` etc., thresholds 10/50/150) for exercising the REP-gating
+  logic, not real catalog content — Max still hasn't defined one.
+  `VaultItem.imageUrl` exists in the schema now too, but nothing has
+  real artwork — the grid renders a generic placeholder icon for every
+  item today. The "Claim" CTA on unlocked items is real UI but
+  deliberately disabled (`title="Redemption isn't set up yet"`) — there's
+  no fulfillment/redemption backend, same honest-placeholder pattern as
+  the disabled Apple Sign-In button. **Fix:** Max replaces the 3 test
+  items with real ones (`POST /api/admin/vault-items`, now takes
+  `imageUrl` too) and defines what "Claim" actually does before that
+  button can be enabled.
 - **`MarketplaceItem` vs `VaultItem`** — whether the older,
   purchase-based marketplace model gets retired in favor of the Vault is
   still an open question; Max's instruction was specifically about Shop.

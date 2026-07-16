@@ -12,6 +12,12 @@ import { prisma } from "@/lib/db/prisma";
  * marketplace, editorial review, thank-you reactions, challenges, club
  * missions) — kept here, not dropped, so nobody has to go re-derive them
  * from CLAUDE.md later. See TECH_DEBT.md for the feature gaps themselves.
+ *
+ * `houseJoined`, `firstPost`, `housePost` added 2026-07-16 (REP system +
+ * Vault task) — Houses/first-post didn't exist when the 2026-07-05 table
+ * was authored. `invitedNewMember` changed 300 -> 15 the same day, per
+ * Max's explicit call: the same task specified +15 for this event, and
+ * he confirmed it replaces the old figure rather than stacking with it.
  */
 export const REP_TABLE = {
   earn: {
@@ -21,10 +27,13 @@ export const REP_TABLE = {
     dailyLogin: { points: 5, wired: true, note: "lib/rating/rep-engine.ts#touchDailyLogin" },
     streak7Day: { points: 50, wired: true, note: "lib/rating/rep-engine.ts#touchDailyLogin" },
     streak30Day: { points: 300, wired: true, note: "lib/rating/rep-engine.ts#touchDailyLogin" },
+    houseJoined: { points: 10, wired: true, note: "app/api/houses/[slug]/join/route.ts, one-time per house" },
+    firstPost: { points: 5, wired: true, note: "app/api/posts/route.ts, one-time (first published post ever)" },
+    housePost: { points: 2, wired: true, note: "app/api/posts/route.ts, per house-tagged post, daily cap 10" },
     offlineMeetupAttended: { points: 200, wired: false, note: "no real Events attendance yet" },
     majorEventAttended: { points: 500, wired: false, note: "no real Events attendance yet" },
     eventOrganized: { points: 1000, wired: false, note: "no real Events creation yet" },
-    invitedNewMember: { points: 300, wired: true, note: "admin approval w/ referral, app/api/admin/applications/[id]/route.ts" },
+    invitedNewMember: { points: 15, wired: true, note: "admin approval w/ referral, app/api/admin/applications/[id]/route.ts" },
     inviteeReachedLevel2: { points: 500, wired: true, note: "lib/rating/level-progression.ts" },
     inviteeActive90Days: { points: 1000, wired: true, note: "lib/rating/referral-lifecycle.ts" },
     usefulPost: { points: [50, 300], wired: false, note: "no post-quality/upvote mechanism exists" },
@@ -63,6 +72,32 @@ export async function awardRep(userId: string, points: number, reason: string, s
     prisma.user.update({ where: { id: userId }, data: { rep: { increment: points } } }),
     prisma.repHistory.create({ data: { userId, delta: points, reason, source } }),
   ]);
+}
+
+/**
+ * Same as `awardRep`, but skips the award once `source`'s total for
+ * today already reaches `dailyCap` — used for `housePost` (+2/post,
+ * capped at +10/day, i.e. the 6th+ house-tagged post in a day earns no
+ * REP). "Today" is UTC-day, matching `touchDailyLogin`'s convention.
+ */
+export async function awardRepWithDailyCap(
+  userId: string,
+  points: number,
+  reason: string,
+  source: string,
+  dailyCap: number,
+) {
+  const startOfDay = new Date();
+  startOfDay.setUTCHours(0, 0, 0, 0);
+
+  const todaysTotal = await prisma.repHistory.aggregate({
+    where: { userId, source, createdAt: { gte: startOfDay } },
+    _sum: { delta: true },
+  });
+  const soFar = todaysTotal._sum.delta ?? 0;
+  if (soFar >= dailyCap) return;
+
+  await awardRep(userId, points, reason, source);
 }
 
 /**
