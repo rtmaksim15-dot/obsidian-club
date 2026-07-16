@@ -9,8 +9,25 @@ type Application = {
   age: number | null;
   city: string | null;
   source: string | null;
+  reason: string | null;
   referralCode: string | null;
   createdAt: string;
+};
+
+// toLocaleDateString() with no fixed locale/timeZone renders differently
+// on the server (container locale) vs. the browser (visitor locale),
+// which React flags as a hydration mismatch and then throws away the
+// server-rendered HTML to re-render from scratch. Pin both to the same
+// locale/UTC so server and client always agree.
+function formatAppliedDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-US", { timeZone: "UTC" });
+}
+
+const CONFIRM_MESSAGE: Record<"approve" | "decline", (name: string) => string> = {
+  approve: (name) =>
+    `Approve ${name}'s application?\n\nThis is final — they will be granted access. We do not reconsider.`,
+  decline: (name) =>
+    `Decline ${name}'s application?\n\nThis is final — no explanation is sent. We do not reconsider.`,
 };
 
 export default function ApplicationsQueue({ initial }: { initial: Application[] }) {
@@ -19,6 +36,10 @@ export default function ApplicationsQueue({ initial }: { initial: Application[] 
   const [errorId, setErrorId] = useState<string | null>(null);
 
   async function review(id: string, action: "approve" | "decline") {
+    const app = applications.find((a) => a.id === id);
+    const name = app?.name || app?.email || "this applicant";
+    if (!window.confirm(CONFIRM_MESSAGE[action](name))) return;
+
     setPendingId(id);
     setErrorId(null);
     try {
@@ -53,8 +74,11 @@ export default function ApplicationsQueue({ initial }: { initial: Application[] 
                   .filter(Boolean)
                   .join(" · ") || "No additional details."}
               </p>
-              <p className="text-caption mt-1">
-                Applied {new Date(a.createdAt).toLocaleDateString()}
+              {a.reason ? (
+                <p className="text-body mt-3 !text-base italic">&ldquo;{a.reason}&rdquo;</p>
+              ) : null}
+              <p className="text-caption mt-2">
+                Applied {formatAppliedDate(a.createdAt)}
               </p>
             </div>
             <div className="flex shrink-0 gap-2">

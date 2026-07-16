@@ -6,6 +6,51 @@ Each item should eventually become a `BACKLOG.md` entry once it's actually
 scheduled; until then, it lives here as "known, not forgotten, not yet
 prioritized."
 
+## 🔴 URGENT — RLS is disabled on every table except `waitlist` (found 2026-07-16)
+
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` ships to every browser by design (it's
+meant to be public — RLS is what's supposed to make that safe). Checked
+`pg_class.relrowsecurity` across all `public` tables while verifying this
+task's "RLS-enforced" framing and found RLS is only actually enabled on
+`waitlist` (see the entry below). Every other table has it **off**:
+`users`, `messages`, `user_profiles`, `notifications`, `rep_history`,
+`reviews`, `rooms`, `posts`, `likes`, `referrals`, `houses`,
+`vault_items`, `marketplace_items`, `user_achievements`.
+
+**Concretely**: anyone with the anon key (visible in any browser's
+network tab or JS bundle — not a secret) can currently call Supabase's
+auto-generated REST API directly, e.g.
+`GET https://fsleaavvmvlpvfsevosw.supabase.co/rest/v1/users?select=*`
+with `apikey: <anon key>`, and read every member's email, age, city, REP
+— or read `messages`, including whatever's posted in rooms this app
+gates behind level/rank. This is completely invisible to and independent
+of this app's own access control (`requireAdmin()`, `getCurrentUser()`,
+middleware route-gating) — every real read/write in this codebase goes
+through Prisma via `DATABASE_URL`, whose role has `BYPASSRLS`, so the app
+itself has never once touched this gap and would look and behave
+identically whether it's open or closed.
+
+**Why this isn't already fixed**: a blanket `ENABLE ROW LEVEL SECURITY`
+with no policies (deny-all) is *almost* free, since nothing here uses
+the browser-side Supabase client for data queries — except
+`components/shared/RoomChat.tsx`, which subscribes to Supabase Realtime
+`postgres_changes` on `messages` to know when to refetch. Realtime
+enforces RLS: it only delivers a change event if the subscribing role
+could `SELECT` that row, so turning on RLS for `messages` with no
+matching policy would silently break live message updates (members
+would need to manually refresh to see anything new) — a real regression,
+not a theoretical one. See DECISIONS.md (2026-07-16) for the full
+investigation.
+
+**Recommended next step**: enable RLS ordered by exposure severity
+(`users` and `messages` first, since those carry PII/private
+conversation content), design `messages`' SELECT policy *before*
+flipping its RLS on (probably: authenticated members can select messages
+in rooms they currently have access to, mirroring
+`lib/rating/room-access.ts`'s existing gating logic), then sweep the
+remaining tables. Worth a dedicated pass, not a rider on whatever task
+happens to touch one of these tables next.
+
 ## Houses / Vault / Apple Sign-In gaps (2026-07-08/09, see ADR-0016)
 
 - **8 more houses have no names yet** — CLAUDE.md says "9 more houses
@@ -214,7 +259,8 @@ enabled, one `INSERT`-only policy for `anon`, no read policy for
 anyone but the service role / `DATABASE_URL`'s role. Worth periodically
 confirming this hasn't regressed (e.g. via `prisma db push`, which
 doesn't manage RLS and won't warn if a future schema change on this
-table needs new policies).
+table needs new policies). **`waitlist` is the only table this applies
+to** — see the top of this file for the other 14.
 
 ## No automated tests
 

@@ -851,3 +851,74 @@ plus ISO timestamps), then **reverted that test data** — the acceptance
 was mine, driven for verification, not Max's genuine consent to a
 document whose own text says "a decision on violations, if any, is
 final." Left `safetyRules`/`newcomerRoom` untouched by the revert.
+
+### 2026-07-16 — Admin application review: two real bugs, and a severe pre-existing RLS gap
+
+Most of the admin panel Max asked for already existed (`/admin/
+applications`, the approve/decline API, referral resolution, REP
+bonuses — all from earlier `v0.2` work). What was actually missing
+against this task's spec: the `reason` field wasn't displayed, there was
+no confirm dialog before Approve/Decline (both final per the Code of
+Conduct's own text), and `requireAdmin()` failures redirected to `/hall`
+instead of 404ing — a redirect confirms "there's an admin panel you
+can't see," which is exactly the discoverability the task asked to
+close. Fixed all three (`app/(platform)/admin/applications/page.tsx`,
+`components/shared/ApplicationsQueue.tsx`).
+
+**Hydration bug found during testing, not asked for, fixed anyway**:
+`ApplicationsQueue`'s applied-date used `toLocaleDateString()` with no
+fixed locale — harmless when server and browser locale happen to agree,
+but this sandbox's server defaults to `en-US` while the browser's
+`navigator.language` is `ru`, so the server rendered "7/16/2026" and the
+client immediately re-rendered "16.07.2026," and React discarded the
+whole server-rendered tree over it. Pinned both to `en-US`/UTC.
+
+**The severe finding**: the task's own framing ("RLS-enforced") prompted
+checking RLS status directly against the database rather than trusting
+that requireAdmin()'s `isAdmin` check was the whole story. It queried
+`pg_class.relrowsecurity` across every `public` table:
+
+```
+select c.relname, c.relrowsecurity from pg_class c
+join pg_namespace n on n.oid = c.relnamespace
+where n.nspname = 'public' and c.relkind = 'r';
+```
+
+Result: **RLS is enabled on `waitlist` only** (fixed 2026-07-14, see this
+file's earlier entry) — every other table (`users`, `messages`,
+`user_profiles`, `notifications`, `rep_history`, `reviews`, `rooms`,
+`posts`, `likes`, `referrals`, `houses`, `vault_items`,
+`marketplace_items`, `user_achievements`) has RLS **off**. Since
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` ships to every browser, and Supabase's
+PostgREST layer exposes every `public` table by default unless RLS
+blocks it, anyone with devtools open could currently run e.g. `fetch(
+'https://fsleaavvmvlpvfsevosw.supabase.co/rest/v1/users?select=*', {
+headers: { apikey: '<anon key>' } })` and get every member's email, age,
+city, and REP — or read `messages`, including whatever's posted in
+supposedly-gated rooms. This is completely independent of and invisible
+to this app's own access control (`requireAdmin()`, `getCurrentUser()`),
+since every real code path reads through Prisma via `DATABASE_URL`,
+whose role has `BYPASSRLS` — the admin panel, and everything else in
+this app, would keep working perfectly even with this hole wide open,
+which is exactly why it went unnoticed.
+
+**Deliberately not fixed in this pass.** Checked whether a blanket
+`ENABLE ROW LEVEL SECURITY` + deny-all-by-default would be safe, since
+Prisma bypasses RLS regardless and every read in this app goes through
+Prisma or a server-side Supabase Auth session — found one real
+exception: `components/shared/RoomChat.tsx` subscribes to Supabase
+Realtime `postgres_changes` on `messages` (`components/shared/
+RoomChat.tsx`) to know when to refetch. Realtime enforces RLS itself —
+it will only deliver a change notification if the subscribing role could
+`SELECT` the row, so enabling RLS on `messages` with no matching policy
+would silently stop live message updates (members would need to
+manually refresh to see new messages), a real functional regression, not
+just a theoretical one. Designing that one policy correctly, auditing
+whether any other client-side Supabase call exists that a blanket
+deny-all would break, and doing this across 14 tables is a proper
+security-hardening pass of its own — not something to do as a rider on
+an unrelated admin-panel task. Flagged prominently to Max instead of
+silently fixing or silently ignoring it; see TECH_DEBT.md for the
+recommended next step (enable RLS ordered by exposure severity —
+`users`/`messages` first — with `messages`' SELECT policy designed
+before it's flipped on).

@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { prisma } from "@/lib/db/prisma";
 import ApplicationsQueue from "@/components/shared/ApplicationsQueue";
@@ -6,10 +6,14 @@ import ApplicationsQueue from "@/components/shared/ApplicationsQueue";
 // Admin panel v1 (BACKLOG.md v0.2) — approve/decline waitlist applications.
 // Minimal by design: no styling polish beyond the base design tokens,
 // since DESIGN.md doesn't specify an admin UI at all (member-facing only).
+//
+// notFound(), not redirect(): the panel must not be discoverable by a
+// logged-in non-admin member — a 404 reveals nothing, where a redirect
+// (or a 403 page) confirms "there's something here you can't see."
 export default async function AdminApplicationsPage() {
   const admin = await requireAdmin();
   if (!admin) {
-    redirect("/hall");
+    notFound();
   }
 
   const applications = await prisma.waitlist.findMany({
@@ -30,6 +34,7 @@ export default async function AdminApplicationsPage() {
             age: a.age,
             city: a.city,
             source: a.source,
+            reason: a.reason,
             referralCode: a.referralCode,
             createdAt: a.createdAt.toISOString(),
           }))}

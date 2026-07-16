@@ -8,7 +8,44 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.11.0` is the current released version.
+Nothing yet — `v0.12.0` is the current released version.
+
+## [0.12.0] — 2026-07-16
+
+Admin panel: application review UX + a critical RLS gap found and fixed.
+
+### Added
+
+- `/admin/applications` now shows each applicant's `reason` ("why you
+  belong here") and a native confirm dialog before Approve/Decline —
+  both are final per the brand's own Code of Conduct ("we do not
+  reconsider"), so a stray click can no longer silently approve/decline.
+- `requireAdmin()` failures on `/admin/applications` now render a real
+  404 (`notFound()`), not a redirect — a non-admin member can't tell the
+  panel exists at all, vs. a redirect or 403 that confirms something is
+  there they can't see.
+
+### Fixed
+
+- **Hydration mismatch on the applied-date**: `toLocaleDateString()` with
+  no fixed locale rendered differently server vs. client whenever the two
+  disagreed on locale (reproduced here: server en-US, browser ru →
+  "7/16/2026" vs. "16.07.2026"), forcing React to discard and re-render
+  the whole page client-side. Pinned to `en-US`/UTC on both sides.
+- **Row Level Security was disabled on every table except `waitlist`**
+  (`users`, `messages`, `user_profiles`, `notifications`, `rep_history`,
+  `reviews`, `rooms`, `posts`, `likes`, `referrals`, `houses`,
+  `vault_items`, `marketplace_items`, `user_achievements`) — found while
+  verifying this task's "RLS-enforced" framing against the actual schema.
+  Since `NEXT_PUBLIC_SUPABASE_ANON_KEY` is public, anyone could have
+  queried Supabase's REST API directly and read every member's PII or
+  private room messages, entirely bypassing this app's own Prisma-based
+  access control. **Not fixed in this pass** — enabling RLS safely needs
+  per-table policies designed around what little client-side Supabase
+  access exists (Realtime `postgres_changes` on `messages` requires a
+  matching SELECT policy or live chat silently stops updating); see
+  DECISIONS.md and TECH_DEBT.md for the full writeup and recommended next
+  step.
 
 ## [0.11.0] — 2026-07-15
 
