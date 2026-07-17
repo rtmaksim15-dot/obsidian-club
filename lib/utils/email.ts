@@ -53,29 +53,6 @@ export async function sendWaitlistConfirmation(email: string, name: string) {
   await sendEmail(email, "Your application has been received", html);
 }
 
-/**
- * Sends the "access granted" email on application approval, per
- * PRODUCT.md §1's specified tone. `actionLink` is a Supabase-generated
- * invite link the recipient uses to set their password (see
- * app/api/admin/applications/[id]/route.ts) — this app sends its own
- * branded email rather than relying on Supabase's default invite email
- * template, to keep full control over voice and design.
- */
-export async function sendAccessGrantedEmail(email: string, name: string, actionLink: string) {
-  const html = emailShell(`
-      <p style="color:#EDEAE4;font-size:18px;line-height:1.6;margin:0 0 16px;">
-        ${name ? escapeHtml(name) + "," : ""}<br/>your access has been granted.
-      </p>
-      <p style="font-size:16px;line-height:1.7;margin:0 0 24px;">
-        Set your password to enter.
-      </p>
-      <a href="${actionLink}" style="display:inline-block;background:#8B1A1A;color:#EDEAE4;font-family:Georgia,serif;letter-spacing:2px;text-transform:uppercase;font-size:13px;text-decoration:none;padding:14px 32px;border-radius:2px;">
-        Enter
-      </a>`);
-
-  await sendEmail(email, "Your access has been granted", html);
-}
-
 /** Shared send + defensive-no-op wrapper for every transactional email. */
 async function sendEmail(to: string, subject: string, html: string) {
   const apiKey = process.env.RESEND_API_KEY;

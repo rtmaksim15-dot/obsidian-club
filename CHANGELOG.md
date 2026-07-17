@@ -8,7 +8,60 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.14.0` is the current released version.
+Nothing yet — `v0.15.0` is the current released version.
+
+## [0.15.0] — 2026-07-17
+
+Closed Registration & Invite System: applications no longer create an
+account at approval time — approval now generates a one-time invite
+link the admin copies and sends manually, and the account (including
+password) is only created when that link is redeemed.
+
+### Added
+
+- **Invite tokens** — `Waitlist.inviteToken`/`inviteTokenUsedAt`. Approving
+  an application (`PATCH /api/admin/applications/[id]`) now only
+  generates a random 48-hex-char token and returns an `inviteUrl` — no
+  account, no email is created at this step anymore.
+- **Invite registration** (`/invite/[token]`, `POST /api/invite/[token]`)
+  — the token's landing page collects name (prefilled, editable), email
+  (prefilled, fixed), and a real password. On submit: creates the
+  Supabase Auth user + `User`/`UserProfile`/`Notification`/`Referral`/REP
+  rows, marks the token used, signs the new member in, and redirects to
+  `/feed`. Invalid, already-used, or non-approved tokens show a plain
+  message instead of the form (no stack traces, no leaking which case
+  it is beyond a human-readable sentence).
+- **`/register` block** — explicit 403 on GET/POST, `{ error: "Direct
+  registration is closed. You need an invite link." }`. No prior route
+  or `signUp()` call existed anywhere in the app; this exists purely so
+  nothing that ever links to `/register` finds an open door.
+- **Admin UI**: after Approve, the application card now shows the invite
+  link inline (`<code>` block + Copy button) instead of just vanishing
+  from the queue — the admin has to actually see and copy it to send it
+  themselves.
+
+### Changed
+
+- **`ApplicationsQueue`**: approved applications stay visible (showing
+  their invite link) instead of disappearing from the list; declined
+  applications still disappear as before.
+
+### Removed
+
+- **`sendAccessGrantedEmail`** (`lib/utils/email.ts`) — the old
+  approval flow's auto-sent "you're in" email is gone along with the
+  flow it belonged to (see DECISIONS.md for why the old flow was
+  replaced, not extended).
+
+### Fixed
+
+- The old approval flow created the Supabase Auth user via
+  `admin.generateLink({ type: "invite" })` and emailed the raw link, but
+  **no page in the app ever collected a password** — the email's own
+  copy ("set your password to enter") described a step that didn't
+  exist. A member who spent that one-time link had no way to log back
+  in afterward. The new flow collects a real password on a real page
+  before the account is ever considered complete.
 
 ## [0.14.0] — 2026-07-17
 

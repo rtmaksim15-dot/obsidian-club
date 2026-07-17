@@ -101,6 +101,8 @@
 - The Vault полностью заменяет Shop (Shop убран) — и теперь реальная механика: `VaultItem` (открывается по REP), `/vault` показывает реальные предметы locked/unlocked, `POST /api/admin/vault-items` для добавления
 - House of Rope (Phase 1) — структура + первый реальный контент + UI: участники теперь сами могут тегировать свои посты домом в композере (`/feed`, `/library`)
 - Apple Sign-In — кнопка на `/login`, готова технически, но скрыта за флагом `NEXT_PUBLIC_APPLE_SIGNIN_ENABLED` (пока `false`) — ждём Apple Developer аккаунт
+- Feed & Posts MVP — фото к постам (Supabase Storage), реальные комментарии, `/posts/[id]`, лента ограничена глобальными постами + домами, в которых состоишь
+- Closed Registration & Invite System — approve теперь только генерирует одноразовую invite-ссылку; аккаунт (и пароль) создаётся только при регистрации по `/invite/[token]`; `/register` заблокирован (403). Осталось вручную: выключить в Supabase Dashboard "Allow new users to sign up" — см. TECH_DEBT.md
 
 ### 🔄 СЛЕДУЮЩИЙ ПРИОРИТЕТ
 1. **Apple OAuth (реальные креды)** — Apple Developer аккаунт, Services ID, ключ → настроить в Supabase Dashboard → включить флаг

@@ -1016,3 +1016,86 @@ testing introduced (`house-joined` +10, `house-post` +2), and removed
 the test membership — left the same day's legitimate `+5` daily-login
 REP untouched (a new calendar day since the last task's testing, so a
 real, non-test event).
+
+### 2026-07-17 — Closed Registration & Invite System: replaced the approve-time account flow, didn't just extend it
+
+The task's spec (admin approves → gets a one-time link → copies/sends
+it manually → recipient sets a password on a real page → account is
+created) reads, on its face, like it could be redundant with the
+approve/decline flow already built (2026-07-16 entry above). It isn't.
+Investigating the existing flow before writing anything turned up a
+real, unfixed bug that made this a genuine fix, not busywork:
+
+**The old flow never actually let anyone set a password.** Approving an
+application called Supabase's `admin.generateLink({ type: "invite" })`,
+which both creates the Auth user immediately and returns a one-time
+`action_link`; that link was auto-emailed via Resend
+(`sendAccessGrantedEmail`), whose copy said "set your password to enter
+the club." But no page anywhere in the app ever collected a password —
+Supabase's own invite-link verify endpoint just authenticates the
+session and redirects. The member's one shot at the link was spent
+without ever setting credentials, so they could never again log in via
+email/password (only OAuth, if the same email happened to match a
+Google account). This was a real dead end for anyone who used a
+different email for Google than for their application — found, not
+theorized, by reading `app/api/admin/applications/[id]/route.ts` and
+`lib/utils/email.ts` together before writing any new code.
+
+**Given that, replaced the flow instead of layering the new spec on top
+of it.** Approval now only generates `Waitlist.inviteToken` (random 48
+hex chars) and returns the resulting URL for the admin to copy — no
+Supabase Auth user, no `User`/`UserProfile`/`Notification`/`Referral`/REP
+rows, no email, at approval time. All of that moves to
+`POST /api/invite/[token]`, which runs only once a real password has
+actually been collected on `/invite/[token]`, immediately before
+signing the new member in and marking the token used. This is a strict
+improvement on the old flow's guarantees, not a parallel path — there
+is now exactly one way an account gets created, and it always has a
+password.
+
+**"Applications" is still `Waitlist`, and `/apply` already exists — no
+new form built.** Same shorthand established in every prior task this
+session: the spec's "applications" table is the existing `Waitlist`
+model, not a new one. The spec's requirement #1 ("landing page stays as
+is") and requirement #2 (an application form with name/email/reason)
+are both already satisfied by the landing page's embedded
+`ApplicationForm` (name/email/age/city/source/reason → `Waitlist`,
+built 2026-07-13). Building a second, separate `/apply` form page would
+have fragmented that flow for no benefit — and `/apply` already exists
+as a *different* real page (the post-OAuth "you need an invite, here's
+your pending/no-account status" landing built during the OAuth task),
+which this task doesn't touch.
+
+**`/register` blocks this app's own route, not Supabase's raw API.**
+Built `app/register/route.ts` returning 403 on GET/POST per the literal
+spec, though no `/register` route or `signUp()` call existed anywhere
+to begin with — nothing to remove, just an explicit door-that-was-never-
+there now visibly locked. This can't be a complete fix: Supabase's
+project-level Auth REST API accepts signups directly from the public
+anon key regardless of what this codebase does, and the service-role
+key doesn't expose a way to flip that from code — it's a
+dashboard-only toggle (Authentication → Providers → Email → "Allow new
+users to sign up"). Flagged in `TECH_DEBT.md` as a manual action item
+for Max; this codebase has no path to closing that gap on its own.
+
+**Verified the full loop live**, using two real test applications
+against the real admin account: approved one
+(`invite-test-user@example.com`), copied the resulting invite link, and
+completed registration through it in a second browser tab — confirmed
+the real account got created, was signed in, and landed on `/feed`;
+confirmed a second `POST` to the same token returns 410 ("already been
+used") and the page itself shows the same state on reload; confirmed a
+nonexistent token's page shows "isn't valid." Submitted a second
+application (`decline-test-user@example.com`) and confirmed Decline
+still works correctly after `ApplicationsQueue`'s full rewrite (200
+response, item removed from the pending list). One incidental finding
+during testing: browser tabs share a single cookie jar, so completing
+registration in one tab (which calls `signInWithPassword`) silently
+invalidated the admin session in another tab open to the same origin —
+not a bug in the app, just a fact about testing two identities in one
+browser; re-authenticating the admin tab via "Continue with Google"
+restored it, and `/admin/applications` correctly 404'd in the meantime
+(proof the not-discoverable-to-non-admins protection from 2026-07-16
+still holds). Fully reverted all test data afterward: both `Waitlist`
+rows, the one real `User`/`UserProfile`/`RepHistory` row set the
+completed test registration created, and its Supabase Auth user.

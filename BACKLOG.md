@@ -320,6 +320,24 @@ renumbered up by one again (old `v0.8` Events & Marketplace → `v0.9`, ...).
       enforced server-side.
 - Not built: multiple photos per post, video, threaded/nested comments.
 
+### v0.15 — Closed Registration & Invite System ✅ (built 2026-07-17)
+
+- [x] Approval generates a one-time invite token (`Waitlist.inviteToken`)
+      instead of creating an account — admin copies the link from
+      `/admin/applications` and sends it manually, no auto-email.
+- [x] Invite registration (`/invite/[token]`) — collects name/email
+      (prefilled)/password; account, REP, and referral rows are only
+      created once this is submitted. Invalid/used/non-approved tokens
+      show a plain message, no form.
+- [x] `/register` blocked — explicit 403 on GET/POST (no prior route or
+      `signUp()` call existed to remove).
+- Fixed a real bug in the flow this replaces: the old approval email
+  said "set your password" but no page ever collected one — see
+  DECISIONS.md/CHANGELOG.md, 2026-07-17.
+- Not built (can't be, from this codebase): fully blocking Supabase's
+  own raw signup REST API — needs a dashboard-only toggle, see
+  `TECH_DEBT.md`.
+
 ## Later
 
 *Intentionally postponed — approved direction, not yet scheduled in

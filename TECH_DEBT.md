@@ -375,18 +375,20 @@ ever sets it to `true` — there's no read/unread interaction yet.
 `name-2` instead" affordance — acceptable for a first pass, worth
 revisiting once profile editing gets real usage.
 
-## `(auth)/apply/` folder purpose is unclear
+## `(auth)/apply/` folder purpose — resolved 2026-07-15/17
 
-`ARCHITECTURE.md` §7's folder plan lists `app/(auth)/apply/` as "форма
-заявки" (application form) — but the actual waitlist application form
-lives embedded in the Landing page (`app/(landing)/page.tsx`'s Apply
-section), matching `DESIGN.md` §6's Landing Page spec exactly (a single
-scrolling page with the form at the bottom). It's unclear whether
-`(auth)/apply/` is meant to be a *separate*, standalone `/apply` route
-(e.g. for direct-linking from marketing instead of the full landing), or
-just an artifact of the original folder plan that predates the landing's
-actual single-page design. **Not resolved — needs Max's input**, not a
-guess. The folder remains empty.
+Settled in practice rather than by a direct answer from Max:
+`app/(auth)/apply/page.tsx` is now the real post-OAuth landing for a
+Google sign-in with no matching member account (built alongside the
+OAuth task, 2026-07-15) — "Application Received" / "Request Access"
+messaging, not a form. The actual application form still lives embedded
+in the Landing page (`ApplicationForm`, `app/(landing)/page.tsx`),
+unchanged. Re-confirmed during the Closed Registration & Invite System
+task (2026-07-17), which reused this same "applications = `Waitlist`,
+form already exists on the landing page" reading rather than building a
+second form page — see DECISIONS.md, 2026-07-17. The three-path
+(`OC_MASTER.md`) speculation below is still unbuilt and still needs
+real specification if pursued.
 
 **Possible new explanation (2026-07-04):** `OC_MASTER.md`'s three-path
 access model ([Vision.md](docs/Vision.md#access-model--three-paths-oc_masterMD),
@@ -394,9 +396,8 @@ access model ([Vision.md](docs/Vision.md#access-model--three-paths-oc_masterMD),
 there may eventually be *three different* entry surfaces — the existing
 Landing Page waitlist form (Path 3, manual review), a purchase-order
 verification flow (Path 1), and a referral-link registration flow
-(Path 2). `(auth)/apply/` could plausibly become the home for Path 1 or
-Path 2's registration form once those are specified. Still a guess, not
-a confirmed answer — the underlying question hasn't been asked directly.
+(Path 2). Still a guess, not a confirmed answer — the underlying
+question hasn't been asked directly.
 
 ## Username is auto-generated; no self-edit flow exists
 
@@ -576,6 +577,15 @@ whether a component references it). See `DECISIONS.md`, 2026-07-04.
   without it.
 - Resend account + verified sending domain (needed for `RESEND_API_KEY`)
 - Uploadthing account (needed for `UPLOADTHING_SECRET`/`UPLOADTHING_APP_ID`)
+- **New (2026-07-17): a Supabase dashboard toggle only Max can flip** —
+  Authentication → Providers → Email → "Allow new users to sign up."
+  `app/register/route.ts` blocks this app's own `/register` path, but
+  Supabase's project-level Auth REST API still accepts a raw signup call
+  directly from the public anon key no matter what this codebase does —
+  the service-role key doesn't expose project-Auth-settings access, only
+  data-layer admin calls. Until this toggle is off, closed registration
+  isn't airtight at the infrastructure level, even though every path
+  inside the app itself is now closed. See DECISIONS.md, 2026-07-17.
 
 These aren't "debt" in the sense of a shortcut taken — they're
 external dependencies the implementer has no way to self-serve. Tracked

@@ -515,28 +515,37 @@ model Notification {
 // ============================================================
 
 model Waitlist {
-  id           String         @id @default(uuid()) @db.Uuid
-  email        String         @unique
-  name         String?
+  id                String         @id @default(uuid()) @db.Uuid
+  email             String         @unique
+  name              String?
   // age/city/source are additive to ARCHITECTURE.md §10's minimal column
   // list — they capture what the DESIGN.md §6 application form actually
   // collects (age is also a compliance checkpoint per ARCHITECTURE.md §9).
-  age          Int?
-  city         String?
-  source       String?
+  age               Int?
+  city              String?
+  source            String?
   // "Why you belong here" — free-text from the full application form
   // (Landing Page redesign, 2026-07). Optional: the hero-only email
   // capture never sets it.
-  reason       String?
-  referralCode String?        @map("referral_code")
-  invitedBy    String?        @map("invited_by") @db.Uuid
+  reason            String?
+  referralCode      String?        @map("referral_code")
+  invitedBy         String?        @map("invited_by") @db.Uuid
   // Status tracking + a minimal review audit trail — additive beyond
   // ARCHITECTURE.md §10's documented columns, needed to implement the
   // application review flow PRODUCT.md §1 already specifies. See ADR-0012.
-  status       WaitlistStatus @default(pending)
-  reviewedAt   DateTime?      @map("reviewed_at")
-  reviewedBy   String?        @map("reviewed_by") @db.Uuid
-  createdAt    DateTime       @default(now()) @map("created_at")
+  status            WaitlistStatus @default(pending)
+  reviewedAt        DateTime?      @map("reviewed_at")
+  reviewedBy        String?        @map("reviewed_by") @db.Uuid
+  // Closed Registration & Invite System (2026-07-17): approving no
+  // longer creates the account immediately — it generates this token,
+  // shown to the admin to copy and send manually (see DECISIONS.md for
+  // why this replaced the old auto-emailed Supabase invite link). The
+  // account itself is only created when the token is redeemed at
+  // /invite/[token]. `inviteTokenUsedAt` is the completion marker — a
+  // null value with a non-null token means "approved, not yet claimed."
+  inviteToken       String?        @unique @map("invite_token")
+  inviteTokenUsedAt DateTime?      @map("invite_token_used_at")
+  createdAt         DateTime       @default(now()) @map("created_at")
 
   @@map("waitlist")
 }
