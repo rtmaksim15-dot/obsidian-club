@@ -8,7 +8,38 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.13.0` is the current released version.
+Nothing yet — `v0.14.0` is the current released version.
+
+## [0.14.0] — 2026-07-17
+
+Feed & Posts MVP: photo uploads, real comments, a post detail page.
+
+### Added
+
+- **Post photos** — a single optional image per post, uploaded to
+  Supabase Storage (`POST /api/posts/photo`, bucket `post-photos`,
+  public read) — chosen deliberately over reusing the existing
+  UploadThing avatar pipeline, since the task named Supabase Storage
+  specifically. 8MB limit, JPEG/PNG/WEBP/GIF only.
+- **Real comments** — `GET`/`POST /api/posts/:id/comments`, a flat
+  chronological list (no nesting/replies — not documented anywhere).
+  `CommentSection` renders the list + an add-comment input.
+- **Post detail page** (`/posts/[id]`) — full post card + all comments.
+  Feed/Library cards' comment count is now a real link here.
+- **REP badge, house tag, and photo** on every post card (`PostCard`,
+  extracted from `PostList` so `/feed`, `/library`, and `/posts/[id]`
+  share one rendering).
+
+### Changed
+
+- **Feed scope**: `/feed` now shows global posts (no house) + posts from
+  houses the caller has actually **joined** (`HouseMembership`) — not
+  every active house's posts, now that membership is a real thing (REP
+  system task, 2026-07-16). `/library`'s composer is scoped the same way.
+- **`POST /api/posts`**: tagging a post to a house now requires real
+  membership, enforced server-side (previously any active house could be
+  tagged regardless of membership — that check predates `HouseMembership`
+  existing at all).
 
 ## [0.13.0] — 2026-07-16
 

@@ -305,6 +305,21 @@ renumbered up by one again (old `v0.8` Events & Marketplace → `v0.9`, ...).
 - Not built: real Vault artwork/catalog (still Max's call), Claim
   redemption/fulfillment flow.
 
+### v0.14 — Feed & Posts MVP ✅ (built 2026-07-17)
+
+- [x] Post photos — single optional image, Supabase Storage
+      (`post-photos` bucket), 8MB limit.
+- [x] Real comments — `GET`/`POST /api/posts/:id/comments`, flat list,
+      no nesting.
+- [x] Post detail page (`/posts/[id]`) — full post + all comments; feed
+      cards' comment count links here.
+- [x] REP badge + house tag + photo on every post card (shared
+      `PostCard`, used by `/feed`, `/library`, `/posts/[id]`).
+- [x] Feed scoped to global posts + houses the caller has joined (not
+      every active house); house-tagging now requires real membership,
+      enforced server-side.
+- Not built: multiple photos per post, video, threaded/nested comments.
+
 ## Later
 
 *Intentionally postponed — approved direction, not yet scheduled in

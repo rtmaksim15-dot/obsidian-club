@@ -10,7 +10,10 @@ const PAGE_SIZE = 20;
 const VALID_TYPES: PostType[] = ["post", "story", "article", "lecture", "manifesto", "course"];
 const EXTERNAL_LINK_PATTERN = /(https?:\/\/|www\.)\S+/i;
 
-const postSelect = {
+// `likes` is scoped to the caller (0 or 1 rows — "did I like this?"),
+// never every like on the post — same shape `/feed`, `/library`, and
+// `/posts/[id]` all already query directly via Prisma.
+const postSelect = (viewerId: string) => ({
   id: true,
   title: true,
   content: true,
@@ -21,9 +24,11 @@ const postSelect = {
   likesCount: true,
   createdAt: true,
   publishedAt: true,
-  author: { select: { id: true, displayName: true, avatarUrl: true, level: true } },
+  author: { select: { id: true, displayName: true, avatarUrl: true, level: true, rep: true } },
+  house: { select: { id: true, name: true, slug: true } },
+  likes: { where: { userId: viewerId }, select: { userId: true } },
   _count: { select: { comments: true } },
-};
+});
 
 // GET /api/posts — the content feed, newest-first, filtered to what the
 // caller's level can see (`Post.minLevel`) — same "locked, not hidden"
@@ -50,13 +55,20 @@ export async function GET(request: Request) {
     },
     orderBy: { publishedAt: "desc" },
     take: PAGE_SIZE,
-    select: postSelect,
+    select: postSelect(user.id),
   });
 
   return NextResponse.json({ posts });
 }
 
-type Body = { type?: string; title?: string; content?: string; minLevel?: number; houseId?: string };
+type Body = {
+  type?: string;
+  title?: string;
+  content?: string;
+  minLevel?: number;
+  houseId?: string;
+  photoUrl?: string;
+};
 
 // POST /api/posts — create + publish immediately (no draft workflow is
 // documented in PRODUCT.md, so this doesn't invent one). Creation rights
@@ -106,13 +118,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid minimum level." }, { status: 422 });
   }
 
+  // Feed & Posts MVP (2026-07-16): tagging a post to a house now requires
+  // real membership (`HouseMembership`, see REP-system task/DECISIONS.md)
+  // — previously any active house could be tagged regardless of
+  // membership, back when membership wasn't a concept yet.
   let houseId: string | null = null;
   if (body.houseId) {
-    const house = await prisma.house.findUnique({ where: { id: body.houseId } });
-    if (!house || house.status !== "active") {
-      return NextResponse.json({ error: "Invalid house." }, { status: 422 });
+    const membership = await prisma.houseMembership.findUnique({
+      where: { userId_houseId: { userId: user.id, houseId: body.houseId } },
+      include: { house: true },
+    });
+    if (!membership || membership.house.status !== "active") {
+      return NextResponse.json({ error: "You can only post to houses you've joined." }, { status: 422 });
     }
-    houseId = house.id;
+    houseId = membership.houseId;
+  }
+
+  const photoUrl = body.photoUrl?.trim();
+  if (photoUrl && !/^https:\/\//.test(photoUrl)) {
+    return NextResponse.json({ error: "Invalid photo." }, { status: 422 });
   }
 
   try {
@@ -124,10 +148,11 @@ export async function POST(request: Request) {
         content,
         minLevel,
         houseId,
+        mediaUrls: photoUrl ? [photoUrl] : [],
         isPublished: true,
         publishedAt: new Date(),
       },
-      select: postSelect,
+      select: postSelect(user.id),
     });
 
     const publishedCount = await prisma.post.count({ where: { authorId: user.id, isPublished: true } });

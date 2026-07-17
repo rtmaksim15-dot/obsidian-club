@@ -976,3 +976,43 @@ waitlist/referral revert (2026-07-16, admin panel task). The two
 (`-195`/`+195`) were left in place — they're an honest, real record of
 the admin-adjustment feature actually being exercised, not fake data,
 and they net to zero.
+
+### 2026-07-17 — Feed & Posts MVP: Supabase Storage over UploadThing, membership-gated house tagging
+
+**Storage provider.** Avatar upload already uses UploadThing
+(`app/api/uploadthing/`) — reusing it for post photos would have been
+the path of least resistance. Didn't: the task named "Supabase Storage"
+specifically, not "file upload" generically, and this project already
+runs Auth + DB on Supabase — fewer vendors is a reasonable reason to
+actually want Storage too, not just an oversight to paper over. Built
+`POST /api/posts/photo` using the service-role admin client (same
+pattern as `lib/auth/supabase-admin.ts`'s other privileged writes),
+lazily creating a public `post-photos` bucket on first use. Verified
+end-to-end: uploaded a real file, confirmed the returned public URL
+actually renders in the feed, then deleted the storage object during
+cleanup.
+
+**House tagging now requires membership.** `POST /api/posts` previously
+let anyone tag any active house regardless of membership — correct at
+the time, since `HouseMembership` didn't exist yet (predates the REP
+system task, 2026-07-16). Now that it does, this task's "dropdown
+selector from user's houses" spec is a real, correct tightening: the
+composer's house dropdown (on both `/feed` and `/library`, which share
+`ContentComposer`) now only lists houses the caller has joined, and the
+API enforces the same rule server-side (not just a client-side
+convenience) — tagging a non-joined house 422s with "You can only post
+to houses you've joined." Feed's own query changed the same way: it
+shows global posts + posts from joined houses only, not every active
+house's content.
+
+**Verified the full loop on the real admin account**: joined House of
+Rope for real, published a post there with an actual uploaded photo,
+liked it, added a comment (confirmed the comment count on the card was
+stale until posting a comment triggers `router.refresh()` — added that
+fix), opened `/posts/[id]` and confirmed the full thread renders there,
+confirmed the feed card's comment count links to that same page. Then
+deleted the test post (and its Storage object), reverted the REP this
+testing introduced (`house-joined` +10, `house-post` +2), and removed
+the test membership — left the same day's legitimate `+5` daily-login
+REP untouched (a new calendar day since the last task's testing, so a
+real, non-test event).

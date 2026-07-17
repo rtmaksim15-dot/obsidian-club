@@ -511,24 +511,21 @@ Realtime's manual-enablement issue above: this app has no scheduled-job
 mechanism at all yet. Revisit once deployed to Vercel (Vercel Cron is
 the natural fit) or once Supabase's `pg_cron` becomes relevant.
 
-## Comment model exists but has no API/UI (`v0.6`)
+## Comment model — fixed 2026-07-17 (Feed & Posts MVP)
 
-`Comment` was added to the schema alongside `Like` (real like-toggling
-needed a join table; comments were added at the same time since they're
-adjacent and equally absent from the original spec's data model) — but
-nothing can create or read a comment yet. `/content` shows a live
-`_count.comments` (always 0 today) with no way to change that. Needs its
-own pass: `POST/GET /api/posts/:id/comments`, a UI thread, and a decision
-on whether comments are level-gated like posts or open to anyone who can
-see the post.
+`GET`/`POST /api/posts/:id/comments` + `CommentSection.tsx` (flat list,
+no nesting) are real now. Comments are gated the same way as the post
+itself (`isPublished` + `minLevel`) — no separate, looser rule for who
+can comment vs. who can see the post.
 
-## Post media (`mediaUrls`) has no upload path
+## Post media (`mediaUrls`) — fixed 2026-07-17, one photo only
 
-`Post.mediaUrls` (a `Json` array) exists in the schema and is selected
-by the API, but nothing writes to it — `ContentComposer.tsx` is
-text-only. `PRODUCT.md`'s content types (photos, video) imply media is
-expected eventually; would reuse the existing `uploadthing` integration
-(already wired for avatars) rather than a new upload path.
+`ContentComposer.tsx` can now attach a single photo per post, uploaded
+to **Supabase Storage** (`POST /api/posts/photo`, bucket `post-photos`)
+— deliberately not the existing `uploadthing` avatar pipeline, since the
+Feed & Posts MVP task named Supabase Storage specifically (see
+DECISIONS.md). Still not built: multiple photos per post, video
+(`PRODUCT.md`'s content types imply both eventually).
 
 ## Content feed has no pagination beyond "latest 20"
 

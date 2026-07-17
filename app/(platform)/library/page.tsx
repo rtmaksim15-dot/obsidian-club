@@ -47,21 +47,26 @@ export default async function LibraryPage({
       id: true,
       title: true,
       content: true,
+      mediaUrls: true,
       type: true,
       likesCount: true,
       createdAt: true,
-      author: { select: { id: true, displayName: true, avatarUrl: true, level: true } },
+      author: { select: { id: true, displayName: true, avatarUrl: true, level: true, rep: true } },
+      house: { select: { id: true, name: true, slug: true } },
       likes: { where: { userId: user.id }, select: { userId: true } },
       _count: { select: { comments: true } },
     },
   });
 
   const allowedTypes = LIBRARY_TYPES.filter((t) => canCreatePostType(user, t));
-  const houses = await prisma.house.findMany({
-    where: { status: "active" },
-    select: { id: true, name: true },
-    orderBy: { name: "asc" },
+  // Same membership scoping as /feed (Feed & Posts MVP, 2026-07-16) — the
+  // composer here is shared, and /api/posts now requires membership to
+  // tag a house regardless of which page submitted the post.
+  const memberships = await prisma.houseMembership.findMany({
+    where: { userId: user.id },
+    select: { house: { select: { id: true, name: true } } },
   });
+  const houses = memberships.map((m) => m.house);
 
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">

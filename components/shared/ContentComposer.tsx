@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { ImagePlus, X } from "lucide-react";
 
 type AllowedType = { type: string; label: string };
 
@@ -23,9 +24,13 @@ type Props = { allowedTypes: string[]; houses?: { id: string; name: string }[] }
  * Post composer — the type dropdown only lists types the caller is
  * actually allowed to create (`canCreatePostType`, PRODUCT.md §10). If a
  * member has no creation rights at their level, this isn't rendered at
- * all (see page.tsx). `houses` is optional and only has entries once a
- * real House exists (House of Rope, see ADR-0016) — lets a member tag
- * their post to a house so it shows up on that house's page.
+ * all (see page.tsx). `houses` lists only houses the caller has actually
+ * joined (Feed & Posts MVP, 2026-07-16 — `/api/posts` rejects a houseId
+ * the caller isn't a member of).
+ *
+ * Photo upload is a single optional image, uploaded to Supabase Storage
+ * (`POST /api/posts/photo`) before the post itself — the returned URL
+ * rides along in the post-creation request as `photoUrl`.
  */
 export default function ContentComposer({ allowedTypes, houses = [] }: Props) {
   const router = useRouter();
@@ -35,10 +40,25 @@ export default function ContentComposer({ allowedTypes, houses = [] }: Props) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [houseId, setHouseId] = useState("");
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (options.length === 0) return null;
+
+  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    setPhoto(file);
+    setPhotoPreview(file ? URL.createObjectURL(file) : null);
+  }
+
+  function clearPhoto() {
+    setPhoto(null);
+    setPhotoPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -48,6 +68,20 @@ export default function ContentComposer({ allowedTypes, houses = [] }: Props) {
     setSubmitting(true);
     setError(null);
 
+    let photoUrl: string | undefined;
+    if (photo) {
+      const formData = new FormData();
+      formData.append("file", photo);
+      const uploadRes = await fetch("/api/posts/photo", { method: "POST", body: formData });
+      const uploadBody = await uploadRes.json().catch(() => ({}));
+      if (!uploadRes.ok) {
+        setError(uploadBody?.error ?? "Could not upload photo.");
+        setSubmitting(false);
+        return;
+      }
+      photoUrl = uploadBody.url;
+    }
+
     const res = await fetch("/api/posts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -56,6 +90,7 @@ export default function ContentComposer({ allowedTypes, houses = [] }: Props) {
         title: title.trim() || undefined,
         content: trimmed,
         houseId: houseId || undefined,
+        photoUrl,
       }),
     });
 
@@ -69,6 +104,7 @@ export default function ContentComposer({ allowedTypes, houses = [] }: Props) {
     setTitle("");
     setContent("");
     setHouseId("");
+    clearPhoto();
     setSubmitting(false);
     router.refresh();
   }
@@ -109,7 +145,7 @@ export default function ContentComposer({ allowedTypes, houses = [] }: Props) {
           onChange={(e) => setHouseId(e.target.value)}
           style={{ width: "auto" }}
         >
-          <option value="">No house</option>
+          <option value="">No house — post globally</option>
           {houses.map((h) => (
             <option key={h.id} value={h.id}>
               {h.name}
@@ -126,6 +162,27 @@ export default function ContentComposer({ allowedTypes, houses = [] }: Props) {
         rows={4}
         maxLength={20000}
       />
+
+      {photoPreview ? (
+        <div className="relative inline-block">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={photoPreview} alt="" className="max-h-48 rounded-ob object-cover" />
+          <button
+            type="button"
+            onClick={clearPhoto}
+            className="absolute right-2 top-2 rounded-full bg-ob-black/70 p-1"
+            aria-label="Remove photo"
+          >
+            <X size={14} strokeWidth={2} style={{ color: "var(--color-text-primary)" }} />
+          </button>
+        </div>
+      ) : (
+        <label className="btn-secondary inline-flex w-fit cursor-pointer items-center gap-2">
+          <ImagePlus size={16} strokeWidth={1.5} />
+          Add photo
+          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
+        </label>
+      )}
 
       {error ? (
         <p className="text-caption" style={{ color: "var(--color-error)" }}>
