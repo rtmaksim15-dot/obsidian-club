@@ -44,6 +44,11 @@ unilaterally.
 - [ ] Enable Realtime on the `messages` table in the Supabase dashboard
       (one-time manual step, not a migration — needed for `/rooms/[slug]`
       chat to actually push live updates)
+- [ ] **Run the RLS migration** (`supabase/migrations/0001_enable_rls.sql`,
+      [ADR-0017](docs/ADR/0017-enable-rls-all-tables.md)) against the
+      live project and verify `/rooms/[slug]` chat still updates live —
+      drafted 2026-07-17, blocked here on real `DATABASE_URL`/`DIRECT_URL`
+      access (see `TECH_DEBT.md`)
 - [x] ~~Set at least one real `User.isAdmin = true`~~ — resolved
       2026-07-06: approved the real waitlist application for
       `lord.obsidian.oc@gmail.com` (submitted through the actual landing

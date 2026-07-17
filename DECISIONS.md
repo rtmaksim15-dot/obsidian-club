@@ -976,3 +976,29 @@ waitlist/referral revert (2026-07-16, admin panel task). The two
 (`-195`/`+195`) were left in place — they're an honest, real record of
 the admin-adjustment feature actually being exercised, not fake data,
 and they net to zero.
+
+### 2026-07-17 — RLS migration drafted for the 2026-07-16 gap; not applied
+
+Followed `TECH_DEBT.md`'s recommended next step for the RLS gap found
+2026-07-16 (RLS disabled on every table except `waitlist`): designed and
+wrote `supabase/migrations/0001_enable_rls.sql`, deny-all by default
+across all sixteen still-unprotected tables (the fourteen originally
+found, plus `house_memberships`/`comments`/`events`/`event_attendees`/
+`achievements` — added to the schema since that check, equally
+unprotected), with three narrow allow-policies (`users` self-select,
+`rooms` all-rows, `messages` gated by the same rule
+`lib/rating/room-access.ts#canAccessRoom()` already enforces
+server-side) so `RoomChat.tsx`'s Realtime subscription keeps working.
+Full reasoning in [ADR-0017](docs/ADR/0017-enable-rls-all-tables.md).
+
+**Could not run or verify it.** This sandbox has no `.env.local` — no
+`DATABASE_URL`/`DIRECT_URL` for the live Supabase project — unlike the
+sandbox that did the original 2026-07-05 `db push`/seed work. Everything
+here was reasoned against `prisma/schema.prisma` and the app's actual
+Supabase-client call sites (grepped for every browser-side `supabase`/
+`createClient` usage to confirm `RoomChat.tsx` really is the only
+client-side data read that exists), not tested against a real database.
+Flagging this explicitly rather than claiming it's fixed: someone with
+real project credentials needs to run the migration and confirm live
+chat still works before `TECH_DEBT.md`'s entry can honestly say
+"resolved."

@@ -6,7 +6,7 @@ Each item should eventually become a `BACKLOG.md` entry once it's actually
 scheduled; until then, it lives here as "known, not forgotten, not yet
 prioritized."
 
-## 🔴 URGENT — RLS is disabled on every table except `waitlist` (found 2026-07-16)
+## 🟡 RLS migration drafted, not yet applied (found 2026-07-16, drafted 2026-07-17)
 
 `NEXT_PUBLIC_SUPABASE_ANON_KEY` ships to every browser by design (it's
 meant to be public — RLS is what's supposed to make that safe). Checked
@@ -42,14 +42,28 @@ would need to manually refresh to see anything new) — a real regression,
 not a theoretical one. See DECISIONS.md (2026-07-16) for the full
 investigation.
 
-**Recommended next step**: enable RLS ordered by exposure severity
-(`users` and `messages` first, since those carry PII/private
-conversation content), design `messages`' SELECT policy *before*
-flipping its RLS on (probably: authenticated members can select messages
-in rooms they currently have access to, mirroring
-`lib/rating/room-access.ts`'s existing gating logic), then sweep the
-remaining tables. Worth a dedicated pass, not a rider on whatever task
-happens to touch one of these tables next.
+**Status as of 2026-07-17**: `supabase/migrations/0001_enable_rls.sql`
+enables RLS (deny-all by default) across all sixteen still-unprotected
+tables — the fourteen above, plus `house_memberships`, `comments`,
+`events`, `event_attendees`, and `achievements` (added to the schema
+since the 2026-07-16 check, equally unprotected). Three narrow
+allow-policies were added where the app genuinely needs client-side
+Supabase access: `users` (self-row select, needed as a join target),
+`rooms` (all rows — metadata isn't sensitive), and `messages`
+(authenticated members can select messages in rooms they can actually
+access, mirroring `lib/rating/room-access.ts#canAccessRoom()` exactly —
+this is the policy Realtime needs to keep `RoomChat.tsx` working). Full
+reasoning in [ADR-0017](docs/ADR/0017-enable-rls-all-tables.md).
+
+**Not yet applied or verified** — this dev sandbox has no
+`DATABASE_URL`/`DIRECT_URL` for the live project (no `.env.local`), so
+the migration couldn't be run or tested end-to-end here, only reasoned
+about against the schema. **Next step for whoever has real project
+credentials**: run
+`psql "$DIRECT_URL" -f supabase/migrations/0001_enable_rls.sql` (or
+paste it into the Supabase SQL Editor), then confirm `/rooms/[slug]`
+still receives live messages across two sessions before marking this
+resolved here and in `BACKLOG.md`.
 
 ## Houses / Vault / Apple Sign-In gaps (2026-07-08/09, see ADR-0016)
 
