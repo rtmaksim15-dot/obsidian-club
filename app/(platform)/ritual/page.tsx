@@ -66,7 +66,7 @@ export default async function RitualPage() {
 
         <div className="mt-10 flex flex-wrap gap-3">
           {status.steps.some((s) => s.id === "profile" && s.status === "todo") ? (
-            <a href={`/profile/${user.id}/edit`} className="btn-primary inline-block">
+            <a href="/profile/edit" className="btn-primary inline-block">
               Complete your profile
             </a>
           ) : null}

@@ -1099,3 +1099,85 @@ restored it, and `/admin/applications` correctly 404'd in the meantime
 still holds). Fully reverted all test data afterward: both `Waitlist`
 rows, the one real `User`/`UserProfile`/`RepHistory` row set the
 completed test registration created, and its Supabase Auth user.
+
+### 2026-07-20 — User Profiles: username-based routing, and replacing avatar upload rather than wiring it as-is
+
+The spec asked for `/profile/[username]` and a param-less `/profile/edit`
+— both a change from what already existed (`/profile/[id]`,
+`/profile/[id]/edit`, built 2026-07-02/03). `username` was already a
+real, unique column on `User` (set at registration), so this was a
+rename with a different lookup key, not new schema. Checked every
+internal link to the old paths first (`grep`, not a guess): only two
+existed, both self-links to the edit page using the session's own
+`user.id` (`/hall`, `/ritual`) — no code linked to `/profile/[id]`'s
+*view* at all. Updated both self-links, deleted the old `[id]` folder,
+and updated `/profile`'s redirect and a doc comment in
+`rep-engine.ts` that referenced the old path.
+
+**Avatar upload: replaced UploadThing, didn't wire it up as spec'd
+"whatever's there."** The task's field list explicitly named "avatar
+upload (Supabase Storage, same bucket pattern as post photos)" — not
+ambiguous, so this wasn't a judgment call the way the invite-system
+replacement (2026-07-17 entry above) was. Checked `TECH_DEBT.md` first
+and confirmed the existing UploadThing flow
+(`app/api/uploadthing/core.ts`, `AvatarUploadButton.tsx`) had never
+actually been verified — `UPLOADTHING_SECRET`/`UPLOADTHING_APP_ID` were
+always empty, so it was dead weight from the start, used nowhere else
+in the codebase (`grep` confirmed). Built `POST /api/profile/avatar`
+on the same lazy-bucket pattern as `app/api/posts/photo/route.ts`
+(`ensureBucket` via `storage.listBuckets()`/`createBucket()`), its own
+`avatars` bucket (not shared with `post-photos` — a user has exactly
+one avatar, not a gallery), a fixed `userId/avatar.<ext>` path with
+`upsert: true` so re-uploading replaces the old file instead of
+accumulating orphans, and a `?v=<timestamp>` cache-buster on the stored
+URL since a fixed path means the public URL is otherwise byte-identical
+across re-uploads and a browser/CDN would keep serving the stale image.
+Removed the UploadThing route, `lib/utils/uploadthing.ts`, both npm
+packages (`npm uninstall`, not just deleting from `package.json`), and
+the two empty env vars — nothing else referenced any of it.
+
+**Nav/header ambiguity — asked rather than guessed.** The spec said
+"clicking avatar or name in nav/header → `/profile/edit` or
+`/profile/[username]`," but this app has no desktop header at all, and
+the only nav (`BottomNav`, mobile-only) already has an intentional,
+documented decision that its "Profile" tab points at `/hall` (the
+self-view dashboard), not a profile page — see the CLAUDE.md v2
+migration entry above. Wiring the new requirement without touching that
+existing decision meant a real design choice (new desktop header?
+repurpose the existing tab? something else?), not something to invent
+silently. Asked Max directly; chose to make the avatar/name already
+rendered at the top of `/hall` link out to `/profile/[username]`
+(view) and repointed `/hall`'s existing "Edit profile" link at the new
+`/profile/edit` — smallest change, nothing renamed, `BottomNav`
+untouched.
+
+**Scoped out deliberately: linking post authors to their profiles.**
+`PostCard` (used on `/feed`, `/library`, `/posts/[id]`, and now this
+profile page's "Recent Posts") doesn't currently link the author's
+name/avatar anywhere, and none of the eight places that `select` a
+post's `author` currently fetch `username`. Doing this properly would
+touch all eight call sites for a feature not in this task's four
+numbered requirements — flagged in `BACKLOG.md` as a natural fast-follow
+instead of expanding scope here.
+
+**Verified live** against the real admin account: the avatar-upload
+code path end-to-end (bucket creation, real upload, public URL fetch
+returning `200`/`image/png`, `User.avatarUrl` write) via a script
+exercising the exact same Supabase Storage calls the route makes — a
+direct HTTP request through the browser's session cookie wasn't
+reliable to reconstruct outside the browser itself (Supabase's
+`@supabase/ssr` chunked-cookie format), so this was the more direct
+verification of the actual risk surface (real Storage + real DB write)
+rather than the routing plumbing, which the framework already
+type-checks. Also verified through the real UI: `/profile/edit`
+loading with real prefilled data, saving a bio via the actual form
+(`PATCH /api/profile` → `200`, persisted across reload, 300-char
+counter live), `/profile/[username]` rendering every section correctly
+for the owner (REP history, edit link) and — via a throwaway `User` row
+created and deleted directly, no real Auth account needed for a
+read-path check — for a non-owner (review form instead of REP
+history/edit link, no posts). Confirmed a nonexistent username 404s.
+Reverted every change this testing made to the real admin account
+(`avatarUrl`/`bio` back to `null`) and deleted the throwaway profile
+row; REP itself was never touched, confirmed unchanged at 220
+before/after.

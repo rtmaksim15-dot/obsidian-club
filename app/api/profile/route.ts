@@ -46,6 +46,9 @@ export async function PATCH(request: Request) {
       { status: 422 }
     );
   }
+  if (bio && bio.length > 300) {
+    return NextResponse.json({ error: "Bio must be 300 characters or fewer." }, { status: 422 });
+  }
 
   let role: MemberRole | undefined;
   if (body.role !== undefined) {

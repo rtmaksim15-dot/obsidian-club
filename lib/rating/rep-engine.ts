@@ -153,7 +153,7 @@ export async function touchDailyLogin(userId: string) {
  * here means the same fields the Initiation Ritual's step 1 already
  * checks (bio + avatar) plus city, since those are the only profile
  * fields with real user-facing edit UI (`lib/auth/ritual.ts`,
- * `/profile/[id]/edit`). Call after a profile edit save; no-ops if
+ * `/profile/edit`). Call after a profile edit save; no-ops if
  * already granted (checked via a RepHistory row, not a boolean flag —
  * avoids a schema addition for a one-time event).
  */

@@ -2,21 +2,27 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import ReviewForm from "@/components/shared/ReviewForm";
+import PostCard, { type FeedPost } from "@/components/shared/PostCard";
 import { LEVEL_NAMES } from "@/lib/rating/levels";
 
 /**
- * Member profile — real header data plus (v0.5) real reviews, and
- * (2026-07-16) a REP event ledger. Still no full tab system
- * (PRODUCT.md's stats/achievements/content/reviews tabs) — reviews and
- * REP history render as flat sections, same pattern as the rest of the
- * profile so far.
+ * Member profile — looked up by `username` (User Profiles task,
+ * 2026-07-17), replacing the old id-based `/profile/[id]`. Real header
+ * data, house memberships, last 5 posts, reviews, and (owner-only) a
+ * REP event ledger. Still no full tab system (PRODUCT.md's
+ * stats/achievements/content/reviews tabs) — everything renders as flat
+ * sections, same pattern as before.
  */
-export default async function ProfilePage({ params }: { params: { id: string } }) {
-  const [user, viewer, reviews, repHistory] = await Promise.all([
-    prisma.user.findUnique({ where: { id: params.id } }),
-    getCurrentUser(),
+export default async function ProfilePage({ params }: { params: { username: string } }) {
+  const user = await prisma.user.findUnique({ where: { username: params.username } });
+  if (!user) notFound();
+
+  const viewer = await getCurrentUser();
+  const isOwnProfile = viewer?.id === user.id;
+
+  const [reviews, repHistory, memberships, posts] = await Promise.all([
     prisma.review.findMany({
-      where: { reviewedId: params.id, isVisible: true },
+      where: { reviewedId: user.id, isVisible: true },
       orderBy: { createdAt: "desc" },
       take: 10,
       include: { reviewer: { select: { id: true, displayName: true } } },
@@ -25,16 +31,42 @@ export default async function ProfilePage({ params }: { params: { id: string } }
     // is public, above) — shown only to the profile's owner, same
     // reasoning as the review form only showing for other people's
     // profiles, just inverted.
-    prisma.repHistory.findMany({
-      where: { userId: params.id },
-      orderBy: { createdAt: "desc" },
-      take: 25,
+    isOwnProfile
+      ? prisma.repHistory.findMany({
+          where: { userId: user.id },
+          orderBy: { createdAt: "desc" },
+          take: 10,
+        })
+      : Promise.resolve([]),
+    prisma.houseMembership.findMany({
+      where: { userId: user.id },
+      orderBy: { joinedAt: "asc" },
+      include: { house: { select: { name: true, slug: true } } },
+    }),
+    prisma.post.findMany({
+      where: { authorId: user.id, isPublished: true },
+      orderBy: { publishedAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        title: true,
+        content: true,
+        mediaUrls: true,
+        type: true,
+        likesCount: true,
+        createdAt: true,
+        author: { select: { id: true, displayName: true, avatarUrl: true, level: true, rep: true } },
+        house: { select: { id: true, name: true, slug: true } },
+        likes: { where: { userId: viewer?.id ?? "" }, select: { userId: true } },
+        _count: { select: { comments: true } },
+      },
     }),
   ]);
-  if (!user) notFound();
 
   const stars = Math.round(Number(user.reputation));
-  const isOwnProfile = viewer?.id === user.id;
+  const memberSince = user.joinedAt
+    ? new Date(user.joinedAt).toLocaleDateString("en-US", { timeZone: "UTC" })
+    : null;
 
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
@@ -51,6 +83,9 @@ export default async function ProfilePage({ params }: { params: { id: string } }
         </div>
 
         <h1 className="text-h1 mt-6">{user.displayName}</h1>
+        <p className="text-data" style={{ color: "var(--color-text-secondary)" }}>
+          @{user.username}
+        </p>
         <p className="font-cinzel uppercase tracking-brand text-ob-gold mt-1 text-sm">
           {LEVEL_NAMES[user.level] ?? `Level ${user.level}`}
         </p>
@@ -70,10 +105,35 @@ export default async function ProfilePage({ params }: { params: { id: string } }
 
         <p className="text-caption mt-4" style={{ color: "var(--color-text-secondary)" }}>
           {[user.locationCity, user.locationCountry].filter(Boolean).join(", ") || "Location not shared"}
-          {user.joinedAt ? ` · Member since ${user.joinedAt.toLocaleDateString()}` : ""}
+          {memberSince ? ` · Member since ${memberSince}` : ""}
         </p>
 
         {user.bio ? <p className="text-body mt-6">{user.bio}</p> : null}
+
+        {isOwnProfile ? (
+          <a href="/profile/edit" className="btn-ghost mt-6 inline-block">
+            Edit profile
+          </a>
+        ) : null}
+
+        {memberships.length > 0 ? (
+          <section className="mt-10">
+            <p className="text-label mb-3">Houses</p>
+            <ul className="flex flex-wrap gap-2">
+              {memberships.map((m) => (
+                <li key={m.id}>
+                  <a
+                    href={`/houses/${m.house.slug}`}
+                    className="text-caption inline-block rounded-ob border px-3 py-1.5 uppercase tracking-brand"
+                    style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
+                  >
+                    {m.house.name}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
 
         {viewer && !isOwnProfile ? (
           <section className="mt-10">
@@ -96,7 +156,7 @@ export default async function ProfilePage({ params }: { params: { id: string } }
                     <div>
                       <p className="text-data !text-sm">{h.reason ?? h.source ?? "REP event"}</p>
                       <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
-                        {h.createdAt.toLocaleDateString()}
+                        {new Date(h.createdAt).toLocaleDateString("en-US", { timeZone: "UTC" })}
                       </p>
                     </div>
                     <p
@@ -136,6 +196,21 @@ export default async function ProfilePage({ params }: { params: { id: string } }
                 </li>
               ))}
             </ul>
+          )}
+        </section>
+
+        <section className="mt-10">
+          <p className="text-label mb-3">Recent Posts</p>
+          {posts.length === 0 ? (
+            <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
+              No posts yet.
+            </p>
+          ) : (
+            <div className="space-y-6">
+              {posts.map((post) => (
+                <PostCard key={post.id} post={post as FeedPost} />
+              ))}
+            </div>
           )}
         </section>
       </div>

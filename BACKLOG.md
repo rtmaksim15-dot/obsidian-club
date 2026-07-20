@@ -338,6 +338,22 @@ renumbered up by one again (old `v0.8` Events & Marketplace → `v0.9`, ...).
   own raw signup REST API — needs a dashboard-only toggle, see
   `TECH_DEBT.md`.
 
+### v0.16 — User Profiles ✅ (built 2026-07-20)
+
+- [x] `/profile/[username]` — avatar, name, level/rank, REP, member
+      since, house memberships, last 5 posts, reviews, and (owner-only)
+      last 10 REP events. Replaces the old `/profile/[id]`.
+- [x] `/profile/edit` — param-less, self-only; bio capped at 300 chars
+      (client + server).
+- [x] Avatar upload moved from UploadThing (never provisioned, never
+      verifiable) to Supabase Storage — same lazy-bucket pattern as
+      post photos, verified end-to-end against the live project.
+- [x] Own-profile link — `/hall`'s avatar/name now link to
+      `/profile/[username]`; its "Edit profile" link points at
+      `/profile/edit`.
+- Not built: linking post-card authors to their profiles (found during
+  this task, small and separable — see `TECH_DEBT.md`).
+
 ## Later
 
 *Intentionally postponed — approved direction, not yet scheduled in

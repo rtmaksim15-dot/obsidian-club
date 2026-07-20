@@ -428,14 +428,16 @@ Fine for now (no client currently needs to distinguish the two), but
 worth splitting if a client ever wants to show "log in" vs. "you don't
 have access" differently.
 
-## Avatar upload is wired but unverified
+## Avatar upload — resolved 2026-07-20 (User Profiles task)
 
-`app/api/uploadthing/`, `lib/utils/uploadthing.ts`,
-`components/shared/AvatarUploadButton.tsx` are all in place and build
-cleanly, but `UPLOADTHING_SECRET`/`UPLOADTHING_APP_ID` are empty — same
-blocked-on-Max pattern as Resend/Supabase. **Cannot be verified
-end-to-end** (a real upload, a real `onUploadComplete` write) until Max
-provisions an Uploadthing account.
+Was blocked on Max provisioning an Uploadthing account
+(`UPLOADTHING_SECRET`/`UPLOADTHING_APP_ID` were always empty, so the
+old flow was never actually verifiable). Replaced entirely with
+Supabase Storage — `POST /api/profile/avatar`, same lazy-bucket pattern
+as post photos, own `avatars` bucket — which needs no external account
+beyond the Supabase project this app already depends on. Verified
+end-to-end against the live project (real upload, real public URL,
+real `User.avatarUrl` write). See DECISIONS.md, 2026-07-20.
 
 ## Realtime requires a manual Supabase dashboard step (`v0.4`)
 
@@ -576,7 +578,9 @@ whether a component references it). See `DECISIONS.md`, 2026-07-04.
   `v0.4`'s note above) — `/rooms/[slug]` chat won't push live updates
   without it.
 - Resend account + verified sending domain (needed for `RESEND_API_KEY`)
-- Uploadthing account (needed for `UPLOADTHING_SECRET`/`UPLOADTHING_APP_ID`)
+- ~~Uploadthing account~~ — **no longer needed, 2026-07-20**: avatar
+  upload moved to Supabase Storage (User Profiles task), which needs no
+  separate account. See CHANGELOG.md/DECISIONS.md, 2026-07-20.
 - **New (2026-07-17): a Supabase dashboard toggle only Max can flip** —
   Authentication → Providers → Email → "Allow new users to sign up."
   `app/register/route.ts` blocks this app's own `/register` path, but
@@ -590,3 +594,16 @@ whether a component references it). See `DECISIONS.md`, 2026-07-04.
 These aren't "debt" in the sense of a shortcut taken — they're
 external dependencies the implementer has no way to self-serve. Tracked
 here so they stay visible, not because they represent a compromise.
+
+## Post cards don't link the author to their profile (found 2026-07-20)
+
+Now that `/profile/[username]` is a real page, `PostCard`'s author
+name/avatar (rendered on `/feed`, `/library`, `/posts/[id]`, and the
+new profile page's own "Recent Posts") is the one obviously-missing
+inbound link to it — right now it's not clickable at all. Not built in
+the User Profiles task because it touches every `select`ed `author`
+field across eight files
+(`app/(platform)/{feed,library,houses/[slug],posts/[id]}/page.tsx`,
+`app/api/posts/{route,[id]/route,[id]/comments/route}.ts`) to add
+`username`, which was outside that task's four numbered requirements.
+Small, low-risk, and worth doing as its own pass.

@@ -8,7 +8,51 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.15.0` is the current released version.
+Nothing yet — `v0.16.0` is the current released version.
+
+## [0.16.0] — 2026-07-20
+
+User Profiles: a real profile page by username, a dedicated self-edit
+route, and avatar uploads finally on working infrastructure.
+
+### Added
+
+- **`/profile/[username]`** — avatar, display name, `@username`,
+  level/rank, star rating, REP total, location + member-since date,
+  bio, house memberships (pills linking to `/houses/[slug]`), last 5
+  published posts (shared `PostCard`), reviews, and — owner-only — the
+  last 10 REP events. Replaces the old id-based `/profile/[id]`.
+- **`/profile/edit`** — param-less, always the caller's own profile
+  (the API route re-derives the user from the session regardless).
+  Same fields as before (display name, username, bio, city, role,
+  interests) plus the new avatar upload; bio is now capped at 300
+  characters, enforced both client-side (`maxLength` + a live counter)
+  and server-side (422 over the limit).
+- **Avatar upload via Supabase Storage** (`POST /api/profile/avatar`)
+  — same lazy-bucket pattern as post photos (`post-photos`), its own
+  `avatars` bucket, a fixed `userId/avatar.<ext>` path (`upsert: true`,
+  so re-uploading replaces rather than accumulates), a cache-busting
+  `?v=` query param on the stored URL so the browser doesn't keep
+  showing the previous image after a re-upload.
+- **Own-profile link**: the avatar and display name on `/hall` now
+  link to `/profile/[username]`; the existing "Edit profile" link now
+  points at `/profile/edit`.
+
+### Changed
+
+- `PATCH /api/profile` — added server-side bio length validation
+  (422 `"Bio must be 300 characters or fewer."`) to match the new
+  client-side cap.
+
+### Removed
+
+- **UploadThing avatar flow** — `app/api/uploadthing/`,
+  `lib/utils/uploadthing.ts`, the `uploadthing`/`@uploadthing/react`
+  packages, and the empty `UPLOADTHING_SECRET`/`UPLOADTHING_APP_ID` env
+  vars. Never actually verifiable (the credentials were never
+  provisioned — see TECH_DEBT.md) and now fully replaced by the
+  Supabase Storage flow above, which is real and was verified
+  end-to-end against the live project.
 
 ## [0.15.0] — 2026-07-17
 

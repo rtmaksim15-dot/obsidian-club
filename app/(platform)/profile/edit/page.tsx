@@ -2,13 +2,12 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import ProfileEditForm from "@/components/shared/ProfileEditForm";
 
-// Self-edit only — always redirect to /profile/[id]/edit for the CALLER's
-// own id, never someone else's (the API route also re-derives the user
-// from the session, so this is UX, not the actual security boundary).
-export default async function ProfileEditPage({ params }: { params: { id: string } }) {
+// Self-edit only — no [id]/[username] param at all, since this can only
+// ever be the caller's own profile. The API route re-derives the user
+// from the session, which is the actual security boundary.
+export default async function ProfileEditPage() {
   const user = await getCurrentUser();
-  if (!user) redirect(`/login?next=/profile/${params.id}/edit`);
-  if (user.id !== params.id) redirect(`/profile/${user.id}`);
+  if (!user) redirect("/login?next=/profile/edit");
 
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">

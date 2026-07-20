@@ -1,23 +1,59 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { UploadButton } from "@/lib/utils/uploadthing";
 
-/** Inert until UPLOADTHING_SECRET/UPLOADTHING_APP_ID are set — see TECH_DEBT.md. */
 export default function AvatarUploadButton() {
   const router = useRouter();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file next time
+    if (!file) return;
+
+    setUploading(true);
+    setError(null);
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch("/api/profile/avatar", { method: "POST", body: formData });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setError(body?.error ?? "Could not upload avatar.");
+      setUploading(false);
+      return;
+    }
+
+    setUploading(false);
+    router.refresh();
+  }
 
   return (
-    <UploadButton
-      endpoint="avatarUploader"
-      appearance={{
-        button:
-          "btn-secondary !bg-transparent !text-sm !min-w-0 !h-auto !py-2 !px-4 after:!bg-ob-accent",
-        allowedContent: "hidden",
-      }}
-      content={{ button: "Change avatar" }}
-      onClientUploadComplete={() => router.refresh()}
-      onUploadError={(err) => console.error("[avatar upload]", err.message)}
-    />
+    <div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        className="hidden"
+        onChange={handleChange}
+      />
+      <button
+        type="button"
+        className="btn-secondary !bg-transparent !text-sm !min-w-0 !h-auto !py-2 !px-4"
+        disabled={uploading}
+        onClick={() => inputRef.current?.click()}
+      >
+        {uploading ? "Uploading…" : "Change avatar"}
+      </button>
+      {error ? (
+        <p className="text-caption mt-2" style={{ color: "var(--color-error)" }}>
+          {error}
+        </p>
+      ) : null}
+    </div>
   );
 }

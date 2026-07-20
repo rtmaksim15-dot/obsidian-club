@@ -49,7 +49,7 @@ export default async function HallPage() {
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
       <div className="mx-auto max-w-2xl">
-        <div className={`avatar avatar-level-${user.level} h-16 w-16`}>
+        <a href={`/profile/${user.username}`} className={`avatar avatar-level-${user.level} h-16 w-16 block`}>
           {user.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={user.avatarUrl} alt={user.displayName} className="h-full w-full object-cover" />
@@ -58,15 +58,17 @@ export default async function HallPage() {
               {user.displayName.charAt(0).toUpperCase()}
             </div>
           )}
-        </div>
+        </a>
 
         <p className="text-body mt-4 italic">Welcome back,</p>
-        <h1 className="text-h1 mt-1">{user.displayName}</h1>
+        <a href={`/profile/${user.username}`}>
+          <h1 className="text-h1 mt-1">{user.displayName}</h1>
+        </a>
         <p className="font-cinzel uppercase tracking-brand text-ob-gold mt-2 text-sm">
           {LEVEL_NAMES[user.level] ?? `Level ${user.level}`}
         </p>
 
-        <a href={`/profile/${user.id}/edit`} className="btn-ghost mt-4 inline-block">
+        <a href="/profile/edit" className="btn-ghost mt-4 inline-block">
           Edit profile
         </a>
 

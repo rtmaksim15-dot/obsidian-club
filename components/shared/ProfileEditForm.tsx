@@ -125,10 +125,14 @@ export default function ProfileEditForm({ user }: Props) {
             id="bio"
             className="input"
             rows={4}
+            maxLength={300}
             value={bio}
             onChange={(e) => setBio(e.target.value)}
             placeholder="A few words about you"
           />
+          <p className="text-caption mt-1" style={{ color: "var(--color-text-muted)" }}>
+            {bio.length}/300
+          </p>
         </div>
 
         <div>
