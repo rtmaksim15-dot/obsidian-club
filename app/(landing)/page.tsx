@@ -168,17 +168,14 @@ export default function LandingPage() {
           <Reveal>
             <div className="relative">
               <div className="pointer-events-none absolute -inset-[14px] z-[3] border border-ob-border" />
-              <div className="relative aspect-[4/5] w-full overflow-hidden shadow-[0_0_40px_rgba(0,0,0,0.6)]">
-                <div className="absolute inset-0 scale-[1.08] blur-[3px]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="/images/founder-bust.jpg"
-                    alt="Lord Obsidian"
-                    className="h-full w-full object-cover object-center"
-                  />
-                </div>
-                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_120%_at_50%_40%,transparent_42%,rgba(10,9,8,0.78)_100%)] shadow-[inset_0_0_90px_34px_rgba(10,9,8,0.85)]" />
-              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/images/lord-obsidian-hero.png"
+                alt="Lord Obsidian"
+                width={1122}
+                height={1402}
+                className="block aspect-[1122/1402] w-full shadow-[0_0_40px_rgba(0,0,0,0.6)]"
+              />
               <div className="mt-7 text-center">
                 <p className="m-0 font-cormorant text-[clamp(1.3rem,2.4vw,1.75rem)] font-light italic leading-[1.32] text-ob-text">
                   &ldquo;I speak rarely. Only when it matters.&rdquo;
