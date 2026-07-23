@@ -60,6 +60,12 @@ export default function LandingPage() {
               {l.label}
             </a>
           ))}
+          <a
+            href="/login"
+            className="ob-navlink font-inter text-[0.7rem] font-medium tracking-[0.2em] text-ob-muted transition-colors hover:text-ob-text"
+          >
+            Sign In
+          </a>
           <a href="#apply" className="btn-secondary !px-[1.4rem] !py-[0.6rem] !text-[0.72rem]">
             Apply
           </a>
