@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
+import Image from "next/image";
 import LogoMark from "@/components/ui/LogoMark";
-import HeroInviteForm from "@/components/shared/HeroInviteForm";
 import ApplicationForm from "@/components/shared/ApplicationForm";
 import { Reveal, RevealGroup, RevealItem } from "@/components/shared/Reveal";
 import { getCurrentUser } from "@/lib/auth/session";
@@ -81,69 +81,49 @@ export default async function LandingPage() {
       </header>
 
       {/* ============ HERO ============ */}
+      {/* Fullscreen photo hero (redesigned 2026-07-23) — first use of
+          next/image in this file (rest of the codebase uses plain <img>
+          deliberately, see other components); `fill` needs it for a
+          true edge-to-edge background with responsive object-position. */}
       <section
         id="top"
-        className="relative flex min-h-screen items-center overflow-hidden bg-ob-black px-[clamp(20px,6vw,64px)] pb-24 pt-[132px]"
+        className="relative flex min-h-screen items-end justify-center overflow-hidden bg-ob-black px-[clamp(20px,6vw,64px)] pb-[clamp(64px,14vh,140px)] pt-[132px]"
       >
+        <Image
+          src="/images/hero-library.png"
+          alt="Obsidian Club — Private Community"
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover object-[center_40%] sm:object-[center_34%] md:object-[center_30%] lg:object-[center_32%]"
+        />
+
+        {/* Darker top/bottom, lighter center — keeps the photo's own
+            focal point (the OC monogram) legible while giving the
+            headline/CTA enough contrast against the busiest parts of
+            the image. */}
         <div
-          className="animate-ob-drift pointer-events-none absolute left-[34%] top-[44%] h-[min(820px,110vw)] w-[min(820px,110vw)] -translate-x-1/2 -translate-y-1/2 bg-[radial-gradient(circle,rgba(139,26,26,0.24)_0%,rgba(139,26,26,0.07)_34%,transparent_66%)]"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/80 via-black/40 to-black/70"
           aria-hidden="true"
         />
 
-        <div className="relative mx-auto grid w-full max-w-[1200px] grid-cols-1 items-center gap-[clamp(44px,6vw,88px)] md:grid-cols-2">
-          {/* Poster */}
-          <Reveal className="flex justify-center">
-            <div className="relative w-full max-w-[392px]">
-              <div className="pointer-events-none absolute -inset-[13px] border border-ob-border" />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/images/hero-library.png"
-                alt="Obsidian Club — Private Community"
-                width={853}
-                height={1844}
-                className="block aspect-[853/1844] w-full shadow-[0_26px_80px_rgba(0,0,0,0.72)]"
-              />
-            </div>
+        <div className="relative z-10 mx-auto flex max-w-[720px] flex-col items-center text-center lg:max-w-[980px]">
+          <Reveal>
+            <h1 className="m-0 font-cinzel text-[clamp(2.1rem,4.6vw,3.9rem)] font-semibold uppercase leading-[1.12] tracking-[0.05em] text-ob-text">
+              A Private Community
+              <br />
+              For Those Who Lead
+            </h1>
           </Reveal>
 
-          {/* Copy */}
-          <div className="flex flex-col items-start text-left">
-            <Reveal>
-              <p className="m-0 mb-[26px] font-inter text-[0.74rem] font-semibold tracking-[0.42em] text-ob-accent">
-                By Invitation Only
-              </p>
-            </Reveal>
-
-            <Reveal>
-              <h1 className="m-0 font-cinzel text-[clamp(2.1rem,4.6vw,3.9rem)] font-semibold uppercase leading-[1.12] tracking-[0.05em] text-ob-text">
-                A Private Community
-                <br />
-                For Those Who Lead
-              </h1>
-            </Reveal>
-
-            <Reveal>
-              <p className="m-0 mt-[26px] max-w-[480px] font-cormorant text-[clamp(1.12rem,1.8vw,1.42rem)] font-light leading-[1.6] text-ob-muted">
-                Not a network. Not a status symbol. A closed circle of those who
-                understand that power is a responsibility — and carry it in
-                silence.
-              </p>
-            </Reveal>
-
-            <Reveal>
-              <div className="my-[34px] flex items-center gap-5">
-                <span className="font-cinzel text-[0.8rem] tracking-[0.3em] text-ob-gold">POWER</span>
-                <span className="h-[5px] w-[5px] rotate-45 bg-ob-accent" />
-                <span className="font-cinzel text-[0.8rem] tracking-[0.3em] text-ob-gold">DISCIPLINE</span>
-                <span className="h-[5px] w-[5px] rotate-45 bg-ob-accent" />
-                <span className="font-cinzel text-[0.8rem] tracking-[0.3em] text-ob-gold">TRUST</span>
-              </div>
-            </Reveal>
-
-            <Reveal className="w-full max-w-[460px]">
-              <HeroInviteForm />
-            </Reveal>
-          </div>
+          <Reveal>
+            <a
+              href="#apply"
+              className="mt-[38px] inline-block rounded-ob bg-[#C6A75E] px-[2.4rem] py-[0.95rem] font-inter text-[0.78rem] font-semibold uppercase tracking-[0.3em] text-ob-text transition-transform hover:scale-[1.03]"
+            >
+              Request Access
+            </a>
+          </Reveal>
         </div>
       </section>
 
