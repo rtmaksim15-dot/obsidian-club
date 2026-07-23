@@ -1,7 +1,9 @@
+import { redirect } from "next/navigation";
 import LogoMark from "@/components/ui/LogoMark";
 import HeroInviteForm from "@/components/shared/HeroInviteForm";
 import ApplicationForm from "@/components/shared/ApplicationForm";
 import { Reveal, RevealGroup, RevealItem } from "@/components/shared/Reveal";
+import { getCurrentUser } from "@/lib/auth/session";
 
 // Landing Page — recreated pixel-for-pixel from the approved design handoff
 // (design_handoff_obsidian_club_landing/, 2026-07). Copy, spacing and color
@@ -39,7 +41,13 @@ const NAV_LINKS = [
   { href: "#admission", label: "Admission" },
 ];
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  // Already-authenticated visitors land on /feed, not the marketing
+  // page — /feed's own ritual gate (see that page) still routes them to
+  // /ritual first if the Initiation Ritual isn't complete yet.
+  const user = await getCurrentUser();
+  if (user) redirect("/feed");
+
   return (
     <div className="relative overflow-hidden bg-ob-black">
       {/* ============ TOP NAV ============ */}

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import type { PostType } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
+import { getRitualStatus } from "@/lib/auth/ritual";
 import { canCreatePostType } from "@/lib/rating/content-rights";
 import ContentComposer from "@/components/shared/ContentComposer";
 import PostList from "@/components/shared/PostList";
@@ -24,6 +25,15 @@ const FEED_TYPES: PostType[] = ["post", "story"];
 export default async function FeedPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/feed");
+
+  // /feed is now the default post-login landing spot (see /login,
+  // /auth/callback), so it needs the same Initiation Ritual gate /hall
+  // already enforces — otherwise a member who hasn't accepted the Code
+  // of Conduct/read the introduction/posted in Newcomers could land
+  // straight on the real feed and skip the ritual entirely.
+  const profile = await prisma.userProfile.findUnique({ where: { userId: user.id } });
+  const ritual = await getRitualStatus(user, profile);
+  if (!ritual.complete) redirect("/ritual");
 
   const memberships = await prisma.houseMembership.findMany({
     where: { userId: user.id },

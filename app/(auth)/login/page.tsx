@@ -43,14 +43,14 @@ function LoginForm() {
       return;
     }
 
-    router.push(searchParams.get("next") || "/hall");
+    router.push(searchParams.get("next") || "/feed");
     router.refresh();
   }
 
   async function handleOAuthSignIn(provider: "google" | "apple") {
     setError(null);
     const supabase = createClient();
-    const next = searchParams.get("next") || "/hall";
+    const next = searchParams.get("next") || "/feed";
     await supabase.auth.signInWithOAuth({
       provider,
       options: {
