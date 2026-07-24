@@ -5,6 +5,41 @@ import { createAdminClient } from "@/lib/auth/supabase-admin";
 import { generateReferralCode, generateUsernameFromEmail } from "@/lib/utils/codes";
 import { awardRep, REP_TABLE } from "@/lib/rating/rep-engine";
 
+// Supabase's Admin API has intermittently returned a transient
+// "unrecognized JWT kid" / bad_jwt error on individual admin calls in
+// this project (observed directly while building this route: the exact
+// same call, same credentials, succeeds when retried immediately after)
+// — looks like JWKS cache staleness on whichever edge node a given
+// request lands on, not a real auth failure. One immediate retry clears
+// it every time it's been seen; worth having here since these admin
+// calls are the one irreversible step in this route.
+async function withRetry<R extends { error: unknown }>(fn: () => Promise<R>): Promise<R> {
+  const first = await fn();
+  if (!first.error) return first;
+  return fn();
+}
+
+// The SDK's admin API has no getUserByEmail — only paginated listUsers().
+// Used when createUser 409s with "email_exists" (see below): a common,
+// real path here, not an edge case — anyone who tried "Continue with
+// Google" before being approved already has an auth.users row (Supabase
+// creates one on a successful OAuth exchange regardless of whether
+// app/auth/callback/route.ts finds a matching member — see that file),
+// and app member counts are small enough that a full page scan is fine.
+async function findAuthUserByEmail(admin: ReturnType<typeof createAdminClient>, email: string) {
+  for (let page = 1; page <= 20; page++) {
+    const { data, error } = await withRetry(() => admin.auth.admin.listUsers({ page, perPage: 200 }));
+    if (error) {
+      console.error("[invite] listUsers failed while looking up an existing auth identity:", error);
+      return null;
+    }
+    const match = data.users.find((u) => u.email === email);
+    if (match) return match;
+    if (data.users.length < 200) return null;
+  }
+  return null;
+}
+
 type Body = { name?: string; password?: string };
 
 // "safetyRules" needs policy content Max hasn't written yet, so it starts
@@ -53,18 +88,56 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
   }
 
   const supabaseAdmin = createAdminClient();
-  const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
-    email: application.email,
-    password,
-    email_confirm: true,
-  });
+  const { data: created, error: createError } = await withRetry(() =>
+    supabaseAdmin.auth.admin.createUser({
+      email: application.email,
+      password,
+      email_confirm: true,
+    }),
+  );
 
-  if (createError || !created?.user) {
+  let authUserId: string;
+
+  if (createError?.code === "email_exists") {
+    // The invitee already has a Supabase Auth identity — almost always
+    // from an earlier "Continue with Google" attempt made before they
+    // were approved (that always succeeds at the Auth layer even when
+    // app/auth/callback/route.ts rejects them as a non-member and sends
+    // them to /apply). Link the invite to that existing identity
+    // instead of failing: set the password they just chose on it, so
+    // email/password login works going forward alongside whatever OAuth
+    // provider they originally used, then continue exactly as if
+    // createUser had succeeded.
+    const existing = await findAuthUserByEmail(supabaseAdmin, application.email);
+    if (!existing) {
+      console.error("[invite] email_exists but couldn't find the matching auth user:", application.email);
+      return NextResponse.json(
+        { error: "Could not create your account. Try again shortly." },
+        { status: 503 }
+      );
+    }
+    const { data: updated, error: updateError } = await withRetry(() =>
+      supabaseAdmin.auth.admin.updateUserById(existing.id, {
+        password,
+        email_confirm: true,
+      }),
+    );
+    if (updateError || !updated?.user) {
+      console.error("[invite] Failed to set a password on the existing auth user:", updateError);
+      return NextResponse.json(
+        { error: "Could not create your account. Try again shortly." },
+        { status: 503 }
+      );
+    }
+    authUserId = updated.user.id;
+  } else if (createError || !created?.user) {
     console.error("[invite] Failed to create Supabase Auth user:", createError);
     return NextResponse.json(
       { error: "Could not create your account. Try again shortly." },
       { status: 503 }
     );
+  } else {
+    authUserId = created.user.id;
   }
 
   // Referral resolution (PRODUCT.md §6 "Trust Chain"): if the applicant
@@ -74,13 +147,14 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
     ? await prisma.user.findUnique({ where: { referralCode: application.referralCode } })
     : null;
 
-  // Supabase Auth user was created successfully at this point. If the
-  // Prisma writes below fail, we're left with an orphaned auth.users row
-  // and no matching public.users row — same reconciliation gap the old
-  // approve-time flow had; logged loudly. See TECH_DEBT.md.
+  // The Supabase Auth identity (new or existing) is settled at this
+  // point. If the Prisma writes below fail, we're left with an
+  // auth.users row and no matching public.users row — same
+  // reconciliation gap the old approve-time flow had; logged loudly.
+  // See TECH_DEBT.md.
   let newUserId: string;
   try {
-    newUserId = created.user.id;
+    newUserId = authUserId;
 
     const [user] = await prisma.$transaction([
       prisma.user.create({
@@ -147,7 +221,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
     }
   } catch (err) {
     console.error(
-      `[invite] Created ${application.email} in Supabase Auth (user id ${created.user.id}) but failed to write the matching rows — needs manual reconciliation:`,
+      `[invite] Settled ${application.email} in Supabase Auth (user id ${authUserId}) but failed to write the matching rows — needs manual reconciliation:`,
       err
     );
     return NextResponse.json(
