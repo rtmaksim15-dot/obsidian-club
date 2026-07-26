@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireAdmin } from "@/lib/auth/require-admin";
+import { track } from "@/lib/analytics/track";
 
 type Body = { action?: "approve" | "decline" };
 
@@ -53,6 +54,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       where: { id: application.id },
       data: { status: "declined", reviewedAt: new Date(), reviewedBy: admin.id },
     });
+    // SPEC-analytics-panel.md §2.2 lists `meta: { reason }` for this
+    // type, but this flow deliberately never captures a decline reason
+    // (PRODUCT.md §1: declines carry no explanation) — nothing real to
+    // put there, so it's omitted rather than faked.
+    await track({ userId: null, type: "waitlist.rejected", entity: "invite", entityId: application.id });
     return NextResponse.json({ ok: true, status: "declined" });
   }
 
@@ -67,6 +73,15 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       reviewedBy: admin.id,
       inviteToken,
     },
+  });
+
+  const waitDays = Math.floor((Date.now() - application.createdAt.getTime()) / 86_400_000);
+  await track({
+    userId: null,
+    type: "waitlist.approved",
+    entity: "invite",
+    entityId: application.id,
+    meta: { reviewedBy: admin.id, waitDays },
   });
 
   const { origin } = new URL(request.url);

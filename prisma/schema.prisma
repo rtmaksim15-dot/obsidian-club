@@ -165,6 +165,7 @@ model User {
   likes             Like[]
   comments          Comment[]
   houseMemberships  HouseMembership[]
+  analyticsEvents   AnalyticsEvent[]
 
   @@map("users")
 }
@@ -548,4 +549,36 @@ model Waitlist {
   createdAt         DateTime       @default(now()) @map("created_at")
 
   @@map("waitlist")
+}
+
+// ============================================================
+// ANALYTICS
+// ============================================================
+
+// Server-written event log (SPEC-analytics-panel.md Phase 0). Named
+// AnalyticsEvent and mapped to `analytics_events`, not `Event`/`events`
+// as the spec literally has it — both names are already taken by the
+// real-world Event model above (offline meetups), which predates this
+// spec. Deliberately NOT using this schema's usual snake_case @map on
+// every field: supabase/migrations/*_analytics_events_rls.sql (SPEC
+// §2.4) references these columns by their camelCase Prisma names
+// directly, so mapping them would silently break the RLS policies.
+// `userId` carries `@db.Uuid` (the spec's literal model has none) so
+// its foreign key type-matches `User.id`; the RLS policy casts the
+// other direction (`auth.uid() = "userId"`, no `::text`) to match.
+model AnalyticsEvent {
+  id        String   @id @default(cuid())
+  userId    String?  @db.Uuid
+  type      String // namespaced "domain.action", see SPEC §2.2 — do not invent new types outside that taxonomy
+  entity    String? // "vault_item" | "post" | "house" | "invite"
+  entityId  String?
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([type, createdAt])
+  @@index([entity, entityId])
+  @@map("analytics_events")
 }

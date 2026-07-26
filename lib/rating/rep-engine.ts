@@ -64,6 +64,13 @@ export const REP_TABLE = {
  * ledger IS the score (`User.rep` is just a cached running total, kept
  * in sync here). Call this at the moment an earn/lose event in
  * `REP_TABLE` actually happens; don't call it speculatively.
+ *
+ * The `rep.granted` analytics event (SPEC-analytics-panel.md §2.2) is
+ * written as a third statement in the same `$transaction` array, not
+ * via `lib/analytics/track.ts` — the spec requires it be in the same
+ * transaction as the grant itself, and every REP award in this codebase
+ * funnels through this one function, so this is the single place that
+ * guarantee needs to be made.
  */
 export async function awardRep(userId: string, points: number, reason: string, source: string) {
   if (points === 0) return;
@@ -71,6 +78,9 @@ export async function awardRep(userId: string, points: number, reason: string, s
   await prisma.$transaction([
     prisma.user.update({ where: { id: userId }, data: { rep: { increment: points } } }),
     prisma.repHistory.create({ data: { userId, delta: points, reason, source } }),
+    prisma.analyticsEvent.create({
+      data: { userId, type: "rep.granted", meta: { amount: points, reason, sourceEvent: source } },
+    }),
   ]);
 }
 

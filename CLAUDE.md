@@ -104,6 +104,7 @@
 - Feed & Posts MVP — фото к постам (Supabase Storage), реальные комментарии, `/posts/[id]`, лента ограничена глобальными постами + домами, в которых состоишь
 - Closed Registration & Invite System — approve теперь только генерирует одноразовую invite-ссылку; аккаунт (и пароль) создаётся только при регистрации по `/invite/[token]`; `/register` заблокирован (403). Осталось вручную: выключить в Supabase Dashboard "Allow new users to sign up" — см. TECH_DEBT.md
 - User Profiles — `/profile/[username]` (аватар, REP, level, дома, последние 5 постов, REP-история — только владельцу), `/profile/edit` (self-only, bio до 300 символов). Загрузка аватара переехала с UploadThing (никогда не был настроен) на Supabase Storage — тот же паттерн, что и фото постов
+- Analytics Phase 0 (SPEC-analytics-panel.md) — событийный слой: `AnalyticsEvent`/`analytics_events` (не `Event`/`events` — уже заняты), `lib/analytics/track.ts` (server-only), RLS (свои события — участнику, все — админу), `track()` подключён в 11 точках. UI (консоль `/admin/insight`, зеркало в `/profile`) — отдельные, ещё не начатые задачи (Phase 1/2)
 
 ### 🔄 СЛЕДУЮЩИЙ ПРИОРИТЕТ
 1. **Apple OAuth (реальные креды)** — Apple Developer аккаунт, Services ID, ключ → настроить в Supabase Dashboard → включить флаг

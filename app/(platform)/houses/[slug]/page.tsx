@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db/prisma";
 import { canAccessRoom } from "@/lib/rating/room-access";
 import PostList from "@/components/shared/PostList";
 import JoinHouseButton from "@/components/shared/JoinHouseButton";
+import { track } from "@/lib/analytics/track";
 
 /**
  * House detail (`/houses/[slug]`) — the house's own room (community) and
@@ -24,6 +25,8 @@ export default async function HouseDetailPage({ params }: { params: { slug: stri
 
   const house = await prisma.house.findUnique({ where: { slug: params.slug } });
   if (!house || house.status !== "active") notFound();
+
+  await track({ userId: user.id, type: "house.viewed", entity: "house", entityId: house.id });
 
   const [room, posts, membership, memberCount] = await Promise.all([
     prisma.room.findFirst({ where: { houseId: house.id } }),

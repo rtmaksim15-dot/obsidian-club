@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { sendWaitlistConfirmation } from "@/lib/utils/email";
+import { track } from "@/lib/analytics/track";
 
 // Waitlist intake (Landing Page, Section 5).
 
@@ -47,6 +48,9 @@ export async function POST(request: Request) {
     await prisma.waitlist.create({
       data: { email, name, age, city, source, reason, referralCode },
     });
+    // Only on a genuine new application — not the duplicate/idempotent
+    // path below, which isn't a real new submission.
+    await track({ userId: null, type: "waitlist.submitted", meta: { source } });
   } catch (err) {
     // Duplicate application: treat as success (idempotent, no email
     // enumeration) rather than telling the caller the email already exists.

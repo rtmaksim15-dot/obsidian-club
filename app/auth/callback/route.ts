@@ -1,6 +1,7 @@
 import { createServerClient, type CookieOptionsWithName } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { track } from "@/lib/analytics/track";
 
 // GET /auth/callback — Supabase OAuth (PKCE) redirect target. Google
 // Sign-In (and any future OAuth provider) redirects here with a `code`
@@ -74,6 +75,11 @@ export async function GET(request: NextRequest) {
       // see DECISIONS.md.
       const member = await prisma.user.findUnique({ where: { id: authUser.id } });
       if (member) {
+        await track({
+          userId: member.id,
+          type: "auth.login",
+          meta: { provider: authUser.app_metadata?.provider ?? "unknown" },
+        });
         return redirectWithCookies(next, cookiesToSet);
       }
 

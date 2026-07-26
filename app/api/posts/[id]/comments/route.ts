@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
+import { track } from "@/lib/analytics/track";
 
 const commentSelect = {
   id: true,
@@ -65,6 +66,14 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const comment = await prisma.comment.create({
     data: { postId: post.id, authorId: user.id, content },
     select: commentSelect,
+  });
+
+  await track({
+    userId: user.id,
+    type: "post.replied",
+    entity: "post",
+    entityId: post.id,
+    meta: { parentId: post.id },
   });
 
   return NextResponse.json({ comment }, { status: 201 });

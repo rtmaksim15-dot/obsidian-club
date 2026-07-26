@@ -607,3 +607,40 @@ field across eight files
 `app/api/posts/{route,[id]/route,[id]/comments/route}.ts`) to add
 `username`, which was outside that task's four numbered requirements.
 Small, low-risk, and worth doing as its own pass.
+
+## Analytics: two SPEC-analytics-panel.md §2.5 event types have nowhere to attach (2026-07-26)
+
+`vault.item_claimed` and `search.performed` are both real entries in
+the spec's taxonomy (§2.2) and both explicitly listed as insertion
+points (§2.5), but neither has any code to instrument yet:
+
+- **No Vault claim/redemption backend exists.** The `/vault` page's
+  "Claim" button is `disabled` unconditionally
+  (`title="Redemption isn't set up yet"`) — a pre-existing, already
+  -documented gap (see `v0.13`'s BACKLOG entry). `vault.item_claimed`
+  can be wired the moment that endpoint gets built; until then there's
+  no "claim succeeded" moment to track.
+- **No search feature exists anywhere in the app.** No search input,
+  no search API route, nothing beyond Next.js's own `searchParams`
+  plumbing (unrelated route query params, not a search feature). Same
+  situation: `search.performed` is ready to wire the day a search
+  feature exists, not before.
+
+Also worth a look before Phase 1's operator console leans on this data:
+`waitlist.rejected` events carry no `reason` in `meta`, even though the
+spec's taxonomy names one — this app's decline flow has never captured
+a reason at all (`PRODUCT.md` §1: declines carry no explanation by
+design), so there's nothing real to put there. Not a bug, just a gap
+between what the taxonomy's meta shape implies and what this product
+actually records.
+
+## Analytics: `post.reacted` / `rank.changed` / `profile.viewed` are real taxonomy entries, not yet wired (2026-07-26)
+
+Unlike the two above, these three have real, already-found insertion
+points (`app/api/posts/[id]/like/route.ts`'s new-like branch,
+`lib/rating/level-progression.ts`'s `promote()`, and any page that
+renders another member's profile) — they just weren't in
+`SPEC-analytics-panel.md` §2.5's explicit "точки внедрения" list, which
+Phase 0's task scoped tracking to. Straightforward to add in a follow
+-up pass; deliberately left out rather than wiring beyond what was
+asked.

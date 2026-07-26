@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { Lock, Gem } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
+import { track } from "@/lib/analytics/track";
 
 /**
  * The Vault (`/vault`) — real access mechanic, replacing the
@@ -28,6 +29,33 @@ export default async function VaultPage() {
     where: { isActive: true },
     orderBy: { minRep: "asc" },
   });
+
+  // SPEC-analytics-panel.md §2.5: "просмотр карточки" / "попытка при
+  // нехватке REP" map onto rendering each card here, not a click — the
+  // Claim button is disabled site-wide (no redemption backend exists
+  // yet, see the TODO below), so there's no click to hook into. Every
+  // card shown counts as `vault.item_viewed`; a card the viewer can't
+  // afford also counts as `vault.item_locked_hit`.
+  await Promise.all(
+    items.flatMap((item) => {
+      const locked = user.rep < item.minRep;
+      const calls = [
+        track({ userId: user.id, type: "vault.item_viewed", entity: "vault_item", entityId: item.id }),
+      ];
+      if (locked) {
+        calls.push(
+          track({
+            userId: user.id,
+            type: "vault.item_locked_hit",
+            entity: "vault_item",
+            entityId: item.id,
+            meta: { repShort: item.minRep - user.rep },
+          }),
+        );
+      }
+      return calls;
+    }),
+  );
 
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">

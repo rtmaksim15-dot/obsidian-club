@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { createAdminClient } from "@/lib/auth/supabase-admin";
 import { generateReferralCode, generateUsernameFromEmail } from "@/lib/utils/codes";
 import { awardRep, REP_TABLE } from "@/lib/rating/rep-engine";
+import { track } from "@/lib/analytics/track";
 
 // Supabase's Admin API has intermittently returned a transient
 // "unrecognized JWT kid" / bad_jwt error on individual admin calls in
@@ -97,6 +98,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
   );
 
   let authUserId: string;
+  let linkedExistingIdentity = false;
 
   if (createError?.code === "email_exists") {
     // The invitee already has a Supabase Auth identity — almost always
@@ -130,6 +132,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
       );
     }
     authUserId = updated.user.id;
+    linkedExistingIdentity = true;
   } else if (createError || !created?.user) {
     console.error("[invite] Failed to create Supabase Auth user:", createError);
     return NextResponse.json(
@@ -205,6 +208,12 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
           ]
         : []),
     ]);
+
+    await track({
+      userId: user.id,
+      type: "auth.signup",
+      meta: { provider: linkedExistingIdentity ? "invite-linked-existing" : "invite" },
+    });
 
     // CLAUDE.md (2026-07-05) REP bonuses — side effects, not the main
     // job, never allowed to fail the request.

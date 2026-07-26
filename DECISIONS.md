@@ -1181,3 +1181,87 @@ Reverted every change this testing made to the real admin account
 (`avatarUrl`/`bio` back to `null`) and deleted the throwaway profile
 row; REP itself was never touched, confirmed unchanged at 220
 before/after.
+
+### 2026-07-26 — Analytics Phase 0: two real naming/type collisions the spec didn't anticipate, and a hard scope line at "listed in 2.5"
+
+`SPEC-analytics-panel.md` names the new model `Event`, mapped to table
+`events`, with a plain `userId String?` field and an admin RLS check on
+`users.role = 'ADMIN'`. None of the three survive contact with the real
+schema:
+
+**Both the model name and the table name were already taken.** This
+codebase already has a real `model Event` (`@@map("events")`) for
+offline meetups (title, location, price, dress code — Events feature,
+`v0.7` backlog). Adding a second model called `Event` doesn't just
+warn, it's a straight `prisma validate` failure, and mapping it to the
+same `events` table would have silently corrupted an unrelated,
+already-populated-in-production table if validation somehow let it
+through. Named the new model `AnalyticsEvent`, table `analytics_events`
+— unambiguous, no collision, and the RLS SQL was adjusted to match
+before ever being applied.
+
+**`users.role` is not a permission level in this schema.** It's
+`MemberRole` (dominant/submissive/switch/observer/newcomer) — the
+onboarding kink-orientation field from ADR-0015, unrelated to admin
+status. The actual admin flag is `User.isAdmin` → Postgres column
+`is_admin`, a boolean. Applying the spec's literal RLS SQL wouldn't
+have errored outright (the `role` column exists, just holds the wrong
+kind of value) — it would have silently produced an admin-read policy
+that matches *nobody*, since no `MemberRole` value is ever `'ADMIN'`.
+That's a worse failure than a crash: it looks like it works (RLS is on,
+policies exist) but the intended admin override never actually fires.
+Caught by reading the real schema before writing the SQL, not by
+testing after the fact.
+
+**`userId`'s type had to change for the foreign key to be valid.**
+`User.id` is `@db.Uuid`. The spec's literal `userId String?` (no native
+type) would create a `text`/`varchar` column — Postgres does allow a
+foreign key from a non-uuid column, so this would actually push
+successfully, but every real `userId` written would need to be a UUID
+string being implicitly compared against a `uuid` column in queries and
+the RLS policy, which is exactly reversed from the actual type
+mismatch: the *safe* fix is `userId String? @db.Uuid` so the column is
+a real `uuid`, matching `User.id` exactly. That in turn means the
+spec's own-row RLS policy (`auth.uid()::text = "userId"`) is now
+casting the wrong direction — comparing `text` to `uuid` has no
+operator in Postgres and would 500 on every read. Flipped it to
+`auth.uid() = "userId"` (both `uuid`, no cast) — verified this exact
+policy live (see below), not just reasoned through.
+
+**Scope: only wired what §2.5 explicitly lists, not the full §2.2
+taxonomy.** `post.reacted` (likes), `rank.changed` (level
+promotion/demotion), and `profile.viewed` are real taxonomy entries
+with real, findable insertion points in this codebase (`app/api/posts/
+[id]/like/route.ts`, `lib/rating/level-progression.ts`) — but §2.5's
+"точки внедрения" list doesn't name them, and the task's own acceptance
+bar ("`track()` вызывается минимум в 10 точках **из 2.5**") is explicit
+about the boundary. Wiring them anyway would have been inventing scope
+beyond what was asked, not thoroughness — left alone, flagged as
+available for a later pass if the spec's own list expands to cover
+them.
+
+**Two of §2.5's listed points have no code to attach to at all**,
+confirmed by grep, not assumption: `vault.item_claimed` (the Claim
+button is `disabled` everywhere — `title="Redemption isn't set up
+yet"` — no `/api/.../claim` route exists in `app/api/`) and
+`search.performed` (no search feature — no search input component, no
+search API route, anywhere in `app/` or `components/`). Reported both
+as "not found," not silently skipped or faked with a placeholder route
+that isn't real product functionality.
+
+**Verified end-to-end with real Supabase accounts, not just
+inspection.** Created two disposable, real Auth + `public.users`
+identities, seeded one event each as the service role (which correctly
+bypasses RLS), then read `analytics_events` back through the
+**anon-key** client signed in as each — Prisma's own connection always
+uses the service role and can't exercise RLS at all, so this was the
+only way to actually prove the policy. User A's unfiltered `select *`
+returned exactly their own row; an explicit query for User B's `userId`
+from A's session returned zero rows, not an error — confirming Postgres
+RLS's actual behavior (silently filters, doesn't reject) matches the
+intent. Also proved the `server-only` guarantee isn't just a comment:
+built a throwaway Client Component importing `track()`, confirmed
+`next build` fails with `You're importing a component that needs
+server-only`, then deleted it — the real build is clean. All test
+accounts, events, and the throwaway component/route were deleted
+afterward; nothing from this verification pass persists.

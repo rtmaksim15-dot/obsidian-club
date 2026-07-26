@@ -1,6 +1,6 @@
 {
   "name": "obsidian-club",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -26,7 +26,8 @@
     "prisma": "^6.19.3",
     "react": "^18",
     "react-dom": "^18",
-    "resend": "^6.16.0"
+    "resend": "^6.16.0",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@types/node": "^20",

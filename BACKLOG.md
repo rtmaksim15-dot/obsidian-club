@@ -354,6 +354,31 @@ renumbered up by one again (old `v0.8` Events & Marketplace → `v0.9`, ...).
 - Not built: linking post-card authors to their profiles (found during
   this task, small and separable — see `TECH_DEBT.md`).
 
+### v0.17 — Analytics Phase 0: event layer ✅ (built 2026-07-26)
+
+Per `SPEC-analytics-panel.md`. No UI in this phase — Phase 1 (operator
+console, `/admin/insight`) and Phase 2 (member-facing profile modules)
+build on top of this and are separate, not-yet-started tasks.
+
+- [x] `AnalyticsEvent` model (table `analytics_events`) — renamed from
+      the spec's literal `Event`/`events`, both already taken by the
+      existing real-world-meetup model.
+- [x] `lib/analytics/track.ts` — server-only (confirmed by an actual
+      failed build attempt, not just inspection).
+- [x] RLS on `analytics_events` — own-row read for members, full read
+      for admins (`is_admin`, not the spec's literal `role = 'ADMIN'`,
+      which doesn't exist as a permission level in this schema).
+      Verified live with two disposable real accounts through the
+      anon-key client.
+- [x] `track()` wired into 11 real call sites — see CHANGELOG.md for
+      the full list.
+- Not built (no code to attach to yet): `vault.item_claimed` (no
+  redemption backend), `search.performed` (no search feature exists).
+  See `TECH_DEBT.md`.
+- Not wired (real insertion points exist, but weren't in the spec's
+  §2.5 list, which this task's scope was explicitly bounded to):
+  `post.reacted`, `rank.changed`, `profile.viewed`. See `TECH_DEBT.md`.
+
 ## Later
 
 *Intentionally postponed — approved direction, not yet scheduled in

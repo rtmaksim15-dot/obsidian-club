@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { canCreatePostType } from "@/lib/rating/content-rights";
 import { grantAchievement } from "@/lib/utils/achievements";
 import { awardRep, awardRepWithDailyCap, REP_TABLE } from "@/lib/rating/rep-engine";
+import { track } from "@/lib/analytics/track";
 
 const PAGE_SIZE = 20;
 const VALID_TYPES: PostType[] = ["post", "story", "article", "lecture", "manifesto", "course"];
@@ -154,6 +155,8 @@ export async function POST(request: Request) {
       },
       select: postSelect(user.id),
     });
+
+    await track({ userId: user.id, type: "post.created", entity: "post", entityId: post.id });
 
     const publishedCount = await prisma.post.count({ where: { authorId: user.id, isPublished: true } });
     if (publishedCount === 1) {

@@ -8,9 +8,59 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.16.0` is the current released version.
+Nothing yet — `v0.17.0` is the current released version.
 
-## [0.16.0] — 2026-07-20
+## [0.17.0] — 2026-07-26
+
+Analytics Phase 0 (SPEC-analytics-panel.md): a server-only event log,
+underneath everything — no UI yet (Phases 1/2 build on top of this).
+
+### Added
+
+- **`AnalyticsEvent` model** (`analytics_events` table) — server-written
+  event log: `userId` (nullable, `SetNull` on user deletion so deleting
+  a member never breaks aggregates), namespaced `type` ("domain.action",
+  see the spec's taxonomy), optional `entity`/`entityId`/`meta`. Named
+  `AnalyticsEvent`, not `Event` as the spec literally has it — both that
+  name and the `events` table name were already taken by the existing
+  real-world-meetup `Event` model.
+- **`lib/analytics/track.ts`** — the only way events get written.
+  `import "server-only"` at the top; confirmed by an actual build
+  attempt that importing it from a Client Component fails compilation,
+  not just by inspection.
+- **RLS on `analytics_events`** (`supabase/migrations/20260726120000_analytics_events_rls.sql`)
+  — a member reads only their own rows, admins read everything. Verified
+  live with two disposable real accounts through Supabase's anon-key
+  client (Prisma's own service-role connection can't test RLS — it
+  bypasses it by design): User A's unfiltered read returned only their
+  own event, and an explicit query for User B's `userId` returned zero
+  rows.
+- **`track()` wired into 11 real call sites**: `auth.login` (OAuth
+  callback), `auth.signup` (invite redemption, both the fresh-account
+  and linked-existing-identity paths), `waitlist.submitted`,
+  `waitlist.approved`/`waitlist.rejected` (admin review),
+  `house.viewed`, `post.created`, `post.replied` (comments),
+  `vault.item_viewed`/`vault.item_locked_hit`, and `rep.granted` — the
+  last one written directly inside `awardRep`'s existing
+  `$transaction`, not via `track()`, since the spec requires it be in
+  the same transaction as the REP grant itself, and every REP award in
+  the codebase already funnels through that one function.
+- **Not wired — no code to attach to**: `vault.item_claimed` (the Claim
+  button is disabled everywhere; no redemption endpoint exists yet) and
+  `search.performed` (no search feature exists anywhere in the app).
+  See DECISIONS.md and TECH_DEBT.md.
+
+### Fixed / adapted from the spec
+
+- RLS policy corrected from the spec's literal `users.role = 'ADMIN'`
+  (this app's `role` column is kink orientation —
+  dominant/submissive/switch/... — not a permission level) to
+  `users.is_admin = true`, the actual boolean admin flag.
+- `AnalyticsEvent.userId` uses `@db.Uuid` (the spec's literal model
+  didn't) so its foreign key type-matches `User.id`; the RLS policy
+  compares directly against `auth.uid()` with no cast as a result,
+  instead of the spec's `::text` cast, which would have been a type
+  error the other way (`uuid = text` has no operator).
 
 User Profiles: a real profile page by username, a dedicated self-edit
 route, and avatar uploads finally on working infrastructure.
