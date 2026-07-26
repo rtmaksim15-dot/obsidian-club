@@ -63,6 +63,11 @@ export default function ProfileEditForm({ user }: Props) {
 
     setSaved(true);
     setSubmitting(false);
+    // Same pattern as AcceptCodeButton (Code of Conduct step) — /ritual
+    // re-checks status and either shows the next step or, once every
+    // step is done, redirects straight to /hall. Without this the user
+    // was stranded on the edit page after saving.
+    router.push("/ritual");
     router.refresh();
   }
 

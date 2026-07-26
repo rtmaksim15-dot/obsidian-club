@@ -46,27 +46,19 @@ export default function IntroductionContent({ alreadyCompleted }: { alreadyCompl
   return (
     <div>
       <div className="text-body space-y-6 !text-lg italic">
-        <p>You were not chosen by accident.</p>
-        <p>Every name in this Hall was weighed. Yours held.</p>
+        <p>You were not invited by chance. Every application is read. Yours held weight.</p>
         <p>
-          I built this place for those who carry power the way it should be
-          carried — quietly, deliberately, without apology and without noise.
-          Out there, strength is performed. Here, it is practiced.
+          Obsidian Club exists for those who value trust, discipline, and
+          connections that mean something. There is nothing to perform here.
+          No followers to count. No algorithm to feed. Your standing in the
+          Circle is built the old way — by how you treat people, what you
+          contribute, and the word you keep.
         </p>
         <p>
-          Three things I ask of you. Read the Code — it is short, because
-          real laws are. Complete your profile — the Circle deserves to know
-          who stands beside them. And listen more than you speak, at first.
-          The ones worth knowing always do.
+          The rite before you is short. Complete it with care — it is the
+          first thing the Circle will know of you.
         </p>
-        <p>
-          This is not a network. You will not be sold to, recruited, or
-          collected. What you build here — reputation, trust, standing —
-          cannot be bought and cannot be transferred. That is precisely what
-          makes it worth having.
-        </p>
-        <p>The doors are closed behind you.</p>
-        <p>Welcome to the Circle.</p>
+        <p>Enter well.</p>
       </div>
 
       <div ref={sentinelRef} className="mt-10 flex items-center justify-end gap-4">
