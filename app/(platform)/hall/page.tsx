@@ -6,6 +6,7 @@ import { getLevelProgress } from "@/lib/rating/level-progress";
 import { syncReferralLifecycle } from "@/lib/rating/referral-lifecycle";
 import { checkLevelUp } from "@/lib/rating/level-progression";
 import { LEVEL_NAMES } from "@/lib/rating/levels";
+import { REP_UI_ENABLED } from "@/lib/config/feature-flags";
 
 /**
  * The Hall (`/hall`) — status card, progress-to-next-level, referral
@@ -35,11 +36,13 @@ export default async function HallPage() {
       take: 5,
     }),
     prisma.referral.count({ where: { inviterId: user.id, status: { in: ["joined", "active"] } } }),
-    prisma.repHistory.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: "desc" },
-      take: 5,
-    }),
+    REP_UI_ENABLED
+      ? prisma.repHistory.findMany({
+          where: { userId: user.id },
+          orderBy: { createdAt: "desc" },
+          take: 5,
+        })
+      : Promise.resolve([]),
     prisma.post.count({ where: { authorId: user.id, isPublished: true } }),
   ]);
 
@@ -73,15 +76,17 @@ export default async function HallPage() {
         </a>
 
         {/* Status */}
-        <div className="card-profile mt-10 grid grid-cols-3 gap-6">
+        <div className={`card-profile mt-10 grid gap-6 ${REP_UI_ENABLED ? "grid-cols-3" : "grid-cols-2"}`}>
           <div>
             <p className="text-label">Reputation</p>
             <p className="text-data mt-1">{Number(user.reputation).toFixed(1)} ★</p>
           </div>
-          <div>
-            <p className="text-label">REP</p>
-            <p className="text-data mt-1">{user.rep}</p>
-          </div>
+          {REP_UI_ENABLED ? (
+            <div>
+              <p className="text-label">REP</p>
+              <p className="text-data mt-1">{user.rep}</p>
+            </div>
+          ) : null}
           <div>
             <p className="text-label">Trust Score</p>
             <p className="text-data mt-1">{user.trustScore}</p>
@@ -165,25 +170,27 @@ export default async function HallPage() {
         </section>
 
         {/* REP history */}
-        <section className="mt-10">
-          <p className="text-label mb-3">Recent REP Changes</p>
-          {repHistory.length === 0 ? (
-            <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
-              No changes yet.
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {repHistory.map((h) => (
-                <li key={h.id} className="text-caption flex items-center justify-between">
-                  <span style={{ color: "var(--color-text-secondary)" }}>{h.reason}</span>
-                  <span style={{ color: h.delta >= 0 ? "var(--color-success)" : "var(--color-error)" }}>
-                    {h.delta >= 0 ? `+${h.delta}` : h.delta}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        {REP_UI_ENABLED ? (
+          <section className="mt-10">
+            <p className="text-label mb-3">Recent REP Changes</p>
+            {repHistory.length === 0 ? (
+              <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
+                No changes yet.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {repHistory.map((h) => (
+                  <li key={h.id} className="text-caption flex items-center justify-between">
+                    <span style={{ color: "var(--color-text-secondary)" }}>{h.reason}</span>
+                    <span style={{ color: h.delta >= 0 ? "var(--color-success)" : "var(--color-error)" }}>
+                      {h.delta >= 0 ? `+${h.delta}` : h.delta}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        ) : null}
       </div>
     </main>
   );

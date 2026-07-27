@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import ReviewForm from "@/components/shared/ReviewForm";
 import PostCard, { type FeedPost } from "@/components/shared/PostCard";
 import { LEVEL_NAMES } from "@/lib/rating/levels";
+import { REP_UI_ENABLED } from "@/lib/config/feature-flags";
 
 /**
  * Member profile — looked up by `username` (User Profiles task,
@@ -31,7 +32,7 @@ export default async function ProfilePage({ params }: { params: { username: stri
     // is public, above) — shown only to the profile's owner, same
     // reasoning as the review form only showing for other people's
     // profiles, just inverted.
-    isOwnProfile
+    isOwnProfile && REP_UI_ENABLED
       ? prisma.repHistory.findMany({
           where: { userId: user.id },
           orderBy: { createdAt: "desc" },
@@ -98,9 +99,11 @@ export default async function ProfilePage({ params }: { params: { username: stri
               </span>
             ))}
           </p>
-          <p className="text-data" style={{ color: "var(--color-text-secondary)" }}>
-            {user.rep} REP
-          </p>
+          {REP_UI_ENABLED ? (
+            <p className="text-data" style={{ color: "var(--color-text-secondary)" }}>
+              {user.rep} REP
+            </p>
+          ) : null}
         </div>
 
         <p className="text-caption mt-4" style={{ color: "var(--color-text-secondary)" }}>
@@ -142,7 +145,7 @@ export default async function ProfilePage({ params }: { params: { username: stri
           </section>
         ) : null}
 
-        {isOwnProfile ? (
+        {isOwnProfile && REP_UI_ENABLED ? (
           <section className="mt-10">
             <p className="text-label mb-3">REP History</p>
             {repHistory.length === 0 ? (

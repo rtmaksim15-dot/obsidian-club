@@ -105,6 +105,7 @@
 - Closed Registration & Invite System — approve теперь только генерирует одноразовую invite-ссылку; аккаунт (и пароль) создаётся только при регистрации по `/invite/[token]`; `/register` заблокирован (403). Осталось вручную: выключить в Supabase Dashboard "Allow new users to sign up" — см. TECH_DEBT.md
 - User Profiles — `/profile/[username]` (аватар, REP, level, дома, последние 5 постов, REP-история — только владельцу), `/profile/edit` (self-only, bio до 300 символов). Загрузка аватара переехала с UploadThing (никогда не был настроен) на Supabase Storage — тот же паттерн, что и фото постов
 - Analytics Phase 0 (SPEC-analytics-panel.md) — событийный слой: `AnalyticsEvent`/`analytics_events` (не `Event`/`events` — уже заняты), `lib/analytics/track.ts` (server-only), RLS (свои события — участнику, все — админу), `track()` подключён в 11 точках. UI (консоль `/admin/insight`, зеркало в `/profile`) — отдельные, ещё не начатые задачи (Phase 1/2)
+- **v1 — feed-first** (OBSIDIAN_ROADMAP_v3.0_The_Feed_First.md, файла пока нет в репо — см. TECH_DEBT.md): REP-интерфейс отложен за флагом `lib/config/feature-flags.ts#REP_UI_ENABLED` (сейчас `false`) — REP-бейджи, разблокировки `/vault`, REP-история на `/hall`/`/profile`, `/admin/rep` (404 для всех, включая админов). Логика начисления REP не тронута, копится молча
 
 ### 🔄 СЛЕДУЮЩИЙ ПРИОРИТЕТ
 1. **Apple OAuth (реальные креды)** — Apple Developer аккаунт, Services ID, ключ → настроить в Supabase Dashboard → включить флаг

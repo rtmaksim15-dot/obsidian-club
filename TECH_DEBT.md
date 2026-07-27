@@ -644,3 +644,28 @@ renders another member's profile) — they just weren't in
 Phase 0's task scoped tracking to. Straightforward to add in a follow
 -up pass; deliberately left out rather than wiring beyond what was
 asked.
+
+## `POST /api/admin/rep-adjustment` isn't locked to `REP_UI_ENABLED` (found 2026-07-27)
+
+The feed-first v1 pivot 404s `/admin/rep` (the page) whenever
+`REP_UI_ENABLED` is `false`, so the form is unreachable through normal
+navigation. The API route it posts to wasn't additionally gated — an
+authenticated admin who already knows the endpoint (or replays an old
+request) can still call it directly and it'll still work, exactly as
+before. Not a public hole (`requireAdmin()` still applies, same as
+every other admin route), just an inconsistency between "the UI is
+gone" and "the capability is gone." Worth adding the same `if
+(!REP_UI_ENABLED) return NextResponse.json(..., { status: 404 })` guard
+to the route itself if REP adjustment needs to be fully unreachable,
+not just undiscoverable, while deferred.
+
+## `OBSIDIAN_ROADMAP_v3.0_The_Feed_First.md` was referenced but never actually added (2026-07-27)
+
+Max's "hide REP UI" task assumed this file was already in the repo
+root; it wasn't, checked twice. The four numbered instructions in his
+message were explicit and self-contained enough to implement without
+it, so the work went ahead — but the actual roadmap document (whatever
+broader v1 scope/sequencing it defines beyond the REP-deferral
+paragraph already relayed in chat) still isn't part of this repo's
+history. Worth adding for real once available — future tasks referring
+back to "the roadmap" won't have anything to read otherwise.

@@ -1,5 +1,6 @@
 import type { PostType } from "@prisma/client";
 import LikeButton from "./LikeButton";
+import { REP_UI_ENABLED } from "@/lib/config/feature-flags";
 
 const TYPE_LABELS: Record<PostType, string> = {
   post: "Post",
@@ -62,9 +63,11 @@ export default function PostCard({ post, linkComments = true }: { post: FeedPost
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-data">{post.author.displayName}</p>
-              <span className="text-caption" style={{ color: "var(--color-gold)" }}>
-                {post.author.rep} REP
-              </span>
+              {REP_UI_ENABLED ? (
+                <span className="text-caption" style={{ color: "var(--color-gold)" }}>
+                  {post.author.rep} REP
+                </span>
+              ) : null}
             </div>
             <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
               {TYPE_LABELS[post.type]} · {timestamp}

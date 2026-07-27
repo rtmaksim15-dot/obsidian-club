@@ -8,7 +8,42 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.17.0` is the current released version.
+Nothing yet — `v0.18.0` is the current released version.
+
+## [0.18.0] — 2026-07-27
+
+Feed-first v1 (`OBSIDIAN_ROADMAP_v3.0_The_Feed_First.md`): REP-facing UI
+deferred behind a feature flag — the earning/ledger logic is untouched
+and keeps running silently.
+
+### Added
+
+- **`lib/config/feature-flags.ts`** — `REP_UI_ENABLED = false`, a single
+  server-side constant gating every REP-facing surface below. Flip it
+  when REP UI is ready to ship; nothing else needs to change.
+
+### Changed
+
+- **`PostCard`** — the REP badge next to the author's name is hidden
+  while the flag is off (`/feed`, `/library`, `/posts/[id]`, and any
+  profile's "Recent Posts").
+- **`/hall`** — the "REP" stat cell is hidden (status grid drops from
+  3 to 2 columns), and the "Recent REP Changes" section + its query are
+  both skipped.
+- **`/profile/[username]`** — the "`{rep}` REP" line next to the star
+  rating is hidden; the owner-only "REP History" section + its query
+  are both skipped.
+- **`/admin/rep`** — now 404s unconditionally while the flag is off,
+  even for real admins — same `notFound()` mechanism `/admin/applications`
+  already uses for non-admins, just gated on the flag first.
+- **`/vault`** — route and nav tab stay, but with the flag off the real
+  REP-gated grid (data fetch, `vault.item_viewed`/`item_locked_hit`
+  tracking, and all) is replaced with a minimal teaser: "The Vault" +
+  "The Vault opens in time." No items, no thresholds, no REP total.
+
+None of this touches `lib/rating/rep-engine.ts` — `awardRep` and every
+award call site keep running exactly as before; REP keeps accumulating
+in `RepHistory`/`User.rep`, just isn't rendered anywhere right now.
 
 ## [0.17.0] — 2026-07-26
 

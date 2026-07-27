@@ -358,7 +358,9 @@ renumbered up by one again (old `v0.8` Events & Marketplace → `v0.9`, ...).
 
 Per `SPEC-analytics-panel.md`. No UI in this phase — Phase 1 (operator
 console, `/admin/insight`) and Phase 2 (member-facing profile modules)
-build on top of this and are separate, not-yet-started tasks.
+build on top of this. As of `v0.18` (below), the REP-facing UI these
+phases would surface is explicitly deferred out of v1 — Phase 1/2 stay
+un-started, now for a stated reason, not just sequencing.
 
 - [x] `AnalyticsEvent` model (table `analytics_events`) — renamed from
       the spec's literal `Event`/`events`, both already taken by the
@@ -378,6 +380,27 @@ build on top of this and are separate, not-yet-started tasks.
 - Not wired (real insertion points exist, but weren't in the spec's
   §2.5 list, which this task's scope was explicitly bounded to):
   `post.reacted`, `rank.changed`, `profile.viewed`. See `TECH_DEBT.md`.
+
+### v0.18 — Feed-first v1: REP UI deferred behind a flag ✅ (built 2026-07-27)
+
+Per `OBSIDIAN_ROADMAP_v3.0_The_Feed_First.md` (referenced, not yet
+actually added to the repo — see `TECH_DEBT.md`). REP badges, `/vault`
+unlocks, `/hall`/`/profile` REP history, and admin REP adjustments must
+not appear in v1's UI. The earning/ledger logic is untouched.
+
+- [x] `lib/config/feature-flags.ts` — `REP_UI_ENABLED = false`, the
+      single switch every REP surface below checks.
+- [x] `PostCard`'s REP badge, `/hall`'s REP stat + REP-history section,
+      `/profile/[username]`'s REP total + REP-history section — all
+      hidden behind the flag (queries skipped too, not just rendering).
+- [x] `/admin/rep` — 404s unconditionally while the flag is off, even
+      for real admins (stricter reading of "not appear in v1," not just
+      "hidden from non-admins").
+- [x] `/vault` — route and nav tab kept; real REP-gated grid replaced
+      with a minimal teaser ("The Vault" / "The Vault opens in time.")
+      while the flag is off.
+- Not done: `POST /api/admin/rep-adjustment` itself isn't additionally
+  gated (only the page 404s) — see `TECH_DEBT.md`.
 
 ## Later
 

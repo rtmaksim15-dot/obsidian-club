@@ -3,6 +3,7 @@ import { Lock, Gem } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { track } from "@/lib/analytics/track";
+import { REP_UI_ENABLED } from "@/lib/config/feature-flags";
 
 /**
  * The Vault (`/vault`) — real access mechanic, replacing the
@@ -24,6 +25,23 @@ import { track } from "@/lib/analytics/track";
 export default async function VaultPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/vault");
+
+  // v1 is feed-first — the route and nav tab stay, but with REP UI
+  // deferred there's nothing honest to show here yet: no REP total, no
+  // thresholds, no items. A minimal teaser instead of the real grid,
+  // not a 404 — unlike /admin/rep, this is a real member-facing nav
+  // destination, not an internal panel that should stay undiscoverable.
+  if (!REP_UI_ENABLED) {
+    return (
+      <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
+        <div className="mx-auto max-w-3xl">
+          <p className="text-label mb-2">Access</p>
+          <h1 className="text-h1 mb-2">The Vault</h1>
+          <p className="text-body italic">The Vault opens in time.</p>
+        </div>
+      </main>
+    );
+  }
 
   const items = await prisma.vaultItem.findMany({
     where: { isActive: true },

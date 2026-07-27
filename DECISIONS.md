@@ -1265,3 +1265,59 @@ built a throwaway Client Component importing `track()`, confirmed
 server-only`, then deleted it — the real build is clean. All test
 accounts, events, and the throwaway component/route were deleted
 afterward; nothing from this verification pass persists.
+
+### 2026-07-27 — Feed-first v1: REP UI deferred behind a flag, not deleted; proceeded on explicit instructions without the named roadmap file present
+
+Max referenced `OBSIDIAN_ROADMAP_v3.0_The_Feed_First.md` as already
+added to the repo root and asked me to read it first. Checked twice
+(`find`/`ls` against the actual root) — it wasn't there either time.
+His own message already gave four fully explicit, self-contained
+instructions (exact flag name and value, exact wrapping targets down to
+"PostCard badge, hall REP section, profile REP display, admin rep
+page," exact `/admin/rep` 404 behavior, exact `/vault` teaser copy
+verbatim, exact push instruction) — nothing about the four tasks
+themselves was ambiguous or depended on the roadmap's literal text, so
+proceeded on the explicit instructions rather than blocking on a file
+that doesn't exist, flagging its absence clearly instead of silently
+either assuming its contents or refusing to act.
+
+**One real judgment call, not covered by the instructions as given**:
+whether `/admin/rep` should 404 for admins too, or only for non-admins
+(the existing pattern). Max's instruction — "same as other admin pages
+for non-admins" — read literally could mean either "same *mechanism*"
+or "same *scope* (non-admins only)." Given the stated goal is that
+REP-adjustment UI must not appear in v1 at all, not just be hidden from
+non-admins, implemented the stricter reading: the flag check runs
+before the admin check, so the page 404s unconditionally while
+`REP_UI_ENABLED` is false, admin session or not.
+
+**Copy note**: Max wrote the requested heading as "THE VAULT" (caps).
+`.text-h1`'s CSS already applies `text-transform: uppercase` — checked
+`app/globals.css` before writing anything — so authored it as "The
+Vault" in JSX, matching how every other heading in the codebase is
+written (title case in source, uppercase rendered), not as literal caps
+in the markup. Renders identically to what he asked for.
+
+**Scope discipline**: only touched rendering (and the two REP-history
+DB queries that fed now-hidden sections, skipped outright rather than
+fetched-and-discarded). `lib/rating/rep-engine.ts` — `REP_TABLE`,
+`awardRep`, every award call site — is untouched; REP keeps
+accumulating in the ledger exactly as before, just isn't drawn anywhere
+in the UI. Did not additionally lock down `POST /api/admin/rep-adjustment`
+itself (only the page 404s) — that endpoint is still reachable by a
+direct request from an authenticated admin session; flagged in
+TECH_DEBT.md rather than silently expanding scope to cover it, since
+that wasn't asked for and the page being undiscoverable was.
+
+**Verified live** against the real admin account: `/vault` renders
+exactly the requested teaser (no items, no REP text); `/admin/rep`
+404s even for the real admin; `/profile/[username]` shows no REP total,
+no "REP History" section, and no REP badge on the Recent Posts cards
+(same shared `PostCard` used on `/feed`/`/library`/`/posts/[id]`) — one
+component fix covers all four surfaces at once. `/hall` wasn't
+separately live-tested (it's gated behind Initiation Ritual completion,
+which the real admin account doesn't have — forcing it would mean
+mutating real ritual-progress state again) — relied instead on the
+identical, already-proven-working `REP_UI_ENABLED` conditional pattern
+plus a clean `tsc`/production build, which did catch the grid-column
+arithmetic (3→2 cols) compiling correctly.
