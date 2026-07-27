@@ -655,13 +655,42 @@ checking `requireAdmin()`, verified live with a plain unauthenticated
 request (404 fires before the admin check would even run). See
 DECISIONS.md, 2026-07-27.
 
-## `OBSIDIAN_ROADMAP_v3.0_The_Feed_First.md` was referenced but never actually added (2026-07-27)
+## `OBSIDIAN_ROADMAP_v3.0_The_Feed_First.md` — resolved 2026-07-27
 
-Max's "hide REP UI" task assumed this file was already in the repo
-root; it wasn't, checked twice. The four numbered instructions in his
-message were explicit and self-contained enough to implement without
-it, so the work went ahead — but the actual roadmap document (whatever
-broader v1 scope/sequencing it defines beyond the REP-deferral
-paragraph already relayed in chat) still isn't part of this repo's
-history. Worth adding for real once available — future tasks referring
-back to "the roadmap" won't have anything to read otherwise.
+Was missing from the repo when the "hide REP UI" task first referenced
+it (checked twice, proceeded on Max's explicit instructions instead of
+blocking). Now actually committed at the repo root. Reading it in full
+surfaced scope beyond what the REP-only pass covered — see the new
+entry below.
+
+## Roadmap v3.0 defers more than REP: Houses UI and levels/gold/achievements aren't flagged yet (found 2026-07-27)
+
+`OBSIDIAN_ROADMAP_v3.0_The_Feed_First.md` §V ("Осознанно отложено")
+names REP/rating (already behind `REP_UI_ENABLED`) plus two more items
+the current flag doesn't touch:
+
+- **Houses** — "Слово временно убираем из интерфейса" (the word
+  "Houses" is temporarily removed from the interface). Real UI surface:
+  `/houses` (list), `/houses/[slug]` (detail), `JoinHouseButton`, the
+  composer's house-tagging dropdown (`ContentComposer`), `PostCard`'s
+  house pill, and presumably the bottom-nav "Community" tab if it links
+  there. The roadmap explicitly keeps the Newcomers' room itself (part
+  of the ritual), just not the Houses concept/label around it — a real
+  design question on where exactly the line falls (e.g. does joining a
+  house stay possible via a direct link even if not advertised, the
+  same "logic keeps running, UI hides" shape `REP_UI_ENABLED` uses?).
+- **"Gold, достижения, уровни"** (gold, achievements, **levels**) —
+  levels/ranks (`LEVEL_NAMES`, Initiate→Council) are a separate system
+  from `REP_UI_ENABLED` (gated by `User.reputation`, not `User.rep` —
+  see DECISIONS.md, 2026-07-25) and weren't touched by that flag. Real
+  UI surface: the level-name label on `/hall` and `/profile/[username]`,
+  the `avatar-level-N` border styling used everywhere an avatar renders
+  (`PostCard`, `/hall`, `/profile/[username]`), achievement grants
+  (`lib/utils/achievements.ts`) and wherever they're displayed.
+
+Neither is implemented yet — flagged here rather than guessed at,
+since the blast radius (especially Houses) is considerably larger than
+the REP pass and the roadmap doesn't specify exactly how deep "removed
+from the interface" should go (label-only vs. full route removal;
+whether underlying joins/promotions should keep working silently, the
+way REP grants still do).
