@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db/prisma";
 import { canCreatePostType } from "@/lib/rating/content-rights";
 import ContentComposer from "@/components/shared/ContentComposer";
 import PostList from "@/components/shared/PostList";
+import { HOUSES_UI_ENABLED } from "@/lib/config/feature-flags";
 
 const LIBRARY_TYPES: PostType[] = ["article", "lecture", "course", "manifesto"];
 
@@ -61,12 +62,17 @@ export default async function LibraryPage({
   const allowedTypes = LIBRARY_TYPES.filter((t) => canCreatePostType(user, t));
   // Same membership scoping as /feed (Feed & Posts MVP, 2026-07-16) — the
   // composer here is shared, and /api/posts now requires membership to
-  // tag a house regardless of which page submitted the post.
-  const memberships = await prisma.houseMembership.findMany({
-    where: { userId: user.id },
-    select: { house: { select: { id: true, name: true } } },
-  });
-  const houses = memberships.map((m) => m.house);
+  // tag a house regardless of which page submitted the post. Skipped
+  // entirely while HOUSES_UI_ENABLED is false — this query exists only
+  // to feed the composer's house dropdown, which is hidden either way.
+  const houses = HOUSES_UI_ENABLED
+    ? (
+        await prisma.houseMembership.findMany({
+          where: { userId: user.id },
+          select: { house: { select: { id: true, name: true } } },
+        })
+      ).map((m) => m.house)
+    : [];
 
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">

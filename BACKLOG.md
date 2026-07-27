@@ -403,6 +403,27 @@ not appear in v1's UI. The earning/ledger logic is untouched.
       flag is off (`v0.18.1`, same day), closing the gap where only the
       page 404'd but the endpoint stayed directly callable.
 
+### v0.19 — Feed-first v1: Houses and levels/ranks UI deferred ✅ (built 2026-07-27)
+
+Same roadmap (§V), same pattern, extended to the two other items it
+defers alongside REP. Max's call: same flag pattern for both, with the
+Newcomers' room (a `Room`, not a `House`) kept fully functional as a
+required Initiation Ritual step.
+
+- [x] `HOUSES_UI_ENABLED` / `LEVELS_UI_ENABLED` — `lib/config/
+      feature-flags.ts`.
+- [x] Houses — `/houses`/`/houses/[slug]` teaser+redirect,
+      `POST /api/houses/[slug]/join` 404s unconditionally, composer
+      house-dropdown and `PostCard` house pill hidden, `/rooms`' "Houses
+      →" link hidden. Feed's house-scoping query untouched.
+- [x] Levels — level-name label and "Your Next Level" progress hidden
+      on `/hall`/`/profile/[username]`; `avatar-level-N` styling hidden
+      everywhere an avatar renders. `checkLevelUp()`/`getLevelProgress()`
+      keep running unconditionally.
+- [x] Full Initiation Ritual verified end-to-end live with all three
+      flags off, including the Newcomers' room exception; test state
+      fully reverted after.
+
 ## Later
 
 *Intentionally postponed — approved direction, not yet scheduled in

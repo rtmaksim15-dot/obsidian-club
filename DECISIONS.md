@@ -1333,3 +1333,56 @@ about whether it would otherwise require admin access. Verified with a
 plain unauthenticated `curl` POST (no session at all) returning `404
 {"error":"Not found."}` — proof the flag check really does run first,
 not just that an admin-gated 403 got relabeled.
+
+### 2026-07-27 (later still) — Extended the deferral pattern to Houses and levels/ranks, with one explicit exception
+
+`OBSIDIAN_ROADMAP_v3.0_The_Feed_First.md` §V defers more than REP — it
+also names Houses ("the word is temporarily removed from the
+interface") and "Gold, достижения, уровни" (levels). Asked Max directly
+rather than guessing, since Houses' blast radius (~7 files touched) is
+considerably larger than the REP-only pass. **Max's answer**: same
+pattern for both, via a new `HOUSES_UI_ENABLED`/`LEVELS_UI_ENABLED` pair
+— not a reuse of `REP_UI_ENABLED`, since levels gate on
+`User.reputation` (peer-review stars), a different field from
+`User.rep` (see ADR-0015's REP/reputation split), and Houses is an
+independent model from either. **One explicit exception carried through
+every surface touched**: the Newcomers' room must stay fully
+functional — it's part of the Initiation Ritual ("Introduce yourself in
+the Newcomers' room"), not something the roadmap defers. Confirmed via
+`prisma/seed.ts` that the Newcomers' room (`Room.type === "newcomers"`)
+has zero `houseId` linkage — it's a `Room`, not a `House` — so neither
+flag can accidentally touch it; also confirmed achievement grants
+(`lib/utils/achievements.ts`) were never rendered anywhere in the UI to
+begin with, so there was nothing to gate for that part of "Gold,
+достижения, уровни."
+
+Same shape as `REP_UI_ENABLED` throughout: gate rendering and the
+otherwise-unused queries that feed it, leave earning/promotion logic
+(`checkLevelUp()`, `getLevelProgress()`, `HouseMembership` writes)
+running unconditionally. Houses got the fuller treatment `REP_UI_ENABLED`
+gave `/admin/rep` — real route removal (teaser/redirect), not just a
+hidden label — since Max's answer said "hide the Houses list/join/browse
+UI" specifically, not just the word.
+
+**Verified live**, for real, on the real admin account (which was
+sitting at a fully unstarted ritual state — no prior reset needed): set
+a real bio via `/profile/edit`, set a placeholder avatar directly via a
+temp script (avatar-upload plumbing itself was already proven working
+in the User Profiles task, so this only needed to unblock the ritual's
+`profileComplete` check, not re-prove upload works), accepted the Code
+of Conduct, completed Lord Obsidian's introduction, and posted a real
+message in `/rooms/newcomers` — each step correctly flipped from "TO DO"
+to "DONE" and redirected back to `/ritual`. Once all four actionable
+steps were done, `/ritual` redirected to `/hall` on its own (the
+still-`"deferred"` Safety & Respect Guidelines step doesn't block
+completion — pre-existing `getRitualStatus()` behavior, unchanged).
+`/hall` rendered with no REP/Levels sections and a 2-column status grid;
+`/feed`'s composer (no house dropdown) published a real post rendering
+cleanly via the shared `PostCard`; `/houses`, `/houses/[slug]`, and
+`/vault` all showed their teasers/redirects correctly; `/rooms` showed
+no "Houses →" link ("Events →" still there) while the Newcomers room
+itself worked exactly as before. No console errors at any step. All
+test-induced state (bio, avatar, `ritualProgress`, the test post, the
+test Newcomers-room message, and the REP grant that message triggered
+via `first-community-intro`) was reverted afterward via a temp script,
+confirmed by re-reading the account back to its exact pre-test baseline.

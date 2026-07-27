@@ -3,6 +3,7 @@ import { Lock } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { canAccessRoom } from "@/lib/rating/room-access";
+import { HOUSES_UI_ENABLED } from "@/lib/config/feature-flags";
 
 const GROUP_LABELS: Record<string, string> = {
   general: "General",
@@ -48,9 +49,11 @@ export default async function RoomsPage() {
           <a href="/events" className="text-caption inline-block text-ob-accent">
             Events →
           </a>
-          <a href="/houses" className="text-caption inline-block text-ob-accent">
-            Houses →
-          </a>
+          {HOUSES_UI_ENABLED ? (
+            <a href="/houses" className="text-caption inline-block text-ob-accent">
+              Houses →
+            </a>
+          ) : null}
         </div>
 
         {grouped.length === 0 ? (

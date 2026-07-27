@@ -663,7 +663,7 @@ blocking). Now actually committed at the repo root. Reading it in full
 surfaced scope beyond what the REP-only pass covered — see the new
 entry below.
 
-## Roadmap v3.0 defers more than REP: Houses UI and levels/gold/achievements aren't flagged yet (found 2026-07-27)
+## Roadmap v3.0 defers more than REP: Houses UI and levels/gold/achievements — resolved 2026-07-27
 
 `OBSIDIAN_ROADMAP_v3.0_The_Feed_First.md` §V ("Осознанно отложено")
 names REP/rating (already behind `REP_UI_ENABLED`) plus two more items
@@ -688,9 +688,19 @@ the current flag doesn't touch:
   (`PostCard`, `/hall`, `/profile/[username]`), achievement grants
   (`lib/utils/achievements.ts`) and wherever they're displayed.
 
-Neither is implemented yet — flagged here rather than guessed at,
-since the blast radius (especially Houses) is considerably larger than
-the REP pass and the roadmap doesn't specify exactly how deep "removed
-from the interface" should go (label-only vs. full route removal;
-whether underlying joins/promotions should keep working silently, the
-way REP grants still do).
+**Resolved same day**: Max's answer settled the open questions above —
+same pattern as `REP_UI_ENABLED` for both (`HOUSES_UI_ENABLED`,
+`LEVELS_UI_ENABLED`), full route/UI removal not just label-hiding for
+Houses (`/houses`, `/houses/[slug]`, join API, composer dropdown,
+`PostCard`'s house pill, `/rooms`' "Houses →" link), underlying
+joins/promotions keep running silently either way. One explicit
+exception: **the Newcomers' room stays fully functional** — it's a
+`Room` (`slug: "newcomers"`), not a `House`, and has zero `houseId`
+linkage (confirmed via `prisma/seed.ts`), so neither flag touches it.
+Achievement grants were confirmed never displayed anywhere in the UI to
+begin with — nothing to gate there. Verified live: the full Initiation
+Ritual (profile → Code of Conduct → Lord Obsidian's intro → Newcomers'
+room post) completed end-to-end with all three flags off, `/ritual`
+correctly redirected to `/hall`, and `/hall`/`/feed`/`/houses`/`/vault`/
+`/rooms` all rendered correctly with no console errors. See
+CHANGELOG.md `v0.19.0` and DECISIONS.md, 2026-07-27.

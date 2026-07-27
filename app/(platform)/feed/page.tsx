@@ -6,6 +6,7 @@ import { getRitualStatus } from "@/lib/auth/ritual";
 import { canCreatePostType } from "@/lib/rating/content-rights";
 import ContentComposer from "@/components/shared/ContentComposer";
 import PostList from "@/components/shared/PostList";
+import { HOUSES_UI_ENABLED } from "@/lib/config/feature-flags";
 
 const FEED_TYPES: PostType[] = ["post", "story"];
 
@@ -66,7 +67,11 @@ export default async function FeedPage() {
   });
 
   const allowedTypes = FEED_TYPES.filter((t) => canCreatePostType(user, t));
-  const houses = memberships.map((m) => m.house);
+  // Feed-first v1 — the composer's house dropdown is part of the
+  // "browse/tag houses" UI the roadmap defers, even though the
+  // underlying membership scoping above (which posts show in feed)
+  // keeps working untouched.
+  const houses = HOUSES_UI_ENABLED ? memberships.map((m) => m.house) : [];
 
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">

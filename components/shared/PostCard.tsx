@@ -1,6 +1,6 @@
 import type { PostType } from "@prisma/client";
 import LikeButton from "./LikeButton";
-import { REP_UI_ENABLED } from "@/lib/config/feature-flags";
+import { REP_UI_ENABLED, HOUSES_UI_ENABLED, LEVELS_UI_ENABLED } from "@/lib/config/feature-flags";
 
 const TYPE_LABELS: Record<PostType, string> = {
   post: "Post",
@@ -46,7 +46,9 @@ export default function PostCard({ post, linkComments = true }: { post: FeedPost
     <article className="card">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className={`avatar avatar-level-${post.author.level} h-9 w-9 shrink-0`}>
+          <div
+            className={`avatar h-9 w-9 shrink-0 ${LEVELS_UI_ENABLED ? `avatar-level-${post.author.level}` : ""}`}
+          >
             {post.author.avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -75,7 +77,7 @@ export default function PostCard({ post, linkComments = true }: { post: FeedPost
           </div>
         </div>
 
-        {post.house ? (
+        {post.house && HOUSES_UI_ENABLED ? (
           <a
             href={`/houses/${post.house.slug}`}
             className="text-caption shrink-0 rounded-ob border px-2 py-1 uppercase tracking-brand"

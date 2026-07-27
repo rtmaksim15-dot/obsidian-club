@@ -6,6 +6,7 @@ import { canAccessRoom } from "@/lib/rating/room-access";
 import PostList from "@/components/shared/PostList";
 import JoinHouseButton from "@/components/shared/JoinHouseButton";
 import { track } from "@/lib/analytics/track";
+import { HOUSES_UI_ENABLED } from "@/lib/config/feature-flags";
 
 /**
  * House detail (`/houses/[slug]`) — the house's own room (community) and
@@ -22,6 +23,11 @@ import { track } from "@/lib/analytics/track";
 export default async function HouseDetailPage({ params }: { params: { slug: string } }) {
   const user = await getCurrentUser();
   if (!user) redirect(`/login?next=/houses/${params.slug}`);
+
+  // Feed-first v1 — browsing into a specific house is exactly the
+  // "browse UI" the roadmap defers; send to /houses's own teaser
+  // rather than duplicating it here.
+  if (!HOUSES_UI_ENABLED) redirect("/houses");
 
   const house = await prisma.house.findUnique({ where: { slug: params.slug } });
   if (!house || house.status !== "active") notFound();

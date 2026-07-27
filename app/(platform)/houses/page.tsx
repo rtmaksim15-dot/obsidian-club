@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
+import { HOUSES_UI_ENABLED } from "@/lib/config/feature-flags";
 
 /**
  * Houses (`/houses`) — CLAUDE.md's (restored version, 2026-07-08)
@@ -12,6 +13,20 @@ import { prisma } from "@/lib/db/prisma";
 export default async function HousesPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/houses");
+
+  // Feed-first v1 (OBSIDIAN_ROADMAP_v3.0_The_Feed_First.md §V) — a
+  // minimal teaser instead of the real list, same shape as /vault's.
+  if (!HOUSES_UI_ENABLED) {
+    return (
+      <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
+        <div className="mx-auto max-w-2xl">
+          <p className="text-label mb-2">Community</p>
+          <h1 className="text-h1 mb-2">Houses</h1>
+          <p className="text-body italic">Houses open in time.</p>
+        </div>
+      </main>
+    );
+  }
 
   const houses = await prisma.house.findMany({ orderBy: { name: "asc" } });
 

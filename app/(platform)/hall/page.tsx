@@ -6,7 +6,7 @@ import { getLevelProgress } from "@/lib/rating/level-progress";
 import { syncReferralLifecycle } from "@/lib/rating/referral-lifecycle";
 import { checkLevelUp } from "@/lib/rating/level-progression";
 import { LEVEL_NAMES } from "@/lib/rating/levels";
-import { REP_UI_ENABLED } from "@/lib/config/feature-flags";
+import { REP_UI_ENABLED, LEVELS_UI_ENABLED } from "@/lib/config/feature-flags";
 
 /**
  * The Hall (`/hall`) — status card, progress-to-next-level, referral
@@ -52,7 +52,10 @@ export default async function HallPage() {
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
       <div className="mx-auto max-w-2xl">
-        <a href={`/profile/${user.username}`} className={`avatar avatar-level-${user.level} h-16 w-16 block`}>
+        <a
+          href={`/profile/${user.username}`}
+          className={`avatar h-16 w-16 block ${LEVELS_UI_ENABLED ? `avatar-level-${user.level}` : ""}`}
+        >
           {user.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={user.avatarUrl} alt={user.displayName} className="h-full w-full object-cover" />
@@ -67,9 +70,11 @@ export default async function HallPage() {
         <a href={`/profile/${user.username}`}>
           <h1 className="text-h1 mt-1">{user.displayName}</h1>
         </a>
-        <p className="font-cinzel uppercase tracking-brand text-ob-gold mt-2 text-sm">
-          {LEVEL_NAMES[user.level] ?? `Level ${user.level}`}
-        </p>
+        {LEVELS_UI_ENABLED ? (
+          <p className="font-cinzel uppercase tracking-brand text-ob-gold mt-2 text-sm">
+            {LEVEL_NAMES[user.level] ?? `Level ${user.level}`}
+          </p>
+        ) : null}
 
         <a href="/profile/edit" className="btn-ghost mt-4 inline-block">
           Edit profile
@@ -99,42 +104,44 @@ export default async function HallPage() {
         ) : null}
 
         {/* Progress */}
-        <section className="mt-10">
-          <p className="text-label mb-3">Your Next Level</p>
-          {progress.isManualAppointment ? (
-            <p className="text-body">
-              {progress.nextLevelName
-                ? `${progress.nextLevelName} is appointed, not earned through a checklist.`
-                : "You've reached the highest documented level."}
-            </p>
-          ) : (
-            <div className="card">
-              <p className="text-body mb-3">Toward {progress.nextLevelName}:</p>
-              <ul className="space-y-2">
-                {progress.criteria.map((c) => (
-                  <li key={c.label} className="text-caption flex items-center gap-2">
-                    <span
-                      style={{
-                        color:
-                          c.met === true
-                            ? "var(--color-success)"
-                            : c.met === false
-                              ? "var(--color-text-muted)"
-                              : "var(--color-text-secondary)",
-                      }}
-                    >
-                      {c.met === true ? "✓" : c.met === false ? "○" : "—"}
-                    </span>
-                    <span style={{ color: "var(--color-text-secondary)" }}>
-                      {c.label}
-                      {c.met === null ? " (not yet tracked)" : ""}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </section>
+        {LEVELS_UI_ENABLED ? (
+          <section className="mt-10">
+            <p className="text-label mb-3">Your Next Level</p>
+            {progress.isManualAppointment ? (
+              <p className="text-body">
+                {progress.nextLevelName
+                  ? `${progress.nextLevelName} is appointed, not earned through a checklist.`
+                  : "You've reached the highest documented level."}
+              </p>
+            ) : (
+              <div className="card">
+                <p className="text-body mb-3">Toward {progress.nextLevelName}:</p>
+                <ul className="space-y-2">
+                  {progress.criteria.map((c) => (
+                    <li key={c.label} className="text-caption flex items-center gap-2">
+                      <span
+                        style={{
+                          color:
+                            c.met === true
+                              ? "var(--color-success)"
+                              : c.met === false
+                                ? "var(--color-text-muted)"
+                                : "var(--color-text-secondary)",
+                        }}
+                      >
+                        {c.met === true ? "✓" : c.met === false ? "○" : "—"}
+                      </span>
+                      <span style={{ color: "var(--color-text-secondary)" }}>
+                        {c.label}
+                        {c.met === null ? " (not yet tracked)" : ""}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </section>
+        ) : null}
 
         {/* Referrals */}
         <section className="mt-10">

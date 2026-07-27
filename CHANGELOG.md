@@ -8,7 +8,54 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.18.1` is the current released version.
+Nothing yet — `v0.19.0` is the current released version.
+
+## [0.19.0] — 2026-07-27
+
+Feed-first v1, continued: `OBSIDIAN_ROADMAP_v3.0_The_Feed_First.md` §V
+also defers Houses and levels/ranks/gold, not just REP. Same pattern as
+`REP_UI_ENABLED` — gate rendering (and the DB queries that only exist to
+feed it), leave the underlying data/logic running silently. One explicit
+exception: the Newcomers' room (a `Room`, not a `House`) stays fully
+functional — it's a required Initiation Ritual step, untouched by either
+flag.
+
+### Added
+
+- **`lib/config/feature-flags.ts`** — `HOUSES_UI_ENABLED = false` and
+  `LEVELS_UI_ENABLED = false`.
+
+### Changed
+
+- **Houses** — `/houses` and `/houses/[slug]` replaced with a minimal
+  teaser/redirect (same shape as `/vault`'s) while the flag is off;
+  `POST /api/houses/[slug]/join` 404s unconditionally, same 404-before-
+  auth-check pattern as `POST /api/admin/rep-adjustment`; the composer's
+  house-tagging dropdown (`/feed`, `/library`) and `PostCard`'s house pill
+  are hidden; `/rooms`' "Houses →" link is hidden ("Events →" stays).
+  Feed-scoping by joined houses (`/feed`'s membership query) is untouched
+  — only the value handed to the composer is gated.
+- **Levels** — the level-name label (Initiate…Council) on `/hall` and
+  `/profile/[username]`, the "Your Next Level" progress section on
+  `/hall`, and the `avatar-level-N` border styling everywhere an avatar
+  renders (`PostCard`, `/hall`, `/profile/[username]`) are all hidden
+  while the flag is off. `checkLevelUp()` (auto-promotion) and
+  `getLevelProgress()` (the computation) still run unconditionally —
+  only their display is gated.
+
+### Verified
+
+- Full Initiation Ritual walked end-to-end live on the real admin
+  account with all three flags (`REP_UI_ENABLED`, `HOUSES_UI_ENABLED`,
+  `LEVELS_UI_ENABLED`) off: profile step, Code of Conduct, Lord
+  Obsidian's introduction, and posting in the Newcomers' room all
+  completed and redirected correctly; `/ritual` redirected to `/hall`
+  once done. `/hall`, `/feed` (post composer, publish), `/houses`
+  teaser, `/houses/[slug]` redirect, `/vault` teaser, and `/rooms` (no
+  "Houses →" link, Newcomers room fully functional) all confirmed
+  working with no console errors. Test-induced state (bio, avatar,
+  ritual progress, the test post/message, the REP grant it triggered)
+  fully reverted afterward.
 
 ## [0.18.1] — 2026-07-27
 

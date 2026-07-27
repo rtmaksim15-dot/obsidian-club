@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import ReviewForm from "@/components/shared/ReviewForm";
 import PostCard, { type FeedPost } from "@/components/shared/PostCard";
 import { LEVEL_NAMES } from "@/lib/rating/levels";
-import { REP_UI_ENABLED } from "@/lib/config/feature-flags";
+import { REP_UI_ENABLED, HOUSES_UI_ENABLED, LEVELS_UI_ENABLED } from "@/lib/config/feature-flags";
 
 /**
  * Member profile — looked up by `username` (User Profiles task,
@@ -39,11 +39,13 @@ export default async function ProfilePage({ params }: { params: { username: stri
           take: 10,
         })
       : Promise.resolve([]),
-    prisma.houseMembership.findMany({
-      where: { userId: user.id },
-      orderBy: { joinedAt: "asc" },
-      include: { house: { select: { name: true, slug: true } } },
-    }),
+    HOUSES_UI_ENABLED
+      ? prisma.houseMembership.findMany({
+          where: { userId: user.id },
+          orderBy: { joinedAt: "asc" },
+          include: { house: { select: { name: true, slug: true } } },
+        })
+      : Promise.resolve([]),
     prisma.post.findMany({
       where: { authorId: user.id, isPublished: true },
       orderBy: { publishedAt: "desc" },
@@ -72,7 +74,7 @@ export default async function ProfilePage({ params }: { params: { username: stri
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
       <div className="mx-auto max-w-2xl">
-        <div className={`avatar avatar-level-${user.level} h-24 w-24`}>
+        <div className={`avatar h-24 w-24 ${LEVELS_UI_ENABLED ? `avatar-level-${user.level}` : ""}`}>
           {user.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={user.avatarUrl} alt={user.displayName} className="h-full w-full object-cover" />
@@ -87,9 +89,11 @@ export default async function ProfilePage({ params }: { params: { username: stri
         <p className="text-data" style={{ color: "var(--color-text-secondary)" }}>
           @{user.username}
         </p>
-        <p className="font-cinzel uppercase tracking-brand text-ob-gold mt-1 text-sm">
-          {LEVEL_NAMES[user.level] ?? `Level ${user.level}`}
-        </p>
+        {LEVELS_UI_ENABLED ? (
+          <p className="font-cinzel uppercase tracking-brand text-ob-gold mt-1 text-sm">
+            {LEVEL_NAMES[user.level] ?? `Level ${user.level}`}
+          </p>
+        ) : null}
 
         <div className="mt-3 flex items-center gap-4">
           <p aria-label={`${stars} out of 5 stars`}>

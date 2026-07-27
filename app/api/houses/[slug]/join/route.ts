@@ -2,11 +2,21 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import { awardRep, REP_TABLE } from "@/lib/rating/rep-engine";
+import { HOUSES_UI_ENABLED } from "@/lib/config/feature-flags";
 
 // POST /api/houses/:slug/join — real House membership (2026-07-16, REP
 // system + Vault task). Idempotent: joining a house you're already in
 // just confirms membership, never re-awards REP.
+//
+// Feed-first v1 (2026-07-27): 404s unconditionally while
+// HOUSES_UI_ENABLED is false — the join UI is hidden, so the endpoint
+// shouldn't stay directly callable either, same page+API pairing
+// REP_UI_ENABLED uses for /admin/rep + rep-adjustment.
 export async function POST(_request: Request, { params }: { params: { slug: string } }) {
+  if (!HOUSES_UI_ENABLED) {
+    return NextResponse.json({ error: "Not found." }, { status: 404 });
+  }
+
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
