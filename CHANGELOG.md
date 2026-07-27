@@ -8,7 +8,18 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.18.0` is the current released version.
+Nothing yet — `v0.18.1` is the current released version.
+
+## [0.18.1] — 2026-07-27
+
+### Fixed
+
+- **`POST /api/admin/rep-adjustment`** now 404s unconditionally while
+  `REP_UI_ENABLED` is `false`, checked before `requireAdmin()` even
+  runs — closes the gap where `/admin/rep` (the page) was 404'd but
+  this endpoint stayed directly callable by anyone who already knew
+  it. Verified live with a plain unauthenticated request. See
+  TECH_DEBT.md/DECISIONS.md.
 
 ## [0.18.0] — 2026-07-27
 

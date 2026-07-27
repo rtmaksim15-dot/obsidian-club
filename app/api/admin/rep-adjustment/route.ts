@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { awardRep } from "@/lib/rating/rep-engine";
+import { REP_UI_ENABLED } from "@/lib/config/feature-flags";
 
 type Body = { email?: string; delta?: number | string; reason?: string };
 
@@ -9,7 +10,16 @@ type Body = { email?: string; delta?: number | string; reason?: string };
 // Vault task, Part A #3). Logged with source "admin-adjustment" so it's
 // always distinguishable in RepHistory from a mechanically-earned event
 // — a real admin event type, per the task, not a disguised regular one.
+//
+// Feed-first v1 (2026-07-27): 404s unconditionally while REP_UI_ENABLED
+// is false, same as /admin/rep (the page this posts to) — closes the
+// gap where the page was undiscoverable but this endpoint still worked
+// for anyone who already knew it, flagged in TECH_DEBT.md.
 export async function POST(request: Request) {
+  if (!REP_UI_ENABLED) {
+    return NextResponse.json({ error: "Not found." }, { status: 404 });
+  }
+
   const admin = await requireAdmin();
   if (!admin) {
     return NextResponse.json({ error: "Admin access required." }, { status: 403 });

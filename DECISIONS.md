@@ -1321,3 +1321,15 @@ mutating real ritual-progress state again) — relied instead on the
 identical, already-proven-working `REP_UI_ENABLED` conditional pattern
 plus a clean `tsc`/production build, which did catch the grid-column
 arithmetic (3→2 cols) compiling correctly.
+
+### 2026-07-27 (later) — Closed the `/api/admin/rep-adjustment` gap flagged the same day
+
+Same-day follow-up: Max asked directly to close the TECH_DEBT.md gap
+this task's own report surfaced. Added the flag check as the very first
+line of the handler, before `requireAdmin()` — matching the page's own
+ordering (flag check, then admin check), so an unauthenticated caller
+gets 404, not 403, while the flag is off; the endpoint reveals nothing
+about whether it would otherwise require admin access. Verified with a
+plain unauthenticated `curl` POST (no session at all) returning `404
+{"error":"Not found."}` — proof the flag check really does run first,
+not just that an admin-gated 403 got relabeled.

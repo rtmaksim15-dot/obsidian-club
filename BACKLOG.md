@@ -399,8 +399,9 @@ not appear in v1's UI. The earning/ledger logic is untouched.
 - [x] `/vault` — route and nav tab kept; real REP-gated grid replaced
       with a minimal teaser ("The Vault" / "The Vault opens in time.")
       while the flag is off.
-- Not done: `POST /api/admin/rep-adjustment` itself isn't additionally
-  gated (only the page 404s) — see `TECH_DEBT.md`.
+- [x] `POST /api/admin/rep-adjustment` — 404s unconditionally while the
+      flag is off (`v0.18.1`, same day), closing the gap where only the
+      page 404'd but the endpoint stayed directly callable.
 
 ## Later
 

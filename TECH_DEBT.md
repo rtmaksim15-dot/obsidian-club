@@ -645,19 +645,15 @@ Phase 0's task scoped tracking to. Straightforward to add in a follow
 -up pass; deliberately left out rather than wiring beyond what was
 asked.
 
-## `POST /api/admin/rep-adjustment` isn't locked to `REP_UI_ENABLED` (found 2026-07-27)
+## `POST /api/admin/rep-adjustment` lock — resolved 2026-07-27
 
-The feed-first v1 pivot 404s `/admin/rep` (the page) whenever
-`REP_UI_ENABLED` is `false`, so the form is unreachable through normal
-navigation. The API route it posts to wasn't additionally gated — an
-authenticated admin who already knows the endpoint (or replays an old
-request) can still call it directly and it'll still work, exactly as
-before. Not a public hole (`requireAdmin()` still applies, same as
-every other admin route), just an inconsistency between "the UI is
-gone" and "the capability is gone." Worth adding the same `if
-(!REP_UI_ENABLED) return NextResponse.json(..., { status: 404 })` guard
-to the route itself if REP adjustment needs to be fully unreachable,
-not just undiscoverable, while deferred.
+Was gap: `/admin/rep` (the page) 404s while `REP_UI_ENABLED` is
+`false`, but the route it posts to didn't independently check the flag
+— reachable directly by anyone who already knew the endpoint. Closed
+the same day: the route now returns 404 unconditionally before even
+checking `requireAdmin()`, verified live with a plain unauthenticated
+request (404 fires before the admin check would even run). See
+DECISIONS.md, 2026-07-27.
 
 ## `OBSIDIAN_ROADMAP_v3.0_The_Feed_First.md` was referenced but never actually added (2026-07-27)
 
