@@ -704,3 +704,33 @@ room post) completed end-to-end with all three flags off, `/ritual`
 correctly redirected to `/hall`, and `/hall`/`/feed`/`/houses`/`/vault`/
 `/rooms` all rendered correctly with no console errors. See
 CHANGELOG.md `v0.19.0` and DECISIONS.md, 2026-07-27.
+
+## Library deferred, Rooms trimmed to Newcomers-only — resolved 2026-07-27
+
+Same roadmap (§III/§IV) names the feed, post creation, comments, and
+people search as "building now" — Library isn't in that list. Same
+pattern as the other flags: `LIBRARY_UI_ENABLED = false` swaps
+`/library`'s real content for a minimal teaser, route/nav tab kept.
+
+The two House of Rope demo articles seeded 2026-07-09 ("What Is
+Shibari?", "Getting Started in House of Rope") were unpublished
+(`isPublished: false`, not deleted) rather than left to the flag —
+they reference a deferred House and don't fit the launch content
+policy regardless of when Library UI ships, so they shouldn't resurface
+just because the flag flips later.
+
+Separately, Max asked to trim the visible Rooms surface further than
+just hiding the House of Rope-named room the Houses deferral already
+made confusing — confirmed with him directly since the roadmap's own
+defer table doesn't name Rooms/General/Local Circles at all, only
+Houses. **Result**: `general`, all 7 Local Circles, and `house-of-rope`
+are deactivated (`isActive: false`, not deleted) — only `newcomers`
+remains visible on `/rooms`. No code changes were needed for this part:
+`/rooms`, `/rooms/[slug]`, and every `/api/rooms/*` route already
+gated fully on `room.isActive` before this task touched anything — a
+pure data change closed it.
+
+Verified via a mobile-viewport pass: Feed works end-to-end (composer,
+publish), Vault and Library both show their teasers, Community shows
+only Newcomers (as a room) and the Events link. See CHANGELOG.md
+`v0.20.0` and DECISIONS.md, 2026-07-27.

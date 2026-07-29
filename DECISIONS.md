@@ -1386,3 +1386,34 @@ test-induced state (bio, avatar, `ritualProgress`, the test post, the
 test Newcomers-room message, and the REP grant that message triggered
 via `first-community-intro`) was reverted afterward via a temp script,
 confirmed by re-reading the account back to its exact pre-test baseline.
+
+### 2026-07-27 (later still) — Library deferred; asked before trimming Rooms beyond House of Rope
+
+Max's next instruction named three things: gate `/library` behind
+`LIBRARY_UI_ENABLED` (same `/vault` teaser shape), unpublish the two
+seeded House of Rope articles so they don't resurface later, and hide
+the `house-of-rope` room from `/rooms` "since a room named after a
+deferred House is confusing." That third item's sentence ended "Only
+Newcomers and Events remain visible" — read literally, that's a bigger
+change than just hiding one room: `/rooms` also shows `general` and 7
+Local Circle rooms today, and the roadmap's own §V defer table names
+only Houses, not Rooms/General/Local Circles at all. Rather than guess
+which reading was meant, asked directly. **Max confirmed the broader
+reading**: deactivate `general` and all 7 Local Circles too, alongside
+`house-of-rope` — for v1, only the Newcomers' room (required by the
+ritual) stays visible on `/rooms`, plus the existing `Events →` link.
+
+All three changes used existing mechanisms, no new gating code needed
+beyond the Library flag: `Post.isPublished` and `Room.isActive` already
+exist and are already checked everywhere real (`/rooms`, `/rooms/[slug]`,
+every `/api/rooms/*` route already do `if (!room.isActive) notFound()`/
+404, predating this task) — this was a pure data change for the Rooms
+part. Re-running `prisma/seed.ts` won't undo either change: its
+room-seeding upsert uses `update: {}` (no-op on conflict) and its
+article-seeding logic skips entirely once a post with that
+houseId+title already exists, regardless of `isPublished` state.
+
+Verified live via a mobile-viewport pass (per Max's own request): Feed
+worked end-to-end (composer, publish), Vault and Library both showed
+their teasers, and Community showed only Newcomers + the Events link
+— matching the confirmed scope exactly.

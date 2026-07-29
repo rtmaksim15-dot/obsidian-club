@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db/prisma";
 import { canCreatePostType } from "@/lib/rating/content-rights";
 import ContentComposer from "@/components/shared/ContentComposer";
 import PostList from "@/components/shared/PostList";
-import { HOUSES_UI_ENABLED } from "@/lib/config/feature-flags";
+import { HOUSES_UI_ENABLED, LIBRARY_UI_ENABLED } from "@/lib/config/feature-flags";
 
 const LIBRARY_TYPES: PostType[] = ["article", "lecture", "course", "manifesto"];
 
@@ -33,6 +33,22 @@ export default async function LibraryPage({
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/library");
+
+  // v1 is feed-first — Library isn't in the "building now" list
+  // (OBSIDIAN_ROADMAP_v3.0_The_Feed_First.md §III/§IV). Route and nav
+  // tab stay; real content replaced with a minimal teaser, same shape
+  // as /vault's while REP_UI_ENABLED is off.
+  if (!LIBRARY_UI_ENABLED) {
+    return (
+      <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
+        <div className="mx-auto max-w-2xl">
+          <p className="text-label mb-2">Community</p>
+          <h1 className="text-h1 mb-2">The Library</h1>
+          <p className="text-body italic">The shelves are being filled.</p>
+        </div>
+      </main>
+    );
+  }
 
   const activeType =
     searchParams.type && LIBRARY_TYPES.includes(searchParams.type as PostType)

@@ -424,6 +424,23 @@ required Initiation Ritual step.
       flags off, including the Newcomers' room exception; test state
       fully reverted after.
 
+### v0.20 — Feed-first v1: Library deferred, Rooms trimmed to Newcomers only ✅ (built 2026-07-27)
+
+Same roadmap, closing out the last named-but-unhandled scope item plus
+a Rooms-surface trim Max asked for directly (not named in the roadmap's
+own defer table, confirmed with him before touching General/Local
+Circles specifically).
+
+- [x] `LIBRARY_UI_ENABLED` — `/library` teaser, same shape as `/vault`'s.
+- [x] House of Rope's 2 seeded articles unpublished (not deleted) —
+      independent of the flag, since they reference a deferred House.
+- [x] `general`, the 7 Local Circles, and `house-of-rope` rooms
+      deactivated (not deleted) — only `newcomers` stays visible on
+      `/rooms`. No code changes needed; existing `isActive` gating
+      already covers list, detail, and API routes.
+- [x] Mobile-viewport pass verified: Feed works, Vault/Library show
+      teasers, Community shows only Newcomers + Events.
+
 ## Later
 
 *Intentionally postponed — approved direction, not yet scheduled in

@@ -8,7 +8,46 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.19.0` is the current released version.
+Nothing yet — `v0.20.0` is the current released version.
+
+## [0.20.0] — 2026-07-27
+
+Feed-first v1, continued: `OBSIDIAN_ROADMAP_v3.0_The_Feed_First.md` §III/§IV
+doesn't name Library among what v1 is "building now," and its seeded
+House of Rope demo content references a deferred House — neither fits
+launch scope. Also trims the visible Rooms surface: with Houses
+deferred, a room named after one is confusing, and Max's call was to
+go further — only the Newcomers' room (required by the Initiation
+Ritual) stays visible; General and the 7 Local Circles are deactivated
+too, not deleted.
+
+### Added
+
+- **`lib/config/feature-flags.ts`** — `LIBRARY_UI_ENABLED = false`.
+
+### Changed
+
+- **`/library`** — route and nav tab kept; real content (post list,
+  type filters, composer) replaced with a minimal teaser ("The Library"
+  / "The shelves are being filled."), same shape as `/vault`'s.
+- **House of Rope's two seeded articles** ("What Is Shibari?", "Getting
+  Started in House of Rope") — unpublished (`isPublished: false`), not
+  deleted. Not tied to `LIBRARY_UI_ENABLED`: they stay unpublished even
+  after Library UI ships, since they reference a deferred House and
+  don't fit the launch content policy regardless.
+- **Rooms** — `general`, the 7 Local Circles (`sf-circle`, `la-circle`,
+  `miami-circle`, `ny-circle`, `berlin-circle`, `london-circle`,
+  `tokyo-circle`), and `house-of-rope` all deactivated (`isActive:
+  false`), not deleted. `/rooms`, `/rooms/[slug]`, and the
+  `/api/rooms/*` routes already gate fully on `isActive` — no code
+  changes needed, only data. Only the Newcomers' room remains visible
+  and reachable.
+
+### Verified
+
+- Mobile-viewport pass confirmed: Feed works (composer, publish);
+  Vault shows its teaser; Library shows its new teaser; Community
+  shows only Newcomers (as a room) and the Events link.
 
 ## [0.19.0] — 2026-07-27
 
