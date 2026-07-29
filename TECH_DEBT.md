@@ -734,3 +734,88 @@ Verified via a mobile-viewport pass: Feed works end-to-end (composer,
 publish), Vault and Library both show their teasers, Community shows
 only Newcomers (as a room) and the Events link. See CHANGELOG.md
 `v0.20.0` and DECISIONS.md, 2026-07-27.
+
+## Photo upload in the composer failing in production — resolved 2026-07-29
+
+`POST /api/posts/photo` proxied the file straight through this app's
+own Next.js Route Handler to Supabase Storage via the service-role
+client. Real production uploads failed with "Could not upload photo" —
+traced to Vercel Serverless Functions' hard 4.5MB request-body cap
+(`FUNCTION_PAYLOAD_TOO_LARGE`), not anything wrong with Storage itself
+(confirmed by uploading directly against the real project — bucket
+existed, correct 8MB `fileSizeLimit`, public, upload succeeded
+instantly). Real phone photos routinely exceed 4.5MB, so they never
+even reached this app's own more generous 8MB check.
+
+**Fix**: the route no longer receives file bytes. It mints a signed
+Supabase Storage upload URL/token (`createSignedUploadUrl`) and the
+browser uploads directly to Storage via `uploadToSignedUrl` — the file
+never passes through the Vercel function body at all, so its 4.5MB cap
+no longer applies. Supabase's own bucket-level `fileSizeLimit` (8MB)
+is what actually enforces the size cap now, on both new and existing
+buckets going forward. Also set `allowedMimeTypes` on bucket creation —
+belt-and-suspenders, since content type is now only declared by the
+client pre-upload (not sniffed from real bytes server-side the way the
+old proxy-upload flow could).
+
+**Found in passing, not fixed**: `POST /api/profile/avatar` (avatar
+upload) has the exact same proxy-through-the-function shape and the
+same latent 4.5MB exposure — it happened to work in earlier testing
+only because avatar images people pick tend to be smaller than full
+phone-camera photos, not because the route is actually safe from the
+same failure mode. Worth the same signed-URL fix in its own pass.
+
+## Library's real composer/browse code was deleted, not gated (2026-07-29)
+
+Every other v1 deferral (REP, Houses, Levels) kept its real
+implementation in the file behind a flag check, ready to reactivate.
+Library's real article/lecture/course/manifesto browsing + composer
+(built 2026-07-05/16) was different: it shared `ContentComposer` with
+`/feed`, and that component was simplified the same day to a single
+always-`"post"` composer (Threads-level-simplicity pass) with no type
+selector or title field at all. Rather than leave Library's dead code
+calling a prop shape (`allowedTypes`) that no longer exists on the
+component, it was deleted outright. Rebuilding Library for real, once
+`LIBRARY_UI_ENABLED` flips on, needs a composer built for what Library
+actually needs (multiple content types, titles) — that's real,
+unstarted work, not a flag flip away like Houses/Vault are.
+
+## v1-scope UI audit, requested directly by Max (2026-07-29)
+
+Surveyed every reachable member-facing route for content the roadmap
+doesn't name as in scope. Not all of these are bugs — recorded here so
+they're each a deliberate call, not an oversight:
+
+- **Peer review (`ReviewForm` on `/profile/[username]`) still fully
+  functional** — any member can still rate another member 1–5 stars,
+  even though the resulting Reputation-stars display is now hidden
+  behind `REP_UI_ENABLED` (this task) on both `/hall` and
+  `/profile/[username]`. Same "logic keeps running silently" shape as
+  REP's own ledger, but worth a product decision: is submitting reviews
+  itself in v1 scope, or should the form also be gated? Not touched
+  without being asked — `ContentComposer`/`PostCard`/`/hall` were the
+  named targets, review submission wasn't.
+- **`/events`** — an honest "coming soon" placeholder, reachable via a
+  link on `/rooms`. Not named anywhere in the roadmap's scope tables
+  (in or out) — predates this pass, low risk, but flagged since it's a
+  real, clickable nav destination the roadmap doesn't account for.
+- **People search and follows — named as "building now" (§III item 7:
+  "нашёл, посмотрел профиль, подписался") but don't exist at all.**
+  Not extra UI to hide, the opposite gap: no search input/API exists
+  anywhere in the app (see the Analytics section above), and
+  `follow`/`follower` isn't a schema relationship. This is missing
+  required v1 scope, not a UI-cleanup item — flagged since Max's own
+  report request ("what else is visible that isn't in scope") implies
+  checking the roadmap's full building-now list, not just what's
+  currently rendered.
+- **Username selection in the Initiation Ritual** — roadmap names this
+  as a new v1 requirement (replacing the auto-generated
+  `email-numbers` username); not built. Same category as the item
+  above — a real gap, not a hidden-but-present UI element.
+- **Safety & Respect Guidelines** — still the pre-existing "Content
+  pending" placeholder in the ritual; unchanged by this pass, already
+  tracked further up this file.
+
+Everything else checked (Houses, Levels, Library, Vault, REP, Rooms'
+General/Local Circles) was already deferred behind a flag or
+deactivated by an earlier pass this same week — see the entries above.

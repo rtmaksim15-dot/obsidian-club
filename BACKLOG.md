@@ -441,6 +441,34 @@ Circles specifically).
 - [x] Mobile-viewport pass verified: Feed works, Vault/Library show
       teasers, Community shows only Newcomers + Events.
 
+### v0.21 — Feed-first simplification pass ✅ (built 2026-07-29)
+
+Per the same roadmap, "Threads-level simplicity." Priority item was a
+real production bug; the rest is a nav/composer/feed redesign.
+
+- [x] Fixed photo upload failing in production ("Could not upload
+      photo") — Vercel's 4.5MB serverless function body cap, not
+      Storage config. Switched `/api/posts/photo` to a signed-upload-URL
+      flow so the file bypasses the function body entirely.
+- [x] `ContentComposer` simplified to a single always-`"post"` composer
+      (no type selector, no title field) — moved off `/feed` onto its
+      own screen, `/compose`, reached from the bottom nav's new center
+      "+" tab.
+- [x] Bottom nav redesigned: five icon-only tabs (Feed, Community,
+      Create Post, Vault, Profile), Library's tab removed (route stays
+      reachable by URL).
+- [x] `PostCard`/`PostList` restyled flat, Threads-style — no card
+      border, subtle divider between posts.
+- [x] `/hall` (Profile tab) stripped to avatar, name, Edit profile, own
+      posts. Reputation stars + Trust Score gated behind `REP_UI_ENABLED`
+      (same profile page fix on `/profile/[username]`); login streak
+      removed; referral block gated behind new `REFERRALS_UI_ENABLED`.
+- [x] `/vault` teaser copy updated.
+- [x] v1-scope UI audit delivered — see TECH_DEBT.md for what's still
+      visible but out of roadmap scope (peer review form, `/events`),
+      and what's roadmap-required but not yet built (people search,
+      follows, ritual username selection).
+
 ## Later
 
 *Intentionally postponed — approved direction, not yet scheduled in

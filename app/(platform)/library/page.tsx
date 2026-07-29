@@ -1,119 +1,31 @@
 import { redirect } from "next/navigation";
-import type { PostType } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth/session";
-import { prisma } from "@/lib/db/prisma";
-import { canCreatePostType } from "@/lib/rating/content-rights";
-import ContentComposer from "@/components/shared/ContentComposer";
-import PostList from "@/components/shared/PostList";
-import { HOUSES_UI_ENABLED, LIBRARY_UI_ENABLED } from "@/lib/config/feature-flags";
-
-const LIBRARY_TYPES: PostType[] = ["article", "lecture", "course", "manifesto"];
-
-const TYPE_LABELS: Record<PostType, string> = {
-  post: "Post",
-  story: "Story",
-  article: "Article",
-  lecture: "Lecture",
-  manifesto: "Manifesto",
-  course: "Course",
-};
 
 /**
- * Library (`/library`) — CLAUDE.md's (2026-07-05) nav tab 4: "courses,
- * books, wellness content." Scoped here to the curated content types
- * this codebase actually has (article/lecture/course/manifesto, gated
- * per PRODUCT.md §10) — split out of the old `/content` page, see
- * ADR-0015. Real books/wellness-service listings aren't built (those are
- * separate `OC_MASTER.md` product-ecosystem items — see BACKLOG.md).
+ * Library (`/library`) — v1 is feed-first; Library isn't in the
+ * "building now" list (OBSIDIAN_ROADMAP_v3.0_The_Feed_First.md
+ * §III/§IV). Route and nav tab stay; real content replaced with a
+ * minimal teaser, same shape as /vault's while REP_UI_ENABLED is off.
+ *
+ * Unlike Vault/Houses, the real article/lecture/course/manifesto
+ * browsing + composer this page used to have (built 2026-07-05/16) was
+ * deleted outright rather than left gated behind `LIBRARY_UI_ENABLED` —
+ * it shared `ContentComposer` with /feed, which was simplified to a
+ * single always-"post" composer for v1's Threads-level-simplicity pass
+ * (2026-07-29) and no longer supports a type selector or title field at
+ * all. Rebuilding Library for real needs its own composer built for
+ * what it actually needs — see TECH_DEBT.md.
  */
-export default async function LibraryPage({
-  searchParams,
-}: {
-  searchParams: { type?: string };
-}) {
+export default async function LibraryPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/library");
-
-  // v1 is feed-first — Library isn't in the "building now" list
-  // (OBSIDIAN_ROADMAP_v3.0_The_Feed_First.md §III/§IV). Route and nav
-  // tab stay; real content replaced with a minimal teaser, same shape
-  // as /vault's while REP_UI_ENABLED is off.
-  if (!LIBRARY_UI_ENABLED) {
-    return (
-      <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
-        <div className="mx-auto max-w-2xl">
-          <p className="text-label mb-2">Community</p>
-          <h1 className="text-h1 mb-2">The Library</h1>
-          <p className="text-body italic">The shelves are being filled.</p>
-        </div>
-      </main>
-    );
-  }
-
-  const activeType =
-    searchParams.type && LIBRARY_TYPES.includes(searchParams.type as PostType)
-      ? (searchParams.type as PostType)
-      : undefined;
-  const types = activeType ? [activeType] : LIBRARY_TYPES;
-
-  const posts = await prisma.post.findMany({
-    where: { isPublished: true, minLevel: { lte: user.level }, type: { in: types } },
-    orderBy: { publishedAt: "desc" },
-    take: 30,
-    select: {
-      id: true,
-      title: true,
-      content: true,
-      mediaUrls: true,
-      type: true,
-      likesCount: true,
-      createdAt: true,
-      author: { select: { id: true, displayName: true, avatarUrl: true, level: true, rep: true } },
-      house: { select: { id: true, name: true, slug: true } },
-      likes: { where: { userId: user.id }, select: { userId: true } },
-      _count: { select: { comments: true } },
-    },
-  });
-
-  const allowedTypes = LIBRARY_TYPES.filter((t) => canCreatePostType(user, t));
-  // Same membership scoping as /feed (Feed & Posts MVP, 2026-07-16) — the
-  // composer here is shared, and /api/posts now requires membership to
-  // tag a house regardless of which page submitted the post. Skipped
-  // entirely while HOUSES_UI_ENABLED is false — this query exists only
-  // to feed the composer's house dropdown, which is hidden either way.
-  const houses = HOUSES_UI_ENABLED
-    ? (
-        await prisma.houseMembership.findMany({
-          where: { userId: user.id },
-          select: { house: { select: { id: true, name: true } } },
-        })
-      ).map((m) => m.house)
-    : [];
 
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
       <div className="mx-auto max-w-2xl">
         <p className="text-label mb-2">Community</p>
-        <h1 className="text-h1 mb-6">Library</h1>
-
-        <div className="mb-8 flex flex-wrap gap-3">
-          <a href="/library" className={`text-caption ${!activeType ? "text-ob-accent" : ""}`}>
-            All
-          </a>
-          {LIBRARY_TYPES.map((t) => (
-            <a
-              key={t}
-              href={`/library?type=${t}`}
-              className={`text-caption ${activeType === t ? "text-ob-accent" : ""}`}
-            >
-              {TYPE_LABELS[t]}
-            </a>
-          ))}
-        </div>
-
-        <ContentComposer allowedTypes={allowedTypes} houses={houses} />
-
-        <PostList posts={posts} />
+        <h1 className="text-h1 mb-2">The Library</h1>
+        <p className="text-body italic">The shelves are being filled.</p>
       </div>
     </main>
   );

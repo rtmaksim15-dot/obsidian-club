@@ -4,6 +4,15 @@
 // earning/ledger logic in lib/rating/rep-engine.ts (REP_TABLE, awardRep,
 // every award call site) keeps running untouched; this only gates what's
 // rendered. Flip to true when REP surfaces are ready to ship.
+//
+// Extended 2026-07-29: also gates the Reputation-stars (`User.reputation`)
+// and Trust Score stats on /hall — Max's own framing was "this is REP/
+// reputation UI that must be behind the disabled flags," i.e. these were
+// a gap in this flag's original coverage (it only checked `User.rep`,
+// the discrete point ledger) rather than a separate concept needing its
+// own flag. The underlying reputation average / Trust Score fields and
+// their recalculation (lib/rating/rating-engine.ts,
+// referral-lifecycle.ts) keep updating silently either way.
 export const REP_UI_ENABLED = false;
 
 // Roadmap §V: "the word 'Houses' is temporarily removed from the
@@ -45,3 +54,16 @@ export const LEVELS_UI_ENABLED = false;
 // deferred House and don't fit the launch content policy regardless of
 // when Library UI ships — see TECH_DEBT.md, DECISIONS.md 2026-07-27.
 export const LIBRARY_UI_ENABLED = false;
+
+// v1 is feed-first — Max's direct instruction (2026-07-29): hide the
+// "Your Invitation" referral-link/stats block on /hall for v1, since
+// "referrals are deferred." Distinct from the core invite-only entry
+// mechanism (admin-approval → one-time invite link, ROADMAP.md §IV
+// "already working, keep, don't touch") — this only gates the
+// referral-stats display and the queries that solely feed it
+// (Referral.count, the ?ref= link). Referral resolution on approval,
+// Trust Score's referral-activation bonus, and
+// lib/rating/referral-lifecycle.ts's transitions all keep running
+// untouched; there's just nothing left in the UI pointing a member at
+// their own referral link/count while this is off.
+export const REFERRALS_UI_ENABLED = false;

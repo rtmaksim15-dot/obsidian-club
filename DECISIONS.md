@@ -1417,3 +1417,109 @@ Verified live via a mobile-viewport pass (per Max's own request): Feed
 worked end-to-end (composer, publish), Vault and Library both showed
 their teasers, and Community showed only Newcomers + the Events link
 — matching the confirmed scope exactly.
+
+### 2026-07-29 — Diagnosed the production photo-upload bug by reproducing it, not guessing
+
+Max reported "Could not upload photo" in production and asked to check
+"logs/storage config." No direct access to Vercel's production logs
+from this environment, so diagnosed by reproduction instead: uploaded
+directly against the real Supabase project using the exact same
+service-role client `POST /api/posts/photo` already used — bucket
+existed, `public: true`, `fileSizeLimit: 8388608` (8MB), upload
+succeeded instantly with no error. That ruled out Storage config,
+permissions, and the bucket itself as the cause.
+
+With Storage confirmed fine, looked at what's different between "works
+in this dev sandbox" and "fails on Vercel specifically": Vercel's own
+docs (fetched directly, not from memory, since platform limits change)
+confirm Serverless Functions cap request/response bodies at a hard
+4.5MB, independent of any app-level check — `POST /api/posts/photo`'s
+own limit was a more generous 8MB, meaning real phone photos between
+~4.5MB and 8MB (an entirely ordinary size for a modern phone camera
+JPEG) were being rejected by the platform itself
+(`FUNCTION_PAYLOAD_TOO_LARGE`) before this app's route code ever ran —
+consistent with a generic-looking failure and no useful server log to
+point at, since the request never reached application code.
+
+**Fix**: switched to the standard Vercel-recommended pattern for this
+exact problem — the client uploads directly to Supabase Storage via a
+short-lived signed upload URL/token (`createSignedUploadUrl`/
+`uploadToSignedUrl`), and the Next.js route only issues that token (a
+tiny JSON exchange, nowhere near 4.5MB). The file itself never touches
+the Vercel function body, so its platform cap becomes irrelevant;
+Supabase's own bucket-level `fileSizeLimit` is what actually enforces
+the size cap from here on. Also tightened `allowedMimeTypes` on the
+bucket at creation time, since content-type validation moved from
+"inspect the real uploaded file server-side" to "trust the client's
+declared type before minting a token" — a real (if minor) trade-off
+of this architecture change, worth a backstop at the Storage layer
+itself rather than just the app's own pre-check.
+
+**Found in passing, deliberately not fixed**: `POST /api/profile/avatar`
+has the identical proxy-through-the-function shape and the same latent
+exposure to the same 4.5MB cap — it just hasn't been hit yet because
+avatar images people pick tend to be smaller than full camera photos.
+Not fixed here since it wasn't the reported bug and touching it wasn't
+asked for; flagged in TECH_DEBT.md as a clear, small, separate fix.
+
+### 2026-07-29 — Composer simplified to post-only; moved off the feed onto its own screen
+
+Direct instruction, not a roadmap-table-driven deferral like the
+Houses/Levels/Library passes: "v1 has only posts; one text area +
+photo button + Publish." Since `/library`'s real page was already a
+permanent teaser (previous entry, same day) and `/feed` was the only
+other real caller of `ContentComposer`, simplifying the shared
+component to always submit `type: "post"` — dropping the type
+dropdown, the title field, and the whole `allowedTypes` prop — left
+Library's own (already-dead, teaser-gated) call site passing a prop
+that no longer exists on the component. Chose to delete that dead code
+outright rather than keep it "compiling but wrong," since — unlike
+Houses/Vault, where the real implementation truly is intact and ready
+to reactivate — Library's old composer usage would need a real rebuild
+regardless (different content types, needs a title field, needs its
+own type selector) whenever `LIBRARY_UI_ENABLED` flips on. Recorded as
+new, real work in TECH_DEBT.md rather than pretending the flag alone
+restores it.
+
+A follow-up message arrived mid-task asking for a full Threads-style
+nav/composer/feed redesign, which further reshaped this: the composer
+now lives on its own screen (`/compose`), not inline on `/feed` at all,
+reached from the bottom nav's new center "+" tab. Chose a dedicated
+route over a modal — this codebase has no modal/dialog primitive
+anywhere yet (every multi-step flow, including the Initiation Ritual,
+is already a sequence of full pages), so a dedicated screen matches
+established patterns instead of introducing a new one for a single use
+case.
+
+### 2026-07-29 — Extended `REP_UI_ENABLED`'s scope to cover Reputation stars and Trust Score; asked before touching Notifications
+
+Max's framing was explicit: "the Reputation stars and Trust Score block
+are visible — this is REP/reputation UI that must be behind the
+disabled flags." Read this as identifying a real gap in
+`REP_UI_ENABLED`'s original coverage (it only ever gated `User.rep`,
+the discrete point ledger — see the 2026-07-25 REP/reputation-split
+entry) rather than a request for a new, separate flag; extended the
+flag's own doc comment and gated both `Reputation` (`User.reputation`
+stars) and `Trust Score` under it on `/hall`, and — for consistency,
+since the flag's meaning had just changed — the equivalent
+Reputation-stars block on `/profile/[username]`, which had the same
+gap. Login streak had no such framing (no "this belongs behind an
+existing flag" cue) and no named later-reactivation story, so it was
+removed outright, not flagged. The referral block ("Your Invitation")
+did get its own new flag, `REFERRALS_UI_ENABLED` — Max's own words
+("referrals are deferred") matched the same defer-with-a-flag shape as
+every other v1 deferral this week, distinct from the core invite-only
+entry mechanism (admin approval → one-time link), which ROADMAP.md §IV
+explicitly keeps.
+
+Max's enumerated "Profile shows: avatar, name, Edit profile, own
+posts" read as potentially exhaustive, which would also mean removing
+Notifications (not named in that list) — asked directly rather than
+guess, since notifications are the only surface carrying real account
+notices (e.g. "your access has been granted") and aren't named
+anywhere as deferred. **Max confirmed: keep Notifications.**
+
+Added "own posts" as a genuinely new capability on `/hall` — the
+Profile tab previously had no post list of its own at all (only
+`/profile/[username]` did). Reused the existing `PostList`/`PostCard`
+shared components rather than building new rendering for this.

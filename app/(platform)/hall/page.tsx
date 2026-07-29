@@ -6,13 +6,19 @@ import { getLevelProgress } from "@/lib/rating/level-progress";
 import { syncReferralLifecycle } from "@/lib/rating/referral-lifecycle";
 import { checkLevelUp } from "@/lib/rating/level-progression";
 import { LEVEL_NAMES } from "@/lib/rating/levels";
-import { REP_UI_ENABLED, LEVELS_UI_ENABLED } from "@/lib/config/feature-flags";
+import PostList, { type FeedPost } from "@/components/shared/PostList";
+import { REP_UI_ENABLED, LEVELS_UI_ENABLED, REFERRALS_UI_ENABLED } from "@/lib/config/feature-flags";
 
 /**
- * The Hall (`/hall`) — status card, progress-to-next-level, referral
- * link + stats, notifications, and (v0.5) recent rating history.
- * Rooms/events/tasks blocks stay out where those features don't exist
- * yet (Events is v0.7) — see app/(platform)/layout.tsx's placeholders.
+ * The Hall (`/hall`) — the "Profile" nav tab. Threads-level-simplicity
+ * pass (2026-07-29, OBSIDIAN_ROADMAP_v3.0): stripped down to avatar,
+ * name, Edit profile, and the member's own posts — Reputation stars,
+ * Trust Score, login streak, and the referral-stats block are all
+ * hidden for v1 (see feature-flags.ts). Notifications stays; it wasn't
+ * named as deferred and is the only place approval-type notices
+ * surface. Rooms/events/tasks blocks stay out where those features
+ * don't exist yet (Events is v0.7) — see app/(platform)/layout.tsx's
+ * placeholders.
  */
 export default async function HallPage() {
   let user = await getCurrentUser();
@@ -24,18 +30,25 @@ export default async function HallPage() {
 
   // No real cron yet (see TECH_DEBT.md) — check referral lifecycle
   // transitions and level-up eligibility opportunistically whenever a
-  // member loads their own Hall.
+  // member loads their own Hall. Kept running regardless of
+  // REFERRALS_UI_ENABLED/LEVELS_UI_ENABLED — those flags only gate
+  // display, not the underlying transitions.
   await syncReferralLifecycle(user.id);
   await checkLevelUp(user.id);
   user = (await prisma.user.findUnique({ where: { id: user.id } }))!;
 
-  const [notifications, referralCount, repHistory, publishedContentCount] = await Promise.all([
+  const [notifications, referralCount, repHistory, posts] = await Promise.all([
     prisma.notification.findMany({
       where: { userId: user.id },
       orderBy: { createdAt: "desc" },
       take: 5,
     }),
-    prisma.referral.count({ where: { inviterId: user.id, status: { in: ["joined", "active"] } } }),
+    // Only feeds the "Your Invitation" block below — skipped while
+    // that's hidden, same "don't run otherwise-unused queries" pattern
+    // as REP_UI_ENABLED/HOUSES_UI_ENABLED.
+    REFERRALS_UI_ENABLED
+      ? prisma.referral.count({ where: { inviterId: user.id, status: { in: ["joined", "active"] } } })
+      : Promise.resolve(0),
     REP_UI_ENABLED
       ? prisma.repHistory.findMany({
           where: { userId: user.id },
@@ -43,10 +56,27 @@ export default async function HallPage() {
           take: 5,
         })
       : Promise.resolve([]),
-    prisma.post.count({ where: { authorId: user.id, isPublished: true } }),
+    prisma.post.findMany({
+      where: { authorId: user.id, isPublished: true },
+      orderBy: { publishedAt: "desc" },
+      take: 30,
+      select: {
+        id: true,
+        title: true,
+        content: true,
+        mediaUrls: true,
+        type: true,
+        likesCount: true,
+        createdAt: true,
+        author: { select: { id: true, displayName: true, avatarUrl: true, level: true, rep: true } },
+        house: { select: { id: true, name: true, slug: true } },
+        likes: { where: { userId: user.id }, select: { userId: true } },
+        _count: { select: { comments: true } },
+      },
+    }),
   ]);
 
-  const progress = getLevelProgress(user, { hasPublishedContent: publishedContentCount >= 1 });
+  const progress = getLevelProgress(user, { hasPublishedContent: posts.length >= 1 });
   const referralLink = `${process.env.NEXT_PUBLIC_APP_URL || ""}/?ref=${user.referralCode}`;
 
   return (
@@ -81,26 +111,21 @@ export default async function HallPage() {
         </a>
 
         {/* Status */}
-        <div className={`card-profile mt-10 grid gap-6 ${REP_UI_ENABLED ? "grid-cols-3" : "grid-cols-2"}`}>
-          <div>
-            <p className="text-label">Reputation</p>
-            <p className="text-data mt-1">{Number(user.reputation).toFixed(1)} ★</p>
-          </div>
-          {REP_UI_ENABLED ? (
+        {REP_UI_ENABLED ? (
+          <div className="card-profile mt-10 grid grid-cols-3 gap-6">
+            <div>
+              <p className="text-label">Reputation</p>
+              <p className="text-data mt-1">{Number(user.reputation).toFixed(1)} ★</p>
+            </div>
             <div>
               <p className="text-label">REP</p>
               <p className="text-data mt-1">{user.rep}</p>
             </div>
-          ) : null}
-          <div>
-            <p className="text-label">Trust Score</p>
-            <p className="text-data mt-1">{user.trustScore}</p>
+            <div>
+              <p className="text-label">Trust Score</p>
+              <p className="text-data mt-1">{user.trustScore}</p>
+            </div>
           </div>
-        </div>
-        {user.currentStreak > 0 ? (
-          <p className="text-caption mt-3" style={{ color: "var(--color-text-secondary)" }}>
-            {user.currentStreak}-day login streak (best: {user.longestStreak})
-          </p>
         ) : null}
 
         {/* Progress */}
@@ -144,18 +169,20 @@ export default async function HallPage() {
         ) : null}
 
         {/* Referrals */}
-        <section className="mt-10">
-          <p className="text-label mb-3">Your Invitation</p>
-          <div className="card">
-            <p className="text-caption" style={{ color: "var(--color-text-secondary)" }}>
-              Your personal link
-            </p>
-            <p className="text-data mt-1 break-all">{referralLink}</p>
-            <p className="text-caption mt-3">
-              {referralCount} joined via your invitation.
-            </p>
-          </div>
-        </section>
+        {REFERRALS_UI_ENABLED ? (
+          <section className="mt-10">
+            <p className="text-label mb-3">Your Invitation</p>
+            <div className="card">
+              <p className="text-caption" style={{ color: "var(--color-text-secondary)" }}>
+                Your personal link
+              </p>
+              <p className="text-data mt-1 break-all">{referralLink}</p>
+              <p className="text-caption mt-3">
+                {referralCount} joined via your invitation.
+              </p>
+            </div>
+          </section>
+        ) : null}
 
         {/* Notifications */}
         <section className="mt-10">
@@ -198,6 +225,12 @@ export default async function HallPage() {
             )}
           </section>
         ) : null}
+
+        {/* Own posts */}
+        <section className="mt-10">
+          <p className="text-label mb-3">Your Posts</p>
+          <PostList posts={posts as FeedPost[]} />
+        </section>
       </div>
     </main>
   );

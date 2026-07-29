@@ -1,25 +1,26 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Home, Vault, Users, BookOpen, User } from "lucide-react";
+import { Home, Users, Plus, Archive, User } from "lucide-react";
 
-// Mobile bottom navigation — CLAUDE.md's (2026-07-05) 5-tab structure:
-// Feed / Vault / Community / Library / Profile, replacing the original
-// DESIGN.md §8 layout (Hall/Rooms/Content/Events/Profile). See ADR-0015.
-// "Vault" was "Shop" until 2026-07-09 — Max confirmed The Vault (the
-// restored CLAUDE.md's reputation-gated concept, replacing a direct-
-// purchase shop entirely) fully replaces it, not a rename in name only —
-// see ADR-0016. "Community" points at /rooms (Rooms is what's actually
-// built; groups/people-discovery/events-as-filter aren't — see /rooms's
-// Events link and TECH_DEBT.md). "Profile" points at /hall (the
-// self-view dashboard — "The Hall" stays the in-app/brand name; the nav
-// label matches CLAUDE.md's generic term). Desktop keeps the platform
-// usable without this (pages are still directly reachable by URL).
+// Mobile bottom navigation — Threads-style redesign (OBSIDIAN_ROADMAP_v3.0,
+// 2026-07-29): five icon-only tabs, no text labels. Order: Feed, Community,
+// Create Post (center), Vault, Profile. Library's tab is gone (the route
+// and its teaser still exist, just not linked from here — see
+// app/(platform)/library/page.tsx). "Community" points at /rooms (Rooms is
+// what's actually built; groups/people-discovery/events-as-filter aren't —
+// see /rooms's Events link and TECH_DEBT.md). "Profile" points at /hall
+// (the self-view dashboard — "The Hall" stays the in-app/brand name).
+// "Create Post" links to /compose, its own screen (see ContentComposer.tsx)
+// rather than a modal — no dialog/portal primitive exists elsewhere in this
+// codebase, and a dedicated route matches how /ritual's steps are already
+// built. Desktop keeps the platform usable without this (pages are still
+// directly reachable by URL).
 const ITEMS = [
   { href: "/feed", label: "Feed", icon: Home },
-  { href: "/vault", label: "Vault", icon: Vault },
   { href: "/rooms", label: "Community", icon: Users },
-  { href: "/library", label: "Library", icon: BookOpen },
+  { href: "/compose", label: "Create Post", icon: Plus },
+  { href: "/vault", label: "Vault", icon: Archive },
   { href: "/hall", label: "Profile", icon: User },
 ];
 
@@ -37,13 +38,11 @@ export default function BottomNav() {
           <a
             key={label}
             href={href}
-            className="flex flex-1 flex-col items-center gap-1 py-3"
+            aria-label={label}
+            className="flex flex-1 items-center justify-center py-4"
             style={{ color: active ? "var(--color-accent)" : "var(--color-text-muted)" }}
           >
-            <Icon size={20} strokeWidth={1.5} />
-            <span className="text-caption" style={{ color: "inherit" }}>
-              {label}
-            </span>
+            <Icon size={22} strokeWidth={1.5} />
           </a>
         );
       })}

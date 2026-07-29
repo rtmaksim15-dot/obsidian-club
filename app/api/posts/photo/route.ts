@@ -8,6 +8,26 @@ import { createAdminClient } from "@/lib/auth/supabase-admin";
 // public bucket, since post photos are meant to be visible to whoever
 // can already see the post itself; access control lives in the app
 // (Post.minLevel / house membership), not in Storage.
+//
+// Rewritten 2026-07-29 (v1 bug fix): this used to accept the file body
+// directly and proxy it to Storage via the service-role client. Real
+// production photos routinely failed with "Could not upload photo" —
+// traced to Vercel's hard 4.5MB request-body cap on Serverless
+// Functions (FUNCTION_PAYLOAD_TOO_LARGE), which our own 8MB app-level
+// check never got a chance to enforce since the platform rejected the
+// request first. Confirmed the Storage side itself (bucket, size
+// limit, permissions) was fine by uploading directly against the real
+// project — the file simply never made it past Vercel's function body
+// limit for anything much over ~4MB, which ordinary phone photos
+// routinely exceed.
+//
+// Fix: this route no longer receives file bytes at all. It hands back
+// a short-lived signed upload URL/token; the browser uploads the file
+// straight to Supabase Storage (bypassing the Vercel function body
+// entirely), then the client sends the resulting public URL along with
+// the rest of the post. Supabase's own bucket-level `fileSizeLimit`
+// (8MB, set below) is what actually enforces the size cap now — a
+// signed upload is still subject to it, just not to Vercel's.
 const BUCKET = "post-photos";
 const MAX_BYTES = 8 * 1024 * 1024; // 8MB
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
@@ -15,8 +35,14 @@ const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/g
 async function ensureBucket(admin: ReturnType<typeof createAdminClient>) {
   const { data: buckets } = await admin.storage.listBuckets();
   if (buckets?.some((b) => b.name === BUCKET)) return;
-  await admin.storage.createBucket(BUCKET, { public: true, fileSizeLimit: MAX_BYTES });
+  await admin.storage.createBucket(BUCKET, {
+    public: true,
+    fileSizeLimit: MAX_BYTES,
+    allowedMimeTypes: Array.from(ALLOWED_TYPES),
+  });
 }
+
+type Body = { filename?: string; contentType?: string; size?: number };
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -24,33 +50,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 403 });
   }
 
-  const formData = await request.formData();
-  const file = formData.get("file");
-  if (!(file instanceof File)) {
-    return NextResponse.json({ error: "No file provided." }, { status: 422 });
+  let body: Body;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
-  if (!ALLOWED_TYPES.has(file.type)) {
+
+  if (!body.contentType || !ALLOWED_TYPES.has(body.contentType)) {
     return NextResponse.json({ error: "Only JPEG, PNG, WEBP, or GIF images are allowed." }, { status: 422 });
   }
-  if (file.size > MAX_BYTES) {
+  if (typeof body.size !== "number" || body.size > MAX_BYTES) {
     return NextResponse.json({ error: "Image must be 8MB or smaller." }, { status: 422 });
   }
 
   const admin = createAdminClient();
   await ensureBucket(admin);
 
-  const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+  const ext = body.filename?.split(".").pop()?.toLowerCase() || "jpg";
   const path = `${user.id}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
 
-  const { error: uploadError } = await admin.storage.from(BUCKET).upload(path, file, {
-    contentType: file.type,
-    cacheControl: "31536000",
-  });
-  if (uploadError) {
-    console.error("[posts/photo] Upload failed:", uploadError);
-    return NextResponse.json({ error: "Could not upload photo. Try again shortly." }, { status: 503 });
+  const { data, error } = await admin.storage.from(BUCKET).createSignedUploadUrl(path);
+  if (error) {
+    console.error("[posts/photo] Could not create signed upload URL:", error);
+    return NextResponse.json({ error: "Could not start photo upload. Try again shortly." }, { status: 503 });
   }
 
-  const { data } = admin.storage.from(BUCKET).getPublicUrl(path);
-  return NextResponse.json({ url: data.publicUrl }, { status: 201 });
+  const { data: pub } = admin.storage.from(BUCKET).getPublicUrl(path);
+  return NextResponse.json(
+    { bucket: BUCKET, path, token: data.token, publicUrl: pub.publicUrl },
+    { status: 201 },
+  );
 }

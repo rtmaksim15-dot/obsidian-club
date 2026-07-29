@@ -95,20 +95,20 @@ export default async function ProfilePage({ params }: { params: { username: stri
           </p>
         ) : null}
 
-        <div className="mt-3 flex items-center gap-4">
-          <p aria-label={`${stars} out of 5 stars`}>
-            {Array.from({ length: 5 }, (_, i) => (
-              <span key={i} className={i < stars ? "star-filled" : "star-empty"}>
-                ★
-              </span>
-            ))}
-          </p>
-          {REP_UI_ENABLED ? (
+        {REP_UI_ENABLED ? (
+          <div className="mt-3 flex items-center gap-4">
+            <p aria-label={`${stars} out of 5 stars`}>
+              {Array.from({ length: 5 }, (_, i) => (
+                <span key={i} className={i < stars ? "star-filled" : "star-empty"}>
+                  ★
+                </span>
+              ))}
+            </p>
             <p className="text-data" style={{ color: "var(--color-text-secondary)" }}>
               {user.rep} REP
             </p>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
 
         <p className="text-caption mt-4" style={{ color: "var(--color-text-secondary)" }}>
           {[user.locationCity, user.locationCountry].filter(Boolean).join(", ") || "Location not shared"}

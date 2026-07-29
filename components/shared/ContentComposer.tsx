@@ -3,41 +3,36 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { ImagePlus, X } from "lucide-react";
+import { createClient } from "@/lib/auth/supabase-browser";
 
-type AllowedType = { type: string; label: string };
+const MAX_BYTES = 8 * 1024 * 1024; // 8MB — must match app/api/posts/photo/route.ts
 
-const LABELS: Record<string, string> = {
-  post: "Post",
-  story: "Story",
-  article: "Article",
-  lecture: "Lecture",
-  course: "Course",
-  manifesto: "Manifesto",
-};
-
-// Only types the toggle applies to need a title; short-form types don't.
-const TITLED_TYPES = new Set(["article", "lecture", "course", "manifesto"]);
-
-type Props = { allowedTypes: string[]; houses?: { id: string; name: string }[] };
+type Props = { houses?: { id: string; name: string }[] };
 
 /**
- * Post composer — the type dropdown only lists types the caller is
- * actually allowed to create (`canCreatePostType`, PRODUCT.md §10). If a
- * member has no creation rights at their level, this isn't rendered at
- * all (see page.tsx). `houses` lists only houses the caller has actually
- * joined (Feed & Posts MVP, 2026-07-16 — `/api/posts` rejects a houseId
- * the caller isn't a member of).
+ * Post composer (Threads-level simplicity, OBSIDIAN_ROADMAP_v3.0's
+ * feed-first v1: "one button: photo + text. Published. Done."). Every
+ * member can create a `post` (min level 1, lib/rating/content-rights.ts),
+ * so there's no type selector to gate — other post types (article/
+ * lecture/course) belong to Library's own composer whenever that's
+ * rebuilt (see TECH_DEBT.md — this component used to serve both).
  *
- * Photo upload is a single optional image, uploaded to Supabase Storage
- * (`POST /api/posts/photo`) before the post itself — the returned URL
- * rides along in the post-creation request as `photoUrl`.
+ * Lives on its own screen (`/compose`, reached from the bottom nav's
+ * center "+" tab) rather than inline on /feed — the 2026-07-29 nav
+ * redesign made the feed pure content, no composer at the top.
+ *
+ * Photo upload is two steps, not a direct proxy through this app's own
+ * API route: `POST /api/posts/photo` hands back a signed Supabase
+ * Storage upload URL/token, and the browser uploads the file straight
+ * to Storage. This bypasses Vercel Serverless Functions' hard 4.5MB
+ * request-body cap — real phone photos routinely exceed that, which is
+ * exactly what caused production's "Could not upload photo" failures
+ * (the file never got proxied through the old flow; Storage itself was
+ * always fine — see DECISIONS.md, 2026-07-29).
  */
-export default function ContentComposer({ allowedTypes, houses = [] }: Props) {
+export default function ContentComposer({ houses = [] }: Props) {
   const router = useRouter();
-  const options: AllowedType[] = allowedTypes.map((type) => ({ type, label: LABELS[type] ?? type }));
 
-  const [type, setType] = useState(options[0]?.type ?? "post");
-  const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [houseId, setHouseId] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
@@ -46,10 +41,13 @@ export default function ContentComposer({ allowedTypes, houses = [] }: Props) {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  if (options.length === 0) return null;
-
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
+    if (file && file.size > MAX_BYTES) {
+      setError("Image must be 8MB or smaller.");
+      return;
+    }
+    setError(null);
     setPhoto(file);
     setPhotoPreview(file ? URL.createObjectURL(file) : null);
   }
@@ -58,6 +56,28 @@ export default function ContentComposer({ allowedTypes, houses = [] }: Props) {
     setPhoto(null);
     setPhotoPreview(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  async function uploadPhoto(file: File): Promise<string> {
+    const signRes = await fetch("/api/posts/photo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename: file.name, contentType: file.type, size: file.size }),
+    });
+    const signBody = await signRes.json().catch(() => ({}));
+    if (!signRes.ok) {
+      throw new Error(signBody?.error ?? "Could not upload photo.");
+    }
+
+    const supabase = createClient();
+    const { error: uploadError } = await supabase.storage
+      .from(signBody.bucket)
+      .uploadToSignedUrl(signBody.path, signBody.token, file, { contentType: file.type });
+    if (uploadError) {
+      throw new Error("Could not upload photo. Try again shortly.");
+    }
+
+    return signBody.publicUrl;
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -70,24 +90,20 @@ export default function ContentComposer({ allowedTypes, houses = [] }: Props) {
 
     let photoUrl: string | undefined;
     if (photo) {
-      const formData = new FormData();
-      formData.append("file", photo);
-      const uploadRes = await fetch("/api/posts/photo", { method: "POST", body: formData });
-      const uploadBody = await uploadRes.json().catch(() => ({}));
-      if (!uploadRes.ok) {
-        setError(uploadBody?.error ?? "Could not upload photo.");
+      try {
+        photoUrl = await uploadPhoto(photo);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not upload photo.");
         setSubmitting(false);
         return;
       }
-      photoUrl = uploadBody.url;
     }
 
     const res = await fetch("/api/posts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        type,
-        title: title.trim() || undefined,
+        type: "post",
         content: trimmed,
         houseId: houseId || undefined,
         photoUrl,
@@ -101,43 +117,12 @@ export default function ContentComposer({ allowedTypes, houses = [] }: Props) {
       return;
     }
 
-    setTitle("");
-    setContent("");
-    setHouseId("");
-    clearPhoto();
     setSubmitting(false);
-    router.refresh();
+    router.push("/feed");
   }
 
   return (
     <form onSubmit={handleSubmit} className="card mb-8 space-y-3">
-      {options.length > 1 ? (
-        <select
-          className="input"
-          value={type}
-          onChange={(e) => setType(e.target.value)}
-          style={{ width: "auto" }}
-        >
-          {options.map((o) => (
-            <option key={o.type} value={o.type}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      ) : (
-        <p className="text-label">{options[0].label}</p>
-      )}
-
-      {TITLED_TYPES.has(type) ? (
-        <input
-          className="input"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Title"
-          maxLength={200}
-        />
-      ) : null}
-
       {houses.length > 0 ? (
         <select
           className="input"

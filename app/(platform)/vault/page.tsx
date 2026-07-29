@@ -37,7 +37,7 @@ export default async function VaultPage() {
         <div className="mx-auto max-w-3xl">
           <p className="text-label mb-2">Access</p>
           <h1 className="text-h1 mb-2">The Vault</h1>
-          <p className="text-body italic">The Vault opens in time.</p>
+          <p className="text-body italic">Under construction. It will be worth the wait.</p>
         </div>
       </main>
     );

@@ -8,7 +8,61 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.20.0` is the current released version.
+Nothing yet — `v0.21.0` is the current released version.
+
+## [0.21.0] — 2026-07-29
+
+Feed-first simplification pass, per `OBSIDIAN_ROADMAP_v3.0_The_Feed_First.md`,
+"Threads-level simplicity."
+
+### Fixed
+
+- **Photo upload in the feed composer** ("Could not upload photo" in
+  production) — root cause: Vercel Serverless Functions cap request
+  bodies at 4.5MB, a hard platform limit; real phone photos routinely
+  exceed that, so they never reached this app's own 8MB check at all.
+  Confirmed Supabase Storage itself (bucket, size limit, permissions)
+  was fine by uploading directly against the real project. Fix:
+  `POST /api/posts/photo` now returns a signed Supabase Storage upload
+  URL/token instead of proxying the file; the browser uploads straight
+  to Storage, bypassing the Vercel function body entirely. Also set
+  `allowedMimeTypes` on the bucket (belt-and-suspenders, since content
+  type is now only declared by the client pre-upload, not sniffed from
+  real bytes server-side). See DECISIONS.md.
+
+### Changed
+
+- **`ContentComposer`** — the type selector (Post/Article/Lecture/...)
+  and title field are gone; every member can already create a `post`
+  (min level 1), so there was nothing to gate. Moved off `/feed` onto
+  its own screen, `/compose`, reached from the bottom nav's new center
+  "+" tab — the feed itself is now pure content, no composer at the
+  top, no "Feed" heading. `/library`'s old composer usage (dead code
+  behind its teaser) was removed rather than kept, since it depended on
+  the type selector this component no longer has — see TECH_DEBT.md.
+- **Bottom nav** — Threads-style redesign: five icon-only tabs, no text
+  labels (Feed, Community, Create Post, Vault, Profile). Library's tab
+  is gone (route + teaser still reachable by URL, just not linked from
+  the nav).
+- **`PostCard`/`PostList`** — flat Threads-style: no card border/
+  background, a subtle divider between posts instead. Dropped the
+  "Post · " type-label prefix (redundant now that only `post` exists in
+  practice).
+- **`/hall`** (the "Profile" nav tab) — stripped to avatar, name, Edit
+  profile, and the member's own posts. Reputation stars and Trust Score
+  now sit behind `REP_UI_ENABLED` (a gap in that flag's original REP-
+  ledger-only scope — Max's framing was that these are the same
+  REP/reputation UI concept). Login streak removed outright. The "Your
+  Invitation" referral block sits behind a new `REFERRALS_UI_ENABLED`
+  flag. Notifications stayed — not named as deferred, and it's the only
+  surface for approval-type notices. `/profile/[username]`'s reputation
+  stars got the same `REP_UI_ENABLED` gate for consistency.
+- **`/vault`** teaser copy — "The Vault opens in time." → "Under
+  construction. It will be worth the wait."
+
+### Added
+
+- **`lib/config/feature-flags.ts`** — `REFERRALS_UI_ENABLED = false`.
 
 ## [0.20.0] — 2026-07-27
 

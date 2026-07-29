@@ -3,10 +3,7 @@ import type { PostType } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { getRitualStatus } from "@/lib/auth/ritual";
-import { canCreatePostType } from "@/lib/rating/content-rights";
-import ContentComposer from "@/components/shared/ContentComposer";
 import PostList from "@/components/shared/PostList";
-import { HOUSES_UI_ENABLED } from "@/lib/config/feature-flags";
 
 const FEED_TYPES: PostType[] = ["post", "story"];
 
@@ -19,9 +16,11 @@ const FEED_TYPES: PostType[] = ["post", "story"];
  *
  * Scope (Feed & Posts MVP, 2026-07-16): global posts (no house) + posts
  * from houses the caller has actually joined (`HouseMembership`) — not
- * every active house, now that membership is a real thing. The composer's
- * house dropdown is scoped the same way: you can only tag a post to a
- * house you've joined (enforced again server-side in `POST /api/posts`).
+ * every active house, now that membership is a real thing.
+ *
+ * Pure content as of the 2026-07-29 nav redesign — no heading, no
+ * composer (moved to its own screen, `/compose`, reached from the
+ * bottom nav's center "+" tab). Posts start at the top of the page.
  */
 export default async function FeedPage() {
   const user = await getCurrentUser();
@@ -66,21 +65,9 @@ export default async function FeedPage() {
     },
   });
 
-  const allowedTypes = FEED_TYPES.filter((t) => canCreatePostType(user, t));
-  // Feed-first v1 — the composer's house dropdown is part of the
-  // "browse/tag houses" UI the roadmap defers, even though the
-  // underlying membership scoping above (which posts show in feed)
-  // keeps working untouched.
-  const houses = HOUSES_UI_ENABLED ? memberships.map((m) => m.house) : [];
-
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
       <div className="mx-auto max-w-2xl">
-        <p className="text-label mb-2">Community</p>
-        <h1 className="text-h1 mb-6">Feed</h1>
-
-        <ContentComposer allowedTypes={allowedTypes} houses={houses} />
-
         <PostList posts={posts} />
       </div>
     </main>
