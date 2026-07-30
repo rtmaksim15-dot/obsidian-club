@@ -760,10 +760,41 @@ old proxy-upload flow could).
 
 **Found in passing, not fixed**: `POST /api/profile/avatar` (avatar
 upload) has the exact same proxy-through-the-function shape and the
-same latent 4.5MB exposure — it happened to work in earlier testing
-only because avatar images people pick tend to be smaller than full
-phone-camera photos, not because the route is actually safe from the
-same failure mode. Worth the same signed-URL fix in its own pass.
+same latent 4.5MB exposure. **Partially mitigated 2026-07-30**:
+`AvatarUploadButton` now runs the same client-side compression as the
+post composer (see the entry below) before uploading, which keeps
+real-world avatar uploads well under 4.5MB in practice — but the route
+itself still proxies bytes through the Vercel function body, so the
+underlying exposure isn't actually closed, just made very unlikely to
+trigger. Worth the same signed-URL fix in its own pass regardless of
+how unlikely.
+
+## Photo uploads failing on size, even after the signed-URL fix — resolved 2026-07-30
+
+The `v0.21.0` signed-URL fix solved Vercel's 4.5MB function-body cap,
+but real iPhone photos routinely exceed even this app's own, more
+generous 8MB check — modern phone cameras commonly produce 10-25MB
+files (especially with Live Photos / ProRAW / high-megapixel sensors).
+That check was rejecting real photos client-side with "Image must be
+8MB or smaller" before any upload was even attempted.
+
+**Fix**: `lib/utils/compressImage.ts` — a client-side canvas pipeline
+(resize to max 2048px long side, re-encode as JPEG at ~0.85 quality)
+that runs on every photo before it's checked against the 8MB limit or
+uploaded at all, in both `ContentComposer` (post photos) and
+`AvatarUploadButton` (avatars). 8MB is now a post-compression safety
+net for the rare oversized edge case, not the primary gate. HEIC files
+(iOS's default camera format) go through the exact same generic
+pipeline via `createImageBitmap` — no separate HEIC-specific code path
+or third-party conversion library — which works wherever the browser
+can natively decode HEIC (Safari/iOS, the real case this matters for);
+unsupported elsewhere is an accepted gap, not something worth a
+dependency for.
+
+Verified live: a synthetic 4000×3000 test image was resized to
+2048×1536 and uploaded successfully end-to-end (compress → signed URL
+→ Storage → post creation), confirmed via network requests and the
+resulting post rendering correctly in the feed.
 
 ## Library's real composer/browse code was deleted, not gated (2026-07-29)
 
@@ -819,3 +850,19 @@ they're each a deliberate call, not an oversight:
 Everything else checked (Houses, Levels, Library, Vault, REP, Rooms'
 General/Local Circles) was already deferred behind a flag or
 deactivated by an earlier pass this same week — see the entries above.
+
+## `/rooms`'s index page skipped while only one room is active — resolved 2026-07-30
+
+With `general` and the 7 Local Circles deactivated (see the entry
+above) and only `newcomers` left active, the "ROOMS" list page was
+showing exactly one item — a list-of-one, plus an Events link, for a
+Community tab that only ever leads one place. `/rooms/page.tsx` now
+redirects straight to the sole active room when `rooms.length === 1`,
+before rendering the heading or the Events/Houses link row at all.
+
+Deliberately not a feature flag: the condition is `rooms.length === 1`
+against live data, not a named roadmap-deferred concept with its own
+later-reactivation story. As soon as a second room is reactivated
+(`isActive: true`), this stops firing on its own and the real index
+renders again — no code change or flag flip needed. `/events` stays
+reachable directly by URL either way, just not linked from this path.

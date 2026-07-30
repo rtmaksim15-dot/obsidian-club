@@ -20,6 +20,14 @@ const GROUP_ORDER = ["general", "newcomers", "thematic", "local", "mentors", "ma
 /**
  * Rooms (`/rooms`), v0.4 — real data, replacing the "coming soon"
  * placeholder. Locked rooms are shown, not hidden, per DESIGN.md.
+ *
+ * Feed-first v1 (2026-07-29): with only one active room right now
+ * (`newcomers` — general and the 7 Local Circles were deactivated, see
+ * TECH_DEBT.md), the Community tab skips this index entirely and goes
+ * straight to that room — no list-of-one, no "ROOMS" heading, no
+ * Events link on the way. Purely data-driven, not a flag: as soon as a
+ * second room is reactivated, `rooms.length` stops being 1 and this
+ * index renders again on its own, no code change needed.
  */
 export default async function RoomsPage() {
   const user = await getCurrentUser();
@@ -29,6 +37,10 @@ export default async function RoomsPage() {
     where: { isActive: true },
     orderBy: [{ type: "asc" }, { name: "asc" }],
   });
+
+  if (rooms.length === 1) {
+    redirect(`/rooms/${rooms[0].slug}`);
+  }
 
   const grouped = GROUP_ORDER.map((type) => ({
     type,

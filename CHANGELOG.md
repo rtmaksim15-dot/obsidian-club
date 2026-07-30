@@ -8,7 +8,36 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.21.0` is the current released version.
+Nothing yet — `v0.22.0` is the current released version.
+
+## [0.22.0] — 2026-07-30
+
+### Fixed
+
+- **Photo upload failing client-side with "Image must be 8MB or
+  smaller"** — the signed-upload-URL fix (`v0.21.0`) solved the Vercel
+  4.5MB function-body cap, but real iPhone photos routinely exceed 8MB
+  in the first place, so this app's own size check was rejecting them
+  before they ever got that far. Added client-side compression
+  (`lib/utils/compressImage.ts`) — resize to a max 2048px long side,
+  re-encode as JPEG at ~0.85 quality — run on every photo before
+  upload, in both the post composer and avatar upload. 8MB stays as a
+  post-compression safety net, not the first line of defense. HEIC
+  files go through the same generic canvas-based pipeline (no separate
+  path/library) — decodes wherever the browser supports it natively
+  (notably Safari/iOS, the real-world case this matters for).
+
+### Changed
+
+- **`AvatarUploadButton`** — same compression pipeline as the post
+  composer; `accept` widened to `image/*` (no longer excludes HEIC by
+  omission).
+- **Community nav tab / `/rooms`** — with only one active room right
+  now (`newcomers`), `/rooms` redirects straight to it instead of
+  showing a list-of-one — no "ROOMS" heading, no Events link on the
+  way. Purely data-driven: as soon as a second room is reactivated,
+  `/rooms`'s real index renders again on its own, no flag or code
+  change needed. `/events` stays reachable directly by URL.
 
 ## [0.21.0] — 2026-07-29
 

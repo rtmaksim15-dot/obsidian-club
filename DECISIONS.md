@@ -1523,3 +1523,58 @@ Added "own posts" as a genuinely new capability on `/hall` — the
 Profile tab previously had no post list of its own at all (only
 `/profile/[username]` did). Reused the existing `PostList`/`PostCard`
 shared components rather than building new rendering for this.
+
+### 2026-07-30 — Client-side compression, not a bigger server-side limit, for the photo-size bug
+
+Max reported the *next* layer of the same underlying problem: after
+the signed-URL fix closed Vercel's 4.5MB gap, uploads started failing
+with this app's own "Image must be 8MB or smaller" instead — real
+iPhone photos commonly land well over that too. The fix he asked for
+was specific: client-side compression (canvas resize to 2048px long
+side, JPEG ~0.85), not simply raising the 8MB number. Raising the
+number alone wouldn't have been a fix, just a bigger version of the
+same problem — phone cameras keep getting higher-resolution, and every
+photo uploaded at full original size costs real Storage space and
+bandwidth for no visual benefit at the sizes this app actually displays
+photos (a feed card, not a full-bleed print). Compression is a real
+improvement regardless of the size limit, not a workaround for it.
+
+Built one shared utility (`lib/utils/compressImage.ts`) rather than
+inlining the logic separately in the composer and the avatar uploader,
+since both needed identical resize/re-encode behavior — Max explicitly
+asked for it applied to both. Chose `createImageBitmap` + `canvas`
+(built into every browser) over a third-party HEIC-conversion library:
+Max's instruction was "HEIC goes through the same pipeline," not "add
+special HEIC handling" — read literally, meaning don't special-case
+it, just let the same generic decode-then-redraw path run for every
+file type and rely on the browser's own native decode support (Safari/
+iOS has it; that's the real-world case that matters here, since the
+bug report was specifically about iPhone photos).
+
+Verified live rather than assumed: generated a synthetic 4000×3000
+test image in the browser (a real File object, not a mock), ran it
+through the actual composer UI, and confirmed via the rendered
+`<img>`'s `naturalWidth`/`naturalHeight` that it came out at exactly
+2048×1536 — proving the resize math (scale-to-long-side, preserve
+aspect ratio) is correct, not just plausible-looking. Then published
+it for real and confirmed both the signed-URL mint and the Storage
+upload succeeded (`POST /api/posts/photo` → 201, then `POST
+/api/posts` → 201), with the compressed photo rendering correctly in
+the feed afterward. Cleaned up the test post and its uploaded Storage
+object afterward, same as every other live-test pass this week.
+
+### 2026-07-30 — `/rooms` redirects to the sole active room; explicitly not a flag
+
+Max's instruction named the mechanism directly: "with only one room
+live, skip the ROOMS index page... When more rooms activate later, the
+index returns." That last clause is the tell that this shouldn't be a
+named flag like `HOUSES_UI_ENABLED`/`LIBRARY_UI_ENABLED` — those gate a
+*deferred concept* with its own later-reactivation story that needs a
+human to flip a switch. This is different: it's describing behavior
+that should track live data (how many rooms are actually active) on
+its own, with nobody needing to remember to change anything when a
+second room comes back. Implemented as a plain `rooms.length === 1`
+check in `/rooms/page.tsx` before it renders anything — redirects to
+that room's `/rooms/[slug]` before the "ROOMS" heading or the Events/
+Houses link row ever render, and stops firing the moment a second room
+is reactivated.

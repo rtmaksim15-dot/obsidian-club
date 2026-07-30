@@ -469,6 +469,23 @@ real production bug; the rest is a nav/composer/feed redesign.
       and what's roadmap-required but not yet built (people search,
       follows, ritual username selection).
 
+### v0.22 — Photo upload size fix + Community-tab redirect ✅ (built 2026-07-30)
+
+Follow-up on the signed-URL fix: it solved Vercel's body cap, but real
+iPhone photos still routinely exceed this app's own 8MB check.
+
+- [x] Client-side image compression (`lib/utils/compressImage.ts`) —
+      resize to max 2048px long side, re-encode as JPEG ~0.85 — applied
+      to both post-photo upload and avatar upload, before the 8MB check
+      runs at all. HEIC goes through the same generic pipeline.
+- [x] `/rooms` redirects straight to the sole active room
+      (`newcomers`) while it's the only one live — no heading, no
+      Events link on the way. Purely data-driven (`rooms.length === 1`),
+      not a flag — the real index returns on its own once a second
+      room is reactivated. `/events` stays reachable by direct URL.
+- [x] Verified live: a synthetic 4000×3000 image resized to 2048×1536
+      and uploaded successfully end-to-end.
+
 ## Later
 
 *Intentionally postponed — approved direction, not yet scheduled in
