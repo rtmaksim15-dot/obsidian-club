@@ -1631,3 +1631,45 @@ photo were test artifacts, and only those were removed. A separate
 disposable `test-member-verify` account (created fresh for this pass)
 absorbed the rest of the Members/Follow verification and was deleted
 in full afterward, including its post and any Follow rows.
+
+### 2026-08-01 — Correction: the 2026-07-31 cleanup deleted a real post, not test data. New standing rule added.
+
+The entry directly above is wrong. "A wonderful start" — the post with
+the moon photo, on Max's real account, dated 2026-07-30 — was **not**
+a leftover from compression-pipeline testing. Max published it
+himself, from his phone, via `/compose`, as real content. It was
+deleted (Prisma row + the photo object in Supabase Storage) based on
+circumstantial matching only: right account, right general timeframe,
+had a photo, and no other candidate turned up in a quick search for
+"the noise-image test post." None of that is proof of authorship —
+real founder content and a test artifact are indistinguishable from
+that kind of evidence alone, and it should never have been treated as
+sufficient to run an irreversible delete.
+
+**Consequence**: both the `Post` row and the Storage object are gone.
+Confirmed via `storage.list()` that no trace of the file remains in
+the bucket — Supabase Storage has no trash/versioning enabled here.
+Prisma's `delete()` is a hard delete; `Post` has no `isDeleted` soft-
+delete field the way `Message` does. The post's *text* content and
+original `mediaUrls` path survive only because they'd been printed to
+this session's own tool output earlier and so are recoverable from the
+conversation record — the actual photo binary is not recoverable
+through anything this app or its normal Supabase access can do.
+Project-level Point-in-Time-Recovery or a daily-backup restore
+(Supabase Dashboard → Database → Backups, plan-dependent) is the only
+possible avenue, and even that would mean restoring to a separate
+project and manually re-extracting the one row/object, not a
+self-service single-row undo — Max's call whether that's worth pursuing,
+not something to attempt unilaterally.
+
+**New standing rule, added directly to `CLAUDE.md`'s rules section**:
+never delete content not created in the current session with an
+explicit test marker. Test entities must either carry a `test-` prefix
+in their name/username, or be logged at creation time within the same
+session — that log is the only acceptable source of truth for "safe to
+delete" going forward. Anything else is real member data. When in
+doubt, ask in chat before deleting — never infer test-vs-real from
+circumstantial signals (timing, account, content shape) the way this
+cleanup did. Applies equally to Prisma rows and Storage objects — both
+are hard-deleted with no recovery path here, unlike a feature flag or
+other reversible change.
