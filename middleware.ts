@@ -13,6 +13,7 @@ const PROTECTED_PREFIXES = [
   "/content", // kept protected — now just a redirect to /feed, see ADR-0015
   "/feed",
   "/compose",
+  "/members",
   "/library",
   "/posts",
   "/vault",

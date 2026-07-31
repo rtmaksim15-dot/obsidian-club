@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import ReviewForm from "@/components/shared/ReviewForm";
+import FollowButton from "@/components/shared/FollowButton";
 import PostCard, { type FeedPost } from "@/components/shared/PostCard";
 import { LEVEL_NAMES } from "@/lib/rating/levels";
 import { REP_UI_ENABLED, HOUSES_UI_ENABLED, LEVELS_UI_ENABLED } from "@/lib/config/feature-flags";
@@ -9,10 +10,21 @@ import { REP_UI_ENABLED, HOUSES_UI_ENABLED, LEVELS_UI_ENABLED } from "@/lib/conf
 /**
  * Member profile — looked up by `username` (User Profiles task,
  * 2026-07-17), replacing the old id-based `/profile/[id]`. Real header
- * data, house memberships, last 5 posts, reviews, and (owner-only) a
- * REP event ledger. Still no full tab system (PRODUCT.md's
- * stats/achievements/content/reviews tabs) — everything renders as flat
- * sections, same pattern as before.
+ * data, house memberships, last 5 posts, and (owner-only) a REP event
+ * ledger. Still no full tab system (PRODUCT.md's stats/achievements/
+ * content/reviews tabs) — everything renders as flat sections, same
+ * pattern as before.
+ *
+ * Members & Follows (OBSIDIAN_ROADMAP_v3.1, 2026-07-30): a Follow
+ * button + modest follower/following counts on every profile. The Feed
+ * stays club-wide chronological for v1 — following doesn't filter it
+ * yet (see BACKLOG.md).
+ *
+ * Reviews (list + submission form) moved behind REP_UI_ENABLED this
+ * same pass — Max's design for the Members→profile tap-through was
+ * explicit: "No REP, no reviews (already flagged off)." Previously
+ * only the REP number/stars were gated; the reviews themselves weren't
+ * (see TECH_DEBT.md, 2026-07-29's open question — now resolved).
  */
 export default async function ProfilePage({ params }: { params: { username: string } }) {
   const user = await prisma.user.findUnique({ where: { username: params.username } });
@@ -21,50 +33,60 @@ export default async function ProfilePage({ params }: { params: { username: stri
   const viewer = await getCurrentUser();
   const isOwnProfile = viewer?.id === user.id;
 
-  const [reviews, repHistory, memberships, posts] = await Promise.all([
-    prisma.review.findMany({
-      where: { reviewedId: user.id, isVisible: true },
-      orderBy: { createdAt: "desc" },
-      take: 10,
-      include: { reviewer: { select: { id: true, displayName: true } } },
-    }),
-    // REP's own ledger is more personal than the aggregate score (which
-    // is public, above) — shown only to the profile's owner, same
-    // reasoning as the review form only showing for other people's
-    // profiles, just inverted.
-    isOwnProfile && REP_UI_ENABLED
-      ? prisma.repHistory.findMany({
-          where: { userId: user.id },
-          orderBy: { createdAt: "desc" },
-          take: 10,
-        })
-      : Promise.resolve([]),
-    HOUSES_UI_ENABLED
-      ? prisma.houseMembership.findMany({
-          where: { userId: user.id },
-          orderBy: { joinedAt: "asc" },
-          include: { house: { select: { name: true, slug: true } } },
-        })
-      : Promise.resolve([]),
-    prisma.post.findMany({
-      where: { authorId: user.id, isPublished: true },
-      orderBy: { publishedAt: "desc" },
-      take: 5,
-      select: {
-        id: true,
-        title: true,
-        content: true,
-        mediaUrls: true,
-        type: true,
-        likesCount: true,
-        createdAt: true,
-        author: { select: { id: true, displayName: true, avatarUrl: true, level: true, rep: true } },
-        house: { select: { id: true, name: true, slug: true } },
-        likes: { where: { userId: viewer?.id ?? "" }, select: { userId: true } },
-        _count: { select: { comments: true } },
-      },
-    }),
-  ]);
+  const [reviews, repHistory, memberships, posts, followerCount, followingCount, isFollowing] =
+    await Promise.all([
+      REP_UI_ENABLED
+        ? prisma.review.findMany({
+            where: { reviewedId: user.id, isVisible: true },
+            orderBy: { createdAt: "desc" },
+            take: 10,
+            include: { reviewer: { select: { id: true, displayName: true } } },
+          })
+        : Promise.resolve([]),
+      // REP's own ledger is more personal than the aggregate score (which
+      // is public, above) — shown only to the profile's owner, same
+      // reasoning as the review form only showing for other people's
+      // profiles, just inverted.
+      isOwnProfile && REP_UI_ENABLED
+        ? prisma.repHistory.findMany({
+            where: { userId: user.id },
+            orderBy: { createdAt: "desc" },
+            take: 10,
+          })
+        : Promise.resolve([]),
+      HOUSES_UI_ENABLED
+        ? prisma.houseMembership.findMany({
+            where: { userId: user.id },
+            orderBy: { joinedAt: "asc" },
+            include: { house: { select: { name: true, slug: true } } },
+          })
+        : Promise.resolve([]),
+      prisma.post.findMany({
+        where: { authorId: user.id, isPublished: true },
+        orderBy: { publishedAt: "desc" },
+        take: 5,
+        select: {
+          id: true,
+          title: true,
+          content: true,
+          mediaUrls: true,
+          type: true,
+          likesCount: true,
+          createdAt: true,
+          author: { select: { id: true, displayName: true, avatarUrl: true, level: true, rep: true } },
+          house: { select: { id: true, name: true, slug: true } },
+          likes: { where: { userId: viewer?.id ?? "" }, select: { userId: true } },
+          _count: { select: { comments: true } },
+        },
+      }),
+      prisma.follow.count({ where: { followingId: user.id } }),
+      prisma.follow.count({ where: { followerId: user.id } }),
+      viewer && !isOwnProfile
+        ? prisma.follow.findUnique({
+            where: { followerId_followingId: { followerId: viewer.id, followingId: user.id } },
+          })
+        : Promise.resolve(null),
+    ]);
 
   const stars = Math.round(Number(user.reputation));
   const memberSince = user.joinedAt
@@ -115,12 +137,22 @@ export default async function ProfilePage({ params }: { params: { username: stri
           {memberSince ? ` · Member since ${memberSince}` : ""}
         </p>
 
+        <p className="text-caption mt-1" style={{ color: "var(--color-text-muted)" }}>
+          {followerCount} {followerCount === 1 ? "follower" : "followers"} · {followingCount} following
+        </p>
+
         {user.bio ? <p className="text-body mt-6">{user.bio}</p> : null}
 
         {isOwnProfile ? (
           <a href="/profile/edit" className="btn-ghost mt-6 inline-block">
             Edit profile
           </a>
+        ) : null}
+
+        {viewer && !isOwnProfile ? (
+          <div className="mt-6">
+            <FollowButton userId={user.id} initialFollowing={Boolean(isFollowing)} />
+          </div>
         ) : null}
 
         {memberships.length > 0 ? (
@@ -142,7 +174,7 @@ export default async function ProfilePage({ params }: { params: { username: stri
           </section>
         ) : null}
 
-        {viewer && !isOwnProfile ? (
+        {viewer && !isOwnProfile && REP_UI_ENABLED ? (
           <section className="mt-10">
             <p className="text-label mb-3">Leave a Review</p>
             <ReviewForm reviewedId={user.id} />
@@ -179,32 +211,34 @@ export default async function ProfilePage({ params }: { params: { username: stri
           </section>
         ) : null}
 
-        <section className="mt-10">
-          <p className="text-label mb-3">Reviews</p>
-          {reviews.length === 0 ? (
-            <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
-              No reviews yet.
-            </p>
-          ) : (
-            <ul className="space-y-3">
-              {reviews.map((r) => (
-                <li key={r.id} className="card">
-                  <div className="flex items-center justify-between">
-                    <p className="text-data">{r.reviewer.displayName}</p>
-                    <p aria-label={`${r.rating} out of 5 stars`}>
-                      {Array.from({ length: 5 }, (_, i) => (
-                        <span key={i} className={i < r.rating ? "star-filled" : "star-empty"}>
-                          ★
-                        </span>
-                      ))}
-                    </p>
-                  </div>
-                  {r.comment ? <p className="text-body mt-2 !text-base">{r.comment}</p> : null}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        {REP_UI_ENABLED ? (
+          <section className="mt-10">
+            <p className="text-label mb-3">Reviews</p>
+            {reviews.length === 0 ? (
+              <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
+                No reviews yet.
+              </p>
+            ) : (
+              <ul className="space-y-3">
+                {reviews.map((r) => (
+                  <li key={r.id} className="card">
+                    <div className="flex items-center justify-between">
+                      <p className="text-data">{r.reviewer.displayName}</p>
+                      <p aria-label={`${r.rating} out of 5 stars`}>
+                        {Array.from({ length: 5 }, (_, i) => (
+                          <span key={i} className={i < r.rating ? "star-filled" : "star-empty"}>
+                            ★
+                          </span>
+                        ))}
+                      </p>
+                    </div>
+                    {r.comment ? <p className="text-body mt-2 !text-base">{r.comment}</p> : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        ) : null}
 
         <section className="mt-10">
           <p className="text-label mb-3">Recent Posts</p>

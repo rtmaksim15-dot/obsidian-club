@@ -486,6 +486,32 @@ iPhone photos still routinely exceed this app's own 8MB check.
 - [x] Verified live: a synthetic 4000×3000 image resized to 2048×1536
       and uploaded successfully end-to-end.
 
+### v0.23 — Members & Follows ✅ (built 2026-07-31)
+
+Per `OBSIDIAN_ROADMAP_v3.1`. A small closed club gets a directory
+instead of a search bar.
+
+- [x] `/members` — plain directory (avatar, name, bio line), sorted by
+      join date. No filter/search yet — added once membership passes
+      ~30 people, not before. "Members →" entry point on the Newcomers
+      room screen.
+- [x] `Follow` model + `POST /api/users/:id/follow` toggle. Follow/
+      Following button + "N followers · N following" line on every
+      public profile. Feed stays club-wide chronological — follows
+      don't filter it yet (deferred to whenever member volume actually
+      justifies a "Following" filter).
+- [x] Reviews (list + form) on `/profile/[username]` moved behind
+      `REP_UI_ENABLED` — closes the gap flagged in `v0.21`'s TECH_DEBT
+      entry (only the REP number was gated before, not reviews
+      themselves).
+- [x] `PostCard`/`PostList` gained a `compact` mode — used for `/hall`'s
+      "Your Posts" to drop the redundant per-post avatar/name.
+- [x] Stale "Your access has been granted" notification now disappears
+      from `/hall` automatically once ritual is complete.
+- [x] Verified live: members list renders and sorts correctly, profile
+      tap-through works, follow/unfollow toggles both ways with counts
+      updating on reload, Feed unaffected.
+
 ## Later
 
 *Intentionally postponed — approved direction, not yet scheduled in

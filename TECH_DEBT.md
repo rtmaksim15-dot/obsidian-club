@@ -817,28 +817,25 @@ Surveyed every reachable member-facing route for content the roadmap
 doesn't name as in scope. Not all of these are bugs — recorded here so
 they're each a deliberate call, not an oversight:
 
-- **Peer review (`ReviewForm` on `/profile/[username]`) still fully
-  functional** — any member can still rate another member 1–5 stars,
-  even though the resulting Reputation-stars display is now hidden
-  behind `REP_UI_ENABLED` (this task) on both `/hall` and
-  `/profile/[username]`. Same "logic keeps running silently" shape as
-  REP's own ledger, but worth a product decision: is submitting reviews
-  itself in v1 scope, or should the form also be gated? Not touched
-  without being asked — `ContentComposer`/`PostCard`/`/hall` were the
-  named targets, review submission wasn't.
+- ~~Peer review (`ReviewForm` on `/profile/[username]`) still fully
+  functional~~ — **resolved 2026-07-31**: both the review submission
+  form and the read-only reviews list are now behind `REP_UI_ENABLED`,
+  per Max's explicit Members & Follows design ("No REP, no reviews").
+  Submission logic itself is untouched — same "keeps running silently"
+  shape as REP's own ledger — only the UI is gated.
 - **`/events`** — an honest "coming soon" placeholder, reachable via a
   link on `/rooms`. Not named anywhere in the roadmap's scope tables
   (in or out) — predates this pass, low risk, but flagged since it's a
   real, clickable nav destination the roadmap doesn't account for.
-- **People search and follows — named as "building now" (§III item 7:
-  "нашёл, посмотрел профиль, подписался") but don't exist at all.**
-  Not extra UI to hide, the opposite gap: no search input/API exists
-  anywhere in the app (see the Analytics section above), and
-  `follow`/`follower` isn't a schema relationship. This is missing
-  required v1 scope, not a UI-cleanup item — flagged since Max's own
-  report request ("what else is visible that isn't in scope") implies
-  checking the roadmap's full building-now list, not just what's
-  currently rendered.
+- ~~People search and follows — named as "building now" (§III item 7:
+  "нашёл, посмотрел профиль, подписался") but don't exist at all.~~ —
+  **follows resolved 2026-07-31** (`OBSIDIAN_ROADMAP_v3.1`'s Members &
+  Follows): the `Follow` model, follow/unfollow, and follower/following
+  counts are real now. **Search is still missing** — a small closed
+  club gets a `/members` directory instead (design decision, not a
+  gap): no search input exists, and none is planned until membership
+  passes ~30 people. No `follow`/`follower` feed filtering yet either —
+  deliberately deferred, see BACKLOG.md `v0.23`.
 - **Username selection in the Initiation Ritual** — roadmap names this
   as a new v1 requirement (replacing the auto-generated
   `email-numbers` username); not built. Same category as the item

@@ -16,9 +16,13 @@ import { REP_UI_ENABLED, LEVELS_UI_ENABLED, REFERRALS_UI_ENABLED } from "@/lib/c
  * Trust Score, login streak, and the referral-stats block are all
  * hidden for v1 (see feature-flags.ts). Notifications stays; it wasn't
  * named as deferred and is the only place approval-type notices
- * surface. Rooms/events/tasks blocks stay out where those features
- * don't exist yet (Events is v0.7) — see app/(platform)/layout.tsx's
- * placeholders.
+ * surface — the one-time "welcome" notice is marked read (and so
+ * disappears) the moment this page is reachable at all, since reaching
+ * it requires ritual completion (2026-07-30). "Your Posts" renders
+ * `compact` — the owner's avatar/name are already shown once above,
+ * repeating them per-post was pure redundancy. Rooms/events/tasks
+ * blocks stay out where those features don't exist yet (Events is
+ * v0.7) — see app/(platform)/layout.tsx's placeholders.
  */
 export default async function HallPage() {
   let user = await getCurrentUser();
@@ -37,9 +41,22 @@ export default async function HallPage() {
   await checkLevelUp(user.id);
   user = (await prisma.user.findUnique({ where: { id: user.id } }))!;
 
+  // The one-time "welcome" notification is stale the moment it's
+  // possible to reach this page at all — Hall itself requires
+  // ritual.complete (see the redirect above), which is exactly the
+  // condition "Complete your profile to begin" was telling the member
+  // to satisfy. Mark it read here rather than on the ritual's last
+  // step specifically, since that keeps this correct even for members
+  // who somehow already had ritualProgress marked complete some other
+  // way — it's driven by reachability, not a specific transition.
+  await prisma.notification.updateMany({
+    where: { userId: user.id, type: "welcome", isRead: false },
+    data: { isRead: true },
+  });
+
   const [notifications, referralCount, repHistory, posts] = await Promise.all([
     prisma.notification.findMany({
-      where: { userId: user.id },
+      where: { userId: user.id, isRead: false },
       orderBy: { createdAt: "desc" },
       take: 5,
     }),
@@ -229,7 +246,7 @@ export default async function HallPage() {
         {/* Own posts */}
         <section className="mt-10">
           <p className="text-label mb-3">Your Posts</p>
-          <PostList posts={posts as FeedPost[]} />
+          <PostList posts={posts as FeedPost[]} compact />
         </section>
       </div>
     </main>

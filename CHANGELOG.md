@@ -8,7 +8,43 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.22.0` is the current released version.
+Nothing yet — `v0.23.0` is the current released version.
+
+## [0.23.0] — 2026-07-31
+
+Members & Follows, per `OBSIDIAN_ROADMAP_v3.1` — a small closed club gets
+a directory instead of a search bar.
+
+### Added
+
+- **`/members`** — a plain directory of all active members (avatar,
+  name, bio line), sorted by join date, founders first. No filter/
+  search input yet — not needed below ~30 members; the plain list is
+  the whole feature for now. Entry point: a "Members →" link at the
+  top of the Newcomers room screen (Community's only reachable room
+  right now).
+- **`Follow` model + `POST /api/users/:id/follow`** — a toggle, same
+  shape as `POST /api/posts/:id/like`. Every public profile now shows
+  a Follow/Following button (for anyone but yourself) and a quiet
+  "N followers · N following" line. The Feed stays club-wide
+  chronological for v1 — following doesn't filter it; a "Following"
+  filter is deferred until member volume actually justifies it (see
+  BACKLOG.md).
+
+### Changed
+
+- **Reviews (list + submission form) on `/profile/[username]`** — now
+  behind `REP_UI_ENABLED`. Previously only the REP number/stars were
+  gated; the reviews themselves weren't, which didn't match the
+  Members→profile design ("no REP, no reviews").
+- **`PostCard`/`PostList`** gained a `compact` mode (drops the avatar/
+  name header) — used for `/hall`'s "Your Posts," where the owner's own
+  avatar and name are already shown once above; repeating them per-post
+  was pure redundancy.
+- **The stale "Your access has been granted" notification** now marked
+  read (and so disappears from `/hall`) the moment the page is
+  reachable at all — reaching Hall already requires ritual completion,
+  which is exactly what that notice was asking for.
 
 ## [0.22.0] — 2026-07-30
 

@@ -87,6 +87,9 @@ export default function RoomChat({ room, currentUserId, initialMessages }: Props
   return (
     <main className="flex min-h-screen flex-col bg-ob-black text-ob-text">
       <header className="border-b border-ob-border px-6 py-6">
+        <a href="/members" className="text-caption mb-2 inline-block text-ob-accent">
+          Members →
+        </a>
         <p className="text-h1 !text-xl">{room.name}</p>
         {room.description ? <p className="text-caption mt-1">{room.description}</p> : null}
       </header>

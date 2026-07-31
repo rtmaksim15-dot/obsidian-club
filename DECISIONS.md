@@ -1578,3 +1578,56 @@ check in `/rooms/page.tsx` before it renders anything — redirects to
 that room's `/rooms/[slug]` before the "ROOMS" heading or the Events/
 Houses link row ever render, and stops firing the moment a second room
 is reactivated.
+
+### 2026-07-31 — Members & Follows: directory over search, reviews folded into `REP_UI_ENABLED`, "compact" scoped to Hall only
+
+Max's own framing for `/members` was explicit about *why* a directory
+and not a search bar: "this is a small closed club." No artificial cap
+was added to the query — the whole membership is small enough to
+render as one list; a filter/search input is real, separate,
+deliberately unstarted work for whenever the club passes ~30 members,
+not a hidden feature flag.
+
+**Reviews gating** (item 4d asked to gate just the *review form*; item
+2 separately stated the design intent for the Members→profile
+tap-through as "No REP, no reviews (already flagged off)"). Read these
+together rather than literally-only-the-form: the second statement
+describes what a profile should show as a whole, and the read-only
+Reviews list is exactly as REP-adjacent as the form submitting into
+it — gating one but not the other would leave `REP_UI_ENABLED` gating
+"most, but not all, of the reviews concept," a real inconsistency. Both
+the form and the list are now behind the flag; review *submission*
+itself (the API route, the rating computation) is untouched, same
+"logic keeps running silently" shape used everywhere else this flag
+applies.
+
+**`PostCard`'s new `compact` prop** was scoped to `/hall`'s "Your
+Posts" only, not `/profile/[username]`'s "Recent Posts" — even though
+the latter is just as redundant when viewing your own profile. Item 4b
+named "Your Posts" specifically (Hall's exact section label), and
+`/profile/[username]` serves a second, different purpose (viewing
+*other* members) where the full author header stays meaningful. Narrow
+scope, not a missed generalization — extending it to the profile page
+wasn't asked for.
+
+**Notification fix**: rather than hooking the specific ritual-
+completion transition (whichever step happens to finish last), the fix
+marks the one-time "welcome" notification read on every `/hall` load.
+This is simpler and can't drift out of sync — `/hall` already redirects
+to `/ritual` for anyone whose ritual isn't complete, so by the time
+this code runs, "ritual complete" is already guaranteed true; no need
+to duplicate that check at a second call site.
+
+**Verification note**: while testing the Follow toggle and the earlier
+compression pipeline, a test post ("A wonderful start", with an
+uploaded photo) ended up on Max's own real account
+(`rtmaksim15@gmail.com`) rather than a disposable test account — a
+carry-over from live-testing the compression fix in a prior pass.
+Confirmed via the account's full state (real bio "Ambassador," real
+avatar, real ritual-completion timestamps from 2026-07-25, the genuine
+Newcomers introduction message from 2026-07-29) that everything else on
+this account is real, active use — only that one post plus its Storage
+photo were test artifacts, and only those were removed. A separate
+disposable `test-member-verify` account (created fresh for this pass)
+absorbed the rest of the Members/Follow verification and was deleted
+in full afterward, including its post and any Follow rows.

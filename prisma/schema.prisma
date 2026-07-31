@@ -166,6 +166,8 @@ model User {
   comments          Comment[]
   houseMemberships  HouseMembership[]
   analyticsEvents   AnalyticsEvent[]
+  following         Follow[]          @relation("Following")
+  followers         Follow[]          @relation("Followers")
 
   @@map("users")
 }
@@ -326,6 +328,25 @@ model Comment {
 
   @@index([postId])
   @@map("comments")
+}
+
+// Members & Follows (OBSIDIAN_ROADMAP_v3.1, 2026-07-30): a member
+// follows another. Powers the follower/following counts and button
+// state on public profiles only — the Feed stays club-wide
+// chronological for v1, deliberately NOT filtered by who you follow
+// (see BACKLOG.md; a "Following" filter is a later addition once
+// member volume justifies it).
+model Follow {
+  followerId  String   @map("follower_id") @db.Uuid
+  followingId String   @map("following_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  follower  User @relation("Following", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("Followers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@id([followerId, followingId])
+  @@index([followingId])
+  @@map("follows")
 }
 
 // ============================================================
