@@ -863,3 +863,41 @@ later-reactivation story. As soon as a second room is reactivated
 (`isActive: true`), this stops firing on its own and the real index
 renders again — no code change or flag flip needed. `/events` stays
 reachable directly by URL either way, just not linked from this path.
+
+## Invitation & Partner system v1 (2026-08-01) — known gaps, on purpose
+
+Built per `OBSIDIAN_ROADMAP_v3.1`. Two things deliberately left out,
+recorded so they're a documented choice, not an oversight:
+
+- **No self-service admin UI to adjust `inviteAllowance` or to unlink a
+  partner.** Both fields are real and adjustable — just not through a
+  page yet, only via direct database access. The task's explicit build
+  list was the three redemption mechanics themselves
+  (`/admin/invite-batches`, "My Invitation" on `/hall`, partner
+  linking); a dedicated "edit this member's allowance" or "unlink this
+  partner" admin screen wasn't in that list, so one wasn't built. Worth
+  its own small pass once this is used enough to matter — see
+  BACKLOG.md.
+- **No REP or `Referral`/Trust-Score wiring for any of the three new
+  sources.** The original referral-code flow
+  (`app/api/invite/[token]/route.ts`) awards `verificationPassed` REP
+  to every new member and `invitedNewMember` REP to the inviter, and
+  creates a `Referral` row feeding `referralCount`/Trust-Score
+  lifecycle transitions. None of that was asked for here, and none of
+  it was added — `invitedById` is set directly (enough to power the
+  "Invited by" profile line), but there's no `Referral` row behind it,
+  so member-invited joins don't participate in the Trust-Score
+  lifecycle at all. `verificationPassed` doesn't apply to any of the
+  three new sources either, semantically — that REP entry is
+  specifically about surviving admin review of an application, which
+  purchase-card/member-invite/partner joins skip by design ("no
+  application step: redeeming goes straight to registration"). Whether
+  any of REP_TABLE's existing categories should extend to these new
+  paths, or whether they need their own, is a real open product
+  question — not decided here, not guessed at either way.
+
+Also: purchase-card CSV links (`{NEXT_PUBLIC_APP_URL}/join/{token}`)
+depend on `NEXT_PUBLIC_APP_URL` actually being set for a printable,
+absolute URL — same pre-existing gap the old `/?ref=` referral link
+had (see "`NEXT_PUBLIC_APP_URL` unset" further up this file), not a
+new one.

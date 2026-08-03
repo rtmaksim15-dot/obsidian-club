@@ -8,7 +8,50 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.23.0` is the current released version.
+Nothing yet — `v0.24.0` is the current released version.
+
+## [0.24.0] — 2026-08-01
+
+Invitation & Partner system v1, per `OBSIDIAN_ROADMAP_v3.1` — three ways
+an account gets created besides the original admin-reviewed application,
+all sharing one redemption route and one "already used" check.
+
+### Added
+
+- **Purchase cards** — `/admin/invite-batches` generates a batch of N
+  single-use tokens, each with a sequential card number (continuing
+  across every batch, not reset per batch). No application step, no
+  email binding — redeeming goes straight to registration. Batch list
+  shows created date, card count, redeemed count; batch detail shows
+  per-card status (unused / redeemed by whom, when); CSV export (card
+  number, token, full URL) for print.
+- **Member invites** — `User.inviteAllowance` (default 1, admin-
+  adjustable). "My Invitation" on `/hall`: "Create invitation" generates
+  a personal single-use link; shows unused / "Joined by [name]".
+  Redeeming stores `invitedById` on the new member — shown quietly as
+  "Invited by [name]" on their public profile. The old `/?ref=` referral
+  mechanic stays off (behind `REFERRALS_UI_ENABLED`), not restored.
+- **Partner** — separate from invites, doesn't touch `inviteAllowance`.
+  "Add partner" on `/hall` generates a single-use partner link; the
+  redeemer's profile shows "Partner of [name]," mirrored on the
+  inviter's own profile. Partners get `inviteAllowance = 0` by default.
+  One partner per member; unlinking is admin-only (direct DB access —
+  no self-service UI yet, see TECH_DEBT.md).
+- **`InviteBatch`/`InviteToken` models** — a new `source` enum
+  (`purchase_card`/`member`/`partner`), fully separate from the
+  Waitlist-application-based `/invite/[token]` flow, which is
+  untouched. All three sources redeem through the same
+  `POST /api/join/:token`, which checks `redeemedAt` unconditionally —
+  a token is permanently invalid after use regardless of source.
+
+### Verified
+
+- Live: batch generation + card redemption, member invite +
+  `invitedById` chain + allowance decrementing to 0, partner link +
+  "Partner of" display (both directions) + partner allowance defaulting
+  to 0, and re-redeeming an already-used token of each of the three
+  sources correctly failing. All test entities used the `test-` prefix
+  per `CLAUDE.md` rule 7 and were fully removed afterward.
 
 ## [0.23.0] — 2026-07-31
 

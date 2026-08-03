@@ -25,10 +25,24 @@ import { REP_UI_ENABLED, HOUSES_UI_ENABLED, LEVELS_UI_ENABLED } from "@/lib/conf
  * explicit: "No REP, no reviews (already flagged off)." Previously
  * only the REP number/stars were gated; the reviews themselves weren't
  * (see TECH_DEBT.md, 2026-07-29's open question — now resolved).
+ *
+ * "Invited by [name]" / "Partner of [name]" (Invitation & Partner
+ * system v1, 2026-08-01) — quiet lines, shown whenever set, for anyone
+ * viewing. Partner reads as `partner ?? partnerOf` since only one side
+ * of the relationship gets the FK written directly (see DECISIONS.md).
  */
 export default async function ProfilePage({ params }: { params: { username: string } }) {
-  const user = await prisma.user.findUnique({ where: { username: params.username } });
+  const user = await prisma.user.findUnique({
+    where: { username: params.username },
+    include: {
+      invitedBy: { select: { displayName: true, username: true } },
+      partner: { select: { displayName: true, username: true } },
+      partnerOf: { select: { displayName: true, username: true } },
+    },
+  });
   if (!user) notFound();
+
+  const partner = user.partner ?? user.partnerOf ?? null;
 
   const viewer = await getCurrentUser();
   const isOwnProfile = viewer?.id === user.id;
@@ -140,6 +154,24 @@ export default async function ProfilePage({ params }: { params: { username: stri
         <p className="text-caption mt-1" style={{ color: "var(--color-text-muted)" }}>
           {followerCount} {followerCount === 1 ? "follower" : "followers"} · {followingCount} following
         </p>
+
+        {user.invitedBy ? (
+          <p className="text-caption mt-1" style={{ color: "var(--color-text-muted)" }}>
+            Invited by{" "}
+            <a href={`/profile/${user.invitedBy.username}`} style={{ color: "var(--color-text-secondary)" }}>
+              {user.invitedBy.displayName}
+            </a>
+          </p>
+        ) : null}
+
+        {partner ? (
+          <p className="text-caption mt-1" style={{ color: "var(--color-text-muted)" }}>
+            Partner of{" "}
+            <a href={`/profile/${partner.username}`} style={{ color: "var(--color-text-secondary)" }}>
+              {partner.displayName}
+            </a>
+          </p>
+        ) : null}
 
         {user.bio ? <p className="text-body mt-6">{user.bio}</p> : null}
 

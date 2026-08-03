@@ -41,6 +41,15 @@ enum WaitlistStatus {
   declined
 }
 
+// Invitation & Partner system v1 (OBSIDIAN_ROADMAP_v3.1, 2026-08-01) —
+// three ways an account gets created besides the original admin-reviewed
+// Waitlist application (app/api/invite/[token]/route.ts, unchanged).
+enum InviteSource {
+  purchase_card
+  member
+  partner
+}
+
 enum RoomType {
   general
   thematic
@@ -141,6 +150,16 @@ model User {
   invitedById     String?     @map("invited_by") @db.Uuid
   referralCode    String?     @unique @map("referral_code")
   referralCount   Int         @default(0) @map("referral_count")
+  // Invitation & Partner system v1 (2026-08-01) — how many personal
+  // member-invite links this member may still create. Redeeming one
+  // decrements it; generating one does not (see DECISIONS.md). Partners
+  // get 0 here by default, set explicitly at redemption — the schema
+  // default of 1 only applies to purchase-card/member-invite joins.
+  inviteAllowance Int         @default(1) @map("invite_allowance")
+  // One partner per member, symmetric: whichever side redeemed the
+  // partner-source InviteToken has `partnerId` pointing at the other;
+  // read "my partner" as `partner ?? partnerOf` from either side.
+  partnerId       String?     @unique @map("partner_id") @db.Uuid
   joinedAt        DateTime?   @map("joined_at")
   lastActiveAt    DateTime?   @map("last_active_at")
   createdAt       DateTime    @default(now()) @map("created_at")
@@ -149,20 +168,26 @@ model User {
   invitedBy User?  @relation("UserInvites", fields: [invitedById], references: [id])
   invitees  User[] @relation("UserInvites")
 
+  partner   User? @relation("UserPartner", fields: [partnerId], references: [id])
+  partnerOf User? @relation("UserPartner")
+
   // relations
-  profile           UserProfile?
-  messages          Message[]
-  posts             Post[]
-  eventAttendees    EventAttendee[]
-  reviewsGiven      Review[]          @relation("ReviewsGiven")
-  reviewsReceived   Review[]          @relation("ReviewsReceived")
-  referralsSent     Referral[]        @relation("ReferralInviter")
-  referralsReceived Referral[]        @relation("ReferralInvited")
-  userAchievements  UserAchievement[]
-  repHistory        RepHistory[]
-  notifications     Notification[]
-  marketplaceItems  MarketplaceItem[]
-  likes             Like[]
+  profile                    UserProfile?
+  messages                   Message[]
+  posts                      Post[]
+  eventAttendees             EventAttendee[]
+  reviewsGiven               Review[]          @relation("ReviewsGiven")
+  reviewsReceived            Review[]          @relation("ReviewsReceived")
+  referralsSent              Referral[]        @relation("ReferralInviter")
+  referralsReceived          Referral[]        @relation("ReferralInvited")
+  userAchievements           UserAchievement[]
+  repHistory                 RepHistory[]
+  notifications              Notification[]
+  marketplaceItems           MarketplaceItem[]
+  memberInviteTokensCreated  InviteToken[]     @relation("MemberInviteTokens")
+  partnerInviteTokensCreated InviteToken[]     @relation("PartnerInviteTokens")
+  redeemedInviteToken        InviteToken?      @relation("RedeemedInviteToken")
+  likes                      Like[]
   comments          Comment[]
   houseMemberships  HouseMembership[]
   analyticsEvents   AnalyticsEvent[]
@@ -570,6 +595,60 @@ model Waitlist {
   createdAt         DateTime       @default(now()) @map("created_at")
 
   @@map("waitlist")
+}
+
+// ============================================================
+// INVITATION & PARTNER SYSTEM v1 (OBSIDIAN_ROADMAP_v3.1, 2026-08-01)
+// ============================================================
+
+// A batch of purchase-card tokens generated together at
+// /admin/invite-batches. `count` records what was requested at creation
+// time — the batch list additionally computes a live redeemed count from
+// `InviteToken` rather than trusting a second stored counter.
+model InviteBatch {
+  id        String   @id @default(uuid()) @db.Uuid
+  count     Int
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tokens InviteToken[]
+
+  @@map("invite_batches")
+}
+
+// One single-use invite/partner token, redeemed at /join/[token]
+// (app/api/join/[token]/route.ts) — a separate, application-free path
+// from the original Waitlist-based /invite/[token] flow above. All
+// three `source`s share the exact same redemption check
+// (`redeemedAt` must be null); there is no per-source special case for
+// "already used," so a token becomes permanently invalid the moment
+// it's redeemed regardless of which source created it.
+model InviteToken {
+  id     String       @id @default(uuid()) @db.Uuid
+  token  String       @unique
+  source InviteSource
+
+  // purchase_card only — globally sequential across every batch (not
+  // reset per batch), so a printed card's number is always unique.
+  cardNumber Int?    @unique @map("card_number")
+  batchId    String? @map("batch_id") @db.Uuid
+
+  // member only — who generated this personal invite link.
+  inviterId String? @map("inviter_id") @db.Uuid
+
+  // partner only — whose partner the redeemer becomes on redemption.
+  partnerOfId String? @map("partner_of_id") @db.Uuid
+
+  redeemedAt   DateTime? @map("redeemed_at")
+  redeemedById String?   @unique @map("redeemed_by_id") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  batch      InviteBatch? @relation(fields: [batchId], references: [id])
+  inviter    User?        @relation("MemberInviteTokens", fields: [inviterId], references: [id])
+  partnerOf  User?        @relation("PartnerInviteTokens", fields: [partnerOfId], references: [id])
+  redeemedBy User?        @relation("RedeemedInviteToken", fields: [redeemedById], references: [id])
+
+  @@index([source])
+  @@map("invite_tokens")
 }
 
 // ============================================================

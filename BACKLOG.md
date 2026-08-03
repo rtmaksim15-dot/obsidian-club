@@ -512,6 +512,31 @@ instead of a search bar.
       tap-through works, follow/unfollow toggles both ways with counts
       updating on reload, Feed unaffected.
 
+### v0.24 — Invitation & Partner system v1 ✅ (built 2026-08-01)
+
+Per `OBSIDIAN_ROADMAP_v3.1`. Three account-creation paths besides the
+original admin-reviewed application, all through one shared redemption
+route.
+
+- [x] Purchase cards — `/admin/invite-batches` generates a batch of N
+      tokens with globally-sequential card numbers; batch list (created
+      date, count, redeemed count) + batch detail (per-card status) +
+      CSV export for print.
+- [x] Member invites — `inviteAllowance` (default 1, admin-adjustable
+      only via direct DB access for now — no self-service admin UI, see
+      TECH_DEBT.md), "My Invitation" on `/hall`, "Invited by [name]" on
+      the public profile. Old `/?ref=` mechanic stays off.
+- [x] Partner — separate from invites, doesn't touch `inviteAllowance`;
+      "Add partner" on `/hall`, "Partner of [name]" mirrored on both
+      profiles. One partner per member; unlink is admin-only (direct DB
+      access, no UI yet).
+- [x] Verified live: batch generation + redemption, member-invite
+      allowance decrementing to 0 + `invitedBy` chain, partner link +
+      mirrored "Partner of" display + partner allowance defaulting to
+      0, and every one of the three sources correctly rejecting a
+      second redemption of the same token. All test entities used the
+      `test-` prefix (CLAUDE.md rule 7) and were removed afterward.
+
 ## Later
 
 *Intentionally postponed — approved direction, not yet scheduled in

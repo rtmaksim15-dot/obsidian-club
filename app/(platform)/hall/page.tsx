@@ -7,6 +7,8 @@ import { syncReferralLifecycle } from "@/lib/rating/referral-lifecycle";
 import { checkLevelUp } from "@/lib/rating/level-progression";
 import { LEVEL_NAMES } from "@/lib/rating/levels";
 import PostList, { type FeedPost } from "@/components/shared/PostList";
+import CreateMemberInviteButton from "@/components/shared/CreateMemberInviteButton";
+import CreatePartnerButton from "@/components/shared/CreatePartnerButton";
 import { REP_UI_ENABLED, LEVELS_UI_ENABLED, REFERRALS_UI_ENABLED } from "@/lib/config/feature-flags";
 
 /**
@@ -23,6 +25,14 @@ import { REP_UI_ENABLED, LEVELS_UI_ENABLED, REFERRALS_UI_ENABLED } from "@/lib/c
  * repeating them per-post was pure redundancy. Rooms/events/tasks
  * blocks stay out where those features don't exist yet (Events is
  * v0.7) — see app/(platform)/layout.tsx's placeholders.
+ *
+ * "My Invitation" (Invitation & Partner system v1, OBSIDIAN_ROADMAP_v3.1,
+ * 2026-08-01) replaces the old `/?ref=` referral block above — that
+ * section stays behind `REFERRALS_UI_ENABLED` (off) permanently, not
+ * restored. Member invites spend `inviteAllowance` at redemption, not
+ * creation (see DECISIONS.md); "my partner" reads as `partner ??
+ * partnerOf` since the relationship is written from whichever side
+ * redeemed the link.
  */
 export default async function HallPage() {
   let user = await getCurrentUser();
@@ -54,47 +64,67 @@ export default async function HallPage() {
     data: { isRead: true },
   });
 
-  const [notifications, referralCount, repHistory, posts] = await Promise.all([
-    prisma.notification.findMany({
-      where: { userId: user.id, isRead: false },
-      orderBy: { createdAt: "desc" },
-      take: 5,
-    }),
-    // Only feeds the "Your Invitation" block below — skipped while
-    // that's hidden, same "don't run otherwise-unused queries" pattern
-    // as REP_UI_ENABLED/HOUSES_UI_ENABLED.
-    REFERRALS_UI_ENABLED
-      ? prisma.referral.count({ where: { inviterId: user.id, status: { in: ["joined", "active"] } } })
-      : Promise.resolve(0),
-    REP_UI_ENABLED
-      ? prisma.repHistory.findMany({
-          where: { userId: user.id },
-          orderBy: { createdAt: "desc" },
-          take: 5,
-        })
-      : Promise.resolve([]),
-    prisma.post.findMany({
-      where: { authorId: user.id, isPublished: true },
-      orderBy: { publishedAt: "desc" },
-      take: 30,
-      select: {
-        id: true,
-        title: true,
-        content: true,
-        mediaUrls: true,
-        type: true,
-        likesCount: true,
-        createdAt: true,
-        author: { select: { id: true, displayName: true, avatarUrl: true, level: true, rep: true } },
-        house: { select: { id: true, name: true, slug: true } },
-        likes: { where: { userId: user.id }, select: { userId: true } },
-        _count: { select: { comments: true } },
-      },
-    }),
-  ]);
+  const [notifications, referralCount, repHistory, posts, memberInviteTokens, partnerToken, withPartner] =
+    await Promise.all([
+      prisma.notification.findMany({
+        where: { userId: user.id, isRead: false },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+      }),
+      // Only feeds the "Your Invitation" block below — skipped while
+      // that's hidden, same "don't run otherwise-unused queries" pattern
+      // as REP_UI_ENABLED/HOUSES_UI_ENABLED.
+      REFERRALS_UI_ENABLED
+        ? prisma.referral.count({ where: { inviterId: user.id, status: { in: ["joined", "active"] } } })
+        : Promise.resolve(0),
+      REP_UI_ENABLED
+        ? prisma.repHistory.findMany({
+            where: { userId: user.id },
+            orderBy: { createdAt: "desc" },
+            take: 5,
+          })
+        : Promise.resolve([]),
+      prisma.post.findMany({
+        where: { authorId: user.id, isPublished: true },
+        orderBy: { publishedAt: "desc" },
+        take: 30,
+        select: {
+          id: true,
+          title: true,
+          content: true,
+          mediaUrls: true,
+          type: true,
+          likesCount: true,
+          createdAt: true,
+          author: { select: { id: true, displayName: true, avatarUrl: true, level: true, rep: true } },
+          house: { select: { id: true, name: true, slug: true } },
+          likes: { where: { userId: user.id }, select: { userId: true } },
+          _count: { select: { comments: true } },
+        },
+      }),
+      // Invitation & Partner system v1 (2026-08-01) — "My Invitation" below.
+      prisma.inviteToken.findMany({
+        where: { source: "member", inviterId: user.id },
+        orderBy: { createdAt: "desc" },
+        include: { redeemedBy: { select: { displayName: true, username: true } } },
+      }),
+      prisma.inviteToken.findFirst({
+        where: { source: "partner", partnerOfId: user.id, redeemedAt: null },
+      }),
+      prisma.user.findUnique({
+        where: { id: user.id },
+        include: {
+          partner: { select: { displayName: true, username: true } },
+          partnerOf: { select: { displayName: true, username: true } },
+        },
+      }),
+    ]);
 
   const progress = getLevelProgress(user, { hasPublishedContent: posts.length >= 1 });
   const referralLink = `${process.env.NEXT_PUBLIC_APP_URL || ""}/?ref=${user.referralCode}`;
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+  const hasOutstandingMemberInvite = memberInviteTokens.some((t) => !t.redeemedAt);
+  const resolvedPartner = withPartner?.partner ?? withPartner?.partnerOf ?? null;
 
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
@@ -185,7 +215,8 @@ export default async function HallPage() {
           </section>
         ) : null}
 
-        {/* Referrals */}
+        {/* Referrals — old /?ref= mechanic, superseded by "My Invitation"
+            below; stays off, not restored (see DECISIONS.md). */}
         {REFERRALS_UI_ENABLED ? (
           <section className="mt-10">
             <p className="text-label mb-3">Your Invitation</p>
@@ -200,6 +231,53 @@ export default async function HallPage() {
             </div>
           </section>
         ) : null}
+
+        {/* My Invitation — Invitation & Partner system v1, 2026-08-01 */}
+        <section className="mt-10">
+          <p className="text-label mb-3">My Invitation</p>
+
+          <div className="card mb-4">
+            <p className="text-data !text-sm">Member invites</p>
+            <p className="text-caption mt-1 mb-3" style={{ color: "var(--color-text-secondary)" }}>
+              {user.inviteAllowance} remaining
+            </p>
+
+            {memberInviteTokens.length > 0 ? (
+              <ul className="space-y-2 mb-3">
+                {memberInviteTokens.map((t) => (
+                  <li key={t.id} className="text-caption">
+                    {t.redeemedBy ? (
+                      <span style={{ color: "var(--color-success)" }}>
+                        Joined by {t.redeemedBy.displayName}
+                      </span>
+                    ) : (
+                      <span className="break-all" style={{ color: "var(--color-text-secondary)" }}>
+                        {baseUrl}/join/{t.token}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+
+            {!hasOutstandingMemberInvite && user.inviteAllowance > 0 ? <CreateMemberInviteButton /> : null}
+          </div>
+
+          <div className="card">
+            <p className="text-data !text-sm mb-3">Partner</p>
+            {resolvedPartner ? (
+              <p className="text-caption" style={{ color: "var(--color-success)" }}>
+                Partner of {resolvedPartner.displayName}
+              </p>
+            ) : partnerToken ? (
+              <p className="text-caption break-all" style={{ color: "var(--color-text-secondary)" }}>
+                {baseUrl}/join/{partnerToken.token}
+              </p>
+            ) : (
+              <CreatePartnerButton />
+            )}
+          </div>
+        </section>
 
         {/* Notifications */}
         <section className="mt-10">

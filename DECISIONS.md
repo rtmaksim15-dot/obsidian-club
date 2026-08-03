@@ -1673,3 +1673,52 @@ circumstantial signals (timing, account, content shape) the way this
 cleanup did. Applies equally to Prisma rows and Storage objects — both
 are hard-deleted with no recovery path here, unlike a feature flag or
 other reversible change.
+
+### 2026-08-01 — Invitation & Partner system: allowance spent at redemption, partner modeled as an asymmetric FK read symmetrically, REP/Referral wiring deliberately skipped
+
+Three design calls made while implementing `OBSIDIAN_ROADMAP_v3.1`'s
+Invitation & Partner system, none explicitly specified in the task:
+
+**When does `inviteAllowance` decrement — creating the link, or
+redeeming it?** The task's own verification checklist ties "allowance
+decrement to 0" to the same step as "`invitedBy` chain" — which only
+happens at redemption — so decrement happens there, not at creation.
+Read literally, this also implies "Create invitation" must stay
+available (allowance not yet spent) even after a link exists, UNTIL it's
+redeemed — but "personal single-use link" (singular) argues against
+letting a member stack up multiple simultaneously-outstanding links.
+Resolved by gating "Create invitation" on two conditions together:
+`inviteAllowance > 0` AND no currently-unredeemed member-invite token
+already exists for that member. This satisfies both readings: allowance
+governs the lifetime total of links a member can ever generate, one
+link is live at a time, and decrementing happens exactly when the task's
+own checklist implies it should.
+
+**Partner as one FK field, read from both sides.** Modeled as a single
+`User.partnerId` (nullable, unique self-relation — Prisma's standard
+"spouse" pattern), written only on the redeeming side at
+`/api/join/[token]`: the new member's `partnerId` is set to the token
+creator's id. The creator's own row is never separately updated —
+Prisma's reverse relation (`partnerOf`) resolves the creator's side of
+the relationship automatically from the redeemer's forward FK. Reading
+"my partner" anywhere in the app is therefore `user.partner ??
+user.partnerOf`, never just one or the other, since which field is
+populated depends on which of the two roles a given user played
+(generated the link vs. redeemed it) — this is not an inconsistency to
+fix, it's how the pattern is meant to be read.
+
+**No REP awards, no `Referral` row, for any of the three new sources.**
+The original referral-code flow (`/api/invite/[token]`) awards REP to
+both the new member and their inviter, and creates a `Referral` row
+feeding the Trust-Score lifecycle. The task's brief named exactly three
+things to build (purchase cards, member invites, partner links) and
+none of them mention REP or Trust Score — extending that infrastructure
+to these new paths would be inventing scope, not building what was
+asked. `invitedById` is set directly on the new user (sufficient for
+the "Invited by [name]" display), but nothing else from the old
+referral-trust-chain machinery runs for these three sources. Flagged as
+a real, open question in TECH_DEBT.md — not decided silently either
+way, since it's a genuine product call (do these three new paths
+deserve the same REP/Trust-Score treatment as the old one, or are they
+intentionally lighter-weight?) that wasn't asked and shouldn't be
+guessed.
