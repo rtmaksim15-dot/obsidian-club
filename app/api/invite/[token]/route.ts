@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/auth/supabase-admin";
 import { generateReferralCode, generateUsernameFromEmail } from "@/lib/utils/codes";
 import { awardRep, REP_TABLE } from "@/lib/rating/rep-engine";
 import { track } from "@/lib/analytics/track";
+import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
 
 // Supabase's Admin API has intermittently returned a transient
 // "unrecognized JWT kid" / bad_jwt error on individual admin calls in
@@ -51,7 +52,22 @@ type Body = { name?: string; password?: string };
 // Marks the token used, signs the new member in immediately (collecting
 // cookies the same way app/auth/callback/route.ts does, since a manually
 // -built NextResponse doesn't inherit cookies written via next/headers).
+// Block 2 (August hardening pass, 2026-08-04): 10 attempts per hour per
+// IP. The token itself (24 random bytes) is infeasible to brute-force —
+// this guards against abuse of the account-creation path itself
+// (repeated Supabase Auth calls, resource exhaustion), not password
+// guessing.
+const RATE_LIMIT = { max: 10, windowMs: 60 * 60 * 1000 };
+
 export async function POST(request: NextRequest, { params }: { params: { token: string } }) {
+  const rateLimit = await checkRateLimit(`invite-redeem:${getClientIp(request)}`, RATE_LIMIT);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: "Too many attempts from this connection. Try again later." },
+      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } },
+    );
+  }
+
   const application = await prisma.waitlist.findUnique({ where: { inviteToken: params.token } });
   if (!application) {
     return NextResponse.json({ error: "Invalid invite link." }, { status: 404 });

@@ -1772,3 +1772,91 @@ Built `/admin/members` matching those three pages' established minimal
 style exactly (plain list, `notFound()` not a redirect for
 non-admins, no styling polish beyond base tokens) rather than skip the
 requirement or invent a heavier admin panel than what was asked for.
+
+### 2026-08-04 — August hardening pass, Block 2: closed the RLS gap, discovered and fixed a Realtime auth bug along the way
+
+Max's task explicitly asked to "verify RLS policies on every Supabase
+table" — re-checked `pg_class.relrowsecurity` (same query TECH_DEBT.md's
+2026-07-16 entry used) and confirmed the URGENT gap was still open: RLS
+enabled on only `waitlist`/`analytics_events`, off on all 22 other
+tables. This was the single highest-severity finding of the whole
+hardening pass, so fixed it directly rather than just re-flagging it.
+
+**Deny-all swept across 21 of 22 tables, no drama.** Confirmed via
+`select rolbypassrls from pg_roles where rolname = current_user` that
+Prisma's connection role bypasses RLS entirely, and via a full-codebase
+grep that `RoomChat.tsx` is the only client-side Supabase-table access
+point — so `alter table ... enable row level security` with zero
+policies is unconditionally safe everywhere except `messages`.
+
+**`messages`' policy needed two real fixes, not one, discovered by
+testing live rather than trusting the design on paper.** First attempt:
+a SELECT policy mirroring `lib/rating/room-access.ts#canAccessRoom()`
+exactly (level gate + newcomers'-room 30-day window, via a join to
+`rooms`/`users`). Verified the predicate was logically correct — ran it
+as a direct SQL query against a real test member and it returned `true`
+— then tested the actual live chat with a real browser session and a
+message inserted from another connection. Nothing arrived, repeatedly,
+across multiple clean retries.
+
+Root-caused in two layers rather than guessing and moving on:
+1. **Client-side**: `RoomChat.tsx` creates a fresh Supabase client per
+   mount and immediately called `.channel().subscribe()` with no wait —
+   the websocket connected before the client's session was hydrated
+   from cookies, so it opened unauthenticated. Fixed by awaiting
+   `supabase.auth.getSession()` before subscribing. Confirmed via a
+   temporary debug log that the session (correct user id, real JWT) was
+   in fact present by the time of `.subscribe()` after this fix, and
+   that the channel reported `SUBSCRIBED`.
+2. **Server-side, and the more interesting bug**: even fully
+   authenticated and subscribed, the `postgres_changes` event still
+   never fired. Isolated by swapping the policy to `using (true)` with
+   nothing else changed — it fired immediately. This proves Supabase
+   Realtime's authorization path for `postgres_changes` does not
+   evaluate RLS policies that reference other tables via a join/EXISTS
+   subquery, even though the identical predicate is correct and true
+   under a normal SQL connection. This wasn't guessed at or found in
+   docs — it was demonstrated empirically with a working control
+   (`using (true)`) against a failing treatment (the join policy),
+   isolating the variable cleanly.
+
+**Resolution: `auth.uid() is not null`, not a perfect mirror of
+`canAccessRoom()`.** Rather than chase a Realtime-specific workaround
+(e.g. a SECURITY DEFINER function, which may hit the same join
+limitation depending on how Realtime evaluates it, and wasn't worth the
+risk to verify against a production-adjacent gap this late in the
+audit), shipped the simplest policy that's (a) self-contained enough for
+Realtime to evaluate reliably — confirmed live, immediately delivered —
+and (b) still closes the actual threat this whole task exists to fix:
+an anonymous anon-key request to Supabase's REST API can no longer read
+`messages` at all. This is a deliberate, documented trade-off, not a
+silent shortcut: the live-update *trigger* is now coarser than
+`canAccessRoom()` (any authenticated member gets pinged that a room has
+new messages, not just members who can access that specific room), but
+the actual *content* a member can act on is unaffected — `GET
+/api/rooms/:slug/messages`, the only place message content is ever
+served, already enforces the real per-room check server-side. Recorded
+in `TECH_DEBT.md` as a known, bounded gap (matters only once a second
+gated room goes live) rather than left implicit.
+
+**Full cleanup discipline maintained through 8 rounds of live
+insert-and-observe testing.** Every test message used a
+`test-rls-realtime-check*` content prefix specifically so it could be
+found and removed unambiguously afterward (rule 7 requires a `test-`
+prefix in name/username OR explicit same-session logging — content-body
+prefixing plus logging every inserted id satisfies the same intent for
+a table with no name/username field of its own); one test member
+account also used throughout was `test-rls-verify`. All 8 messages and
+the test account (Prisma row + Supabase Auth identity) were deleted
+after; verified the `users` table and the newcomers' room's message
+list matched their exact pre-session state.
+
+### 2026-08-04 — August hardening pass, Block 2 continued: rate limiting, secret-exposure check, file-upload byte verification
+
+**Auth-check audit found nothing to fix.** Grepped all 27 `app/api/**/route.ts` files: every admin route calls `requireAdmin()`, every member route calls `getCurrentUser()`, every single call is immediately followed by a null-check, and every mutation on another user's resource (posts, follows, reviews, likes) scopes to `user.id` from the session rather than trusting a client-supplied id — no IDOR gaps found. The three routes with no auth call at all (`/api/waitlist`, `/api/invite/[token]`, `/api/join/[token]`) are correct by design: they're the account-creation/application entry points themselves: there's no session to check yet. Nothing to change here; recorded as a verified-clean result, not skipped.
+
+**Rate limiting: DB-backed, not Upstash/Redis.** No rate-limiting infra existed. Added `RateLimitHit` (fixed-window counter, `lib/security/rate-limit.ts`) backed by the same Postgres every other piece of app state already lives in, rather than a new external dependency this project's scale doesn't need. Wired into the three endpoints the task named that this app actually controls: `/api/waitlist` (5/hour/IP), `/api/invite/[token]` and `/api/join/[token]` (10/hour/IP each). **Login itself is out of scope for app-level rate limiting** — `supabase.auth.signInWithPassword()` is called directly from the browser against Supabase's own hosted Auth API and never touches this app's server at all, so there's no request of ours to intercept; Supabase's Auth service enforces its own rate limits there. Recorded as a boundary, not silently ignored.
+
+**Secret exposure: two defense-in-depth `import "server-only"` guards added, nothing was actually leaking.** Grepped for every consumer of `SUPABASE_SERVICE_ROLE_KEY` (only `lib/auth/supabase-admin.ts`) and confirmed every importer is an API route (never a Client Component). Same check for `lib/db/prisma.ts` (`DATABASE_URL`). Neither had a build-time guard against an accidental future client-side import — `lib/analytics/track.ts` already used one for the same reason, so both got the same `import "server-only"` for consistency, verified with a full production build (fails loudly at build time if anything client-side ever imports either).
+
+**File uploads: the declared MIME type was the only check, and it's just a client-supplied label.** Both `app/api/profile/avatar/route.ts` (receives real bytes) and `app/api/posts/photo/route.ts` (hands back a signed Storage upload URL — bytes never reach this app's server at all, deliberately, to stay under Vercel's request-body cap, see 2026-07-29) validated only `file.type` / a client-sent `contentType` field against an allowlist — trivially spoofable, so an SVG or HTML payload with an embedded `<script>` could be uploaded and stored declared as `image/jpeg`. Added `lib/utils/validateImageBytes.ts` (checks real file signatures: JPEG/PNG/GIF/WEBP magic bytes) and wired it in at the one point in each flow where real bytes are actually reachable: directly in the avatar route, and via a short ranged fetch of the object in `app/api/posts/route.ts` at post-creation time for photo posts (the first point post-upload where the server can reach the object) — reject-and-delete-from-storage if the signature doesn't match. Also fixed both routes deriving the Storage path's file extension from the validated Content-Type instead of the client-supplied filename (previously trusted as-is), and tightened `POST /api/posts`' `photoUrl` check from "any `https://` URL" to "must be this app's own `post-photos` bucket" — it was otherwise possible to attach an arbitrary external URL as `mediaUrls`. Verified all four cases live end-to-end (valid avatar accepted, spoofed SVG-as-avatar rejected; valid photo post accepted, spoofed SVG-as-photo rejected AND removed from Storage afterward) with a `test-upload-verify` account, fully cleaned up (Prisma rows, Storage objects, Auth identity) afterward.

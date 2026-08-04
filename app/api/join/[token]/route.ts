@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { createAdminClient } from "@/lib/auth/supabase-admin";
 import { generateReferralCode, generateUsernameFromEmail } from "@/lib/utils/codes";
 import { track } from "@/lib/analytics/track";
+import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
 
 // Same transient-JWKS-staleness workaround as app/api/invite/[token]/route.ts.
 async function withRetry<R extends { error: unknown }>(fn: () => Promise<R>): Promise<R> {
@@ -37,7 +38,19 @@ type Body = { name?: string; email?: string; password?: string };
 // "already redeemed" check (`redeemedAt` must be null) — there is no
 // per-source branch in that check, so a token is permanently invalid
 // after use regardless of which of the three created it.
+// Block 2 (August hardening pass, 2026-08-04): same shape and reasoning
+// as app/api/invite/[token]/route.ts's rate limit.
+const RATE_LIMIT = { max: 10, windowMs: 60 * 60 * 1000 };
+
 export async function POST(request: NextRequest, { params }: { params: { token: string } }) {
+  const rateLimit = await checkRateLimit(`join-redeem:${getClientIp(request)}`, RATE_LIMIT);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: "Too many attempts from this connection. Try again later." },
+      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } },
+    );
+  }
+
   const invite = await prisma.inviteToken.findUnique({ where: { token: params.token } });
   if (!invite) {
     return NextResponse.json({ error: "Invalid invite link." }, { status: 404 });

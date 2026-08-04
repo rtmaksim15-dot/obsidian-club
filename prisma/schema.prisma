@@ -610,6 +610,23 @@ model Waitlist {
   @@map("waitlist")
 }
 
+// August hardening pass (ROADMAP v3.1), Block 2 (2026-08-04): DB-backed
+// rate limiting for auth-sensitive endpoints (apply, register, token
+// redemption) — no Upstash/Redis in this project, and every other piece
+// of app state already lives in this same Postgres via Prisma, so this
+// avoids a new infra dependency for something this app's scale doesn't
+// need. See lib/security/rate-limit.ts. `key` is caller-defined
+// (typically `${route}:${ip}`) — deliberately opaque here, not
+// normalized into ip/route columns, since nothing queries across keys.
+model RateLimitHit {
+  id        String   @id @default(cuid())
+  key       String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([key, createdAt])
+  @@map("rate_limit_hits")
+}
+
 // ============================================================
 // INVITATION & PARTNER SYSTEM v1 (OBSIDIAN_ROADMAP_v3.1, 2026-08-01)
 // ============================================================

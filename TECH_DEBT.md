@@ -6,50 +6,53 @@ Each item should eventually become a `BACKLOG.md` entry once it's actually
 scheduled; until then, it lives here as "known, not forgotten, not yet
 prioritized."
 
-## 🔴 URGENT — RLS is disabled on every table except `waitlist` (found 2026-07-16)
+## RLS was disabled on every table except `waitlist` — fixed 2026-08-04
 
-`NEXT_PUBLIC_SUPABASE_ANON_KEY` ships to every browser by design (it's
-meant to be public — RLS is what's supposed to make that safe). Checked
-`pg_class.relrowsecurity` across all `public` tables while verifying this
-task's "RLS-enforced" framing and found RLS is only actually enabled on
-`waitlist` (see the entry below). Every other table has it **off**:
-`users`, `messages`, `user_profiles`, `notifications`, `rep_history`,
-`reviews`, `rooms`, `posts`, `likes`, `referrals`, `houses`,
-`vault_items`, `marketplace_items`, `user_achievements`.
+**Original finding (2026-07-16)**: `NEXT_PUBLIC_SUPABASE_ANON_KEY` ships
+to every browser by design (it's meant to be public — RLS is what's
+supposed to make that safe). RLS was only actually enabled on
+`waitlist`; every other table had it off — `users`, `messages`,
+`user_profiles`, `notifications`, `rep_history`, `reviews`, `rooms`,
+`posts`, `likes`, `referrals`, `houses`, `vault_items`,
+`marketplace_items`, `user_achievements`, plus several more added since
+that first check. Concretely: anyone with the anon key could call
+Supabase's auto-generated REST API directly, e.g.
+`GET https://fsleaavvmvlpvfsevosw.supabase.co/rest/v1/users?select=*`,
+and read every member's email, age, city, REP, private room messages —
+completely invisible to and independent of this app's own access
+control (`requireAdmin()`, `getCurrentUser()`, middleware route-gating),
+none of which touches Postgres directly.
 
-**Concretely**: anyone with the anon key (visible in any browser's
-network tab or JS bundle — not a secret) can currently call Supabase's
-auto-generated REST API directly, e.g.
-`GET https://fsleaavvmvlpvfsevosw.supabase.co/rest/v1/users?select=*`
-with `apikey: <anon key>`, and read every member's email, age, city, REP
-— or read `messages`, including whatever's posted in rooms this app
-gates behind level/rank. This is completely invisible to and independent
-of this app's own access control (`requireAdmin()`, `getCurrentUser()`,
-middleware route-gating) — every real read/write in this codebase goes
-through Prisma via `DATABASE_URL`, whose role has `BYPASSRLS`, so the app
-itself has never once touched this gap and would look and behave
-identically whether it's open or closed.
+**Fix (August hardening pass, Block 2, 2026-08-04)**: `alter table ...
+enable row level security` on every remaining table, with zero policies
+(deny-all) — confirmed safe since the app's own Prisma connection role
+has `BYPASSRLS`, and a full grep confirmed `RoomChat.tsx` is the only
+place in the codebase using the browser-side Supabase client for direct
+table access. `messages` got a real SELECT policy instead of deny-all,
+since it's the one table `RoomChat.tsx` subscribes to via Realtime
+(deny-all there would have silently broken live chat updates).
+Migration: `supabase/migrations/20260804090000_rls_sweep_remaining_tables.sql`.
 
-**Why this isn't already fixed**: a blanket `ENABLE ROW LEVEL SECURITY`
-with no policies (deny-all) is *almost* free, since nothing here uses
-the browser-side Supabase client for data queries — except
-`components/shared/RoomChat.tsx`, which subscribes to Supabase Realtime
-`postgres_changes` on `messages` to know when to refetch. Realtime
-enforces RLS: it only delivers a change event if the subscribing role
-could `SELECT` that row, so turning on RLS for `messages` with no
-matching policy would silently break live message updates (members
-would need to manually refresh to see anything new) — a real regression,
-not a theoretical one. See DECISIONS.md (2026-07-16) for the full
-investigation.
-
-**Recommended next step**: enable RLS ordered by exposure severity
-(`users` and `messages` first, since those carry PII/private
-conversation content), design `messages`' SELECT policy *before*
-flipping its RLS on (probably: authenticated members can select messages
-in rooms they currently have access to, mirroring
-`lib/rating/room-access.ts`'s existing gating logic), then sweep the
-remaining tables. Worth a dedicated pass, not a rider on whatever task
-happens to touch one of these tables next.
+**A second, real bug surfaced while wiring `messages`' policy** — see
+`components/shared/RoomChat.tsx`'s comment and DECISIONS.md
+(2026-08-04) for the full trail: (1) the browser Realtime client needed
+an explicit `getSession()` await before subscribing, or the websocket
+opened unauthenticated and the policy (correctly) delivered nothing; (2)
+Supabase Realtime's `postgres_changes` authorization does not evaluate
+RLS policies that join out to other tables — a policy mirroring
+`canAccessRoom()`'s exact per-room level/window logic never fired for
+Realtime even though the identical predicate is true via direct SQL.
+Shipped `auth.uid() is not null` instead: self-contained, and sufficient
+since this policy only gates the live "something changed" ping, never
+message content — `GET /api/rooms/:slug/messages` already enforces the
+real `canAccessRoom()` check server-side. **Known gap, not silently
+accepted**: this means the Realtime ping (not the content) is slightly
+more permissive than `canAccessRoom()` — any authenticated member gets
+notified of new messages in any room, though they still can't read the
+content of one they can't access. Only matters once more than one room
+with a real level tier is active (currently just Newcomers). Revisit if
+Supabase's Realtime RLS join-authorization limitation gets fixed
+upstream, or if a second gated room goes live.
 
 ## Houses / Vault / Apple Sign-In gaps (2026-07-08/09, see ADR-0016)
 

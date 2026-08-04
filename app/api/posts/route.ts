@@ -6,6 +6,8 @@ import { canCreatePostType } from "@/lib/rating/content-rights";
 import { grantAchievement } from "@/lib/utils/achievements";
 import { awardRep, awardRepWithDailyCap, REP_TABLE } from "@/lib/rating/rep-engine";
 import { track } from "@/lib/analytics/track";
+import { isValidImageSignature } from "@/lib/utils/validateImageBytes";
+import { createAdminClient } from "@/lib/auth/supabase-admin";
 
 const PAGE_SIZE = 20;
 const VALID_TYPES: PostType[] = ["post", "story", "article", "lecture", "manifesto", "course"];
@@ -136,8 +138,35 @@ export async function POST(request: Request) {
   }
 
   const photoUrl = body.photoUrl?.trim();
-  if (photoUrl && !/^https:\/\//.test(photoUrl)) {
-    return NextResponse.json({ error: "Invalid photo." }, { status: 422 });
+  if (photoUrl) {
+    // Block 2 (August hardening pass, 2026-08-04): must be our own
+    // post-photos bucket, not an arbitrary https URL a client could
+    // otherwise smuggle in here (e.g. a third-party tracking pixel).
+    const bucketPrefix = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/post-photos/`;
+    if (!photoUrl.startsWith(bucketPrefix)) {
+      return NextResponse.json({ error: "Invalid photo." }, { status: 422 });
+    }
+
+    // app/api/posts/photo/route.ts hands the browser a signed upload
+    // URL and never sees the file's actual bytes (deliberately, to stay
+    // under Vercel's request-body cap — see that route's comment), so
+    // the declared Content-Type at upload time is unverified client
+    // input just like `file.type` elsewhere. Verify the real bytes here
+    // instead, the first point where the server can reach the uploaded
+    // object directly: a short ranged read is enough to check the
+    // signature without downloading the whole image.
+    try {
+      const check = await fetch(photoUrl, { headers: { Range: "bytes=0-15" } });
+      const bytes = new Uint8Array(await check.arrayBuffer());
+      if (!check.ok || !isValidImageSignature(bytes)) {
+        const path = photoUrl.slice(bucketPrefix.length);
+        await createAdminClient().storage.from("post-photos").remove([path]).catch(() => {});
+        return NextResponse.json({ error: "This photo doesn't look like a valid image." }, { status: 422 });
+      }
+    } catch (err) {
+      console.error("[posts] Failed to verify photo bytes:", err);
+      return NextResponse.json({ error: "Could not verify the photo. Try again shortly." }, { status: 503 });
+    }
   }
 
   try {

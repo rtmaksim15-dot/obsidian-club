@@ -31,6 +31,12 @@ import { createAdminClient } from "@/lib/auth/supabase-admin";
 const BUCKET = "post-photos";
 const MAX_BYTES = 8 * 1024 * 1024; // 8MB
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const EXT_BY_TYPE: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+};
 
 async function ensureBucket(admin: ReturnType<typeof createAdminClient>) {
   const { data: buckets } = await admin.storage.listBuckets();
@@ -67,7 +73,12 @@ export async function POST(request: Request) {
   const admin = createAdminClient();
   await ensureBucket(admin);
 
-  const ext = body.filename?.split(".").pop()?.toLowerCase() || "jpg";
+  // Extension derived from the validated Content-Type, not the
+  // client-supplied filename (August hardening pass, Block 2,
+  // 2026-08-04) — the actual bytes are verified separately, at post
+  // creation time, in app/api/posts/route.ts (see that route's
+  // comment for why it can't happen here).
+  const ext = EXT_BY_TYPE[body.contentType] ?? "jpg";
   const path = `${user.id}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
 
   const { data, error } = await admin.storage.from(BUCKET).createSignedUploadUrl(path);

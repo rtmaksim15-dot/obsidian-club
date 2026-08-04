@@ -37,23 +37,53 @@ export default function RoomChat({ room, currentUserId, initialMessages }: Props
 
   useEffect(() => {
     const supabase = createClient();
-    const channel = supabase
-      .channel(`room:${room.id}`)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "messages", filter: `room_id=eq.${room.id}` },
-        async () => {
-          const res = await fetch(`/api/rooms/${room.slug}/messages`);
-          if (res.ok) {
-            const body = await res.json();
-            setMessages(body.messages);
+    let cancelled = false;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    // Block 2 (August hardening pass, 2026-08-04): `messages` now has a
+    // real RLS SELECT policy (previously RLS was off entirely — see
+    // TECH_DEBT.md's URGENT entry). Two things had to be fixed together
+    // for Realtime to keep working once that policy existed:
+    //
+    // 1. This fresh client instance has no session until it's hydrated
+    //    from storage/cookies — without this `getSession()` await,
+    //    `.subscribe()` raced ahead and opened the websocket
+    //    unauthenticated, so `auth.uid()` was null and the policy
+    //    (correctly) delivered nothing.
+    // 2. The policy itself can't join out to `rooms`/`users` — confirmed
+    //    live that a policy mirroring canAccessRoom() exactly (level +
+    //    newcomers'-window via a join) never fires for Realtime even
+    //    though the identical predicate evaluates true via a direct SQL
+    //    query; a `using (true)` policy fired immediately, isolating
+    //    this to Realtime's postgres_changes authorization specifically,
+    //    not this component's wiring. The policy is `auth.uid() is not
+    //    null` instead — self-contained, no cross-table reference. This
+    //    only gates *whether the live "something changed" ping fires*;
+    //    the actual message content this component displays always
+    //    comes from `GET /api/rooms/:slug/messages`, which already
+    //    enforces the real per-room canAccessRoom() check server-side
+    //    (see that route). See DECISIONS.md, 2026-08-04.
+    supabase.auth.getSession().then(() => {
+      if (cancelled) return;
+      channel = supabase
+        .channel(`room:${room.id}`)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "messages", filter: `room_id=eq.${room.id}` },
+          async () => {
+            const res = await fetch(`/api/rooms/${room.slug}/messages`);
+            if (res.ok) {
+              const body = await res.json();
+              setMessages(body.messages);
+            }
           }
-        }
-      )
-      .subscribe();
+        )
+        .subscribe();
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      cancelled = true;
+      if (channel) supabase.removeChannel(channel);
     };
   }, [room.id, room.slug]);
 

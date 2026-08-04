@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { sendWaitlistConfirmation } from "@/lib/utils/email";
 import { track } from "@/lib/analytics/track";
+import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
 
 // Waitlist intake (Landing Page, Section 5).
 
@@ -18,7 +19,21 @@ type WaitlistPayload = {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Block 2 (August hardening pass, 2026-08-04): 5 applications per hour
+// per IP. Generous enough for a real applicant retrying past validation
+// errors, tight enough to blunt scripted spam of this public,
+// unauthenticated endpoint.
+const RATE_LIMIT = { max: 5, windowMs: 60 * 60 * 1000 };
+
 export async function POST(request: Request) {
+  const rateLimit = await checkRateLimit(`waitlist:${getClientIp(request)}`, RATE_LIMIT);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: "Too many applications from this connection. Try again later." },
+      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } },
+    );
+  }
+
   let body: WaitlistPayload;
   try {
     body = await request.json();
