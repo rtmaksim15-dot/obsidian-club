@@ -8,7 +8,46 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.25.0` is the current released version.
+Nothing yet — `v0.26.0` is the current released version.
+
+## [0.26.0] — 2026-08-04
+
+August hardening pass (ROADMAP v3.1), Block 1 + Block 2: an 18+ notice
+on every entry point, and a full security audit — most importantly,
+closing an URGENT RLS gap open since 2026-07-16.
+
+### Added
+
+- **18+ notice** — understated serif line on the landing page (above
+  the footer) and `/apply`; a confirmation line above the submit button
+  on `/join/[token]`'s registration form.
+- **RLS enabled on all 22 tables that had it disabled** — previously
+  only `waitlist`/`analytics_events` had it on; anyone with the public
+  anon key could read/write the entire database via Supabase's REST
+  API, completely bypassing this app's own access control. Deny-all
+  everywhere except `messages` (real member's needed for Realtime; see
+  `DECISIONS.md`/`TECH_DEBT.md` for the Realtime-authorization bug this
+  surfaced and fixed along the way, in `RoomChat.tsx`).
+- **DB-backed rate limiting** (`RateLimitHit`, `lib/security/rate-limit.ts`)
+  on `/api/waitlist`, `/api/invite/[token]`, and `/api/join/[token]`.
+- **File upload byte verification** — real magic-byte checks
+  (`lib/utils/validateImageBytes.ts`) on both the avatar and post-photo
+  upload paths, replacing MIME-type-only validation (trivially
+  spoofable); also tightened `POST /api/posts`' `photoUrl` to only
+  accept this app's own Storage bucket.
+- **`server-only` guards** on `lib/auth/supabase-admin.ts` and
+  `lib/db/prisma.ts` — build-time protection against an accidental
+  client-side import of service-role/database credentials.
+
+### Verified
+
+- Every API route's auth checks audited (all 27 routes — clean, no
+  gaps found). Live end-to-end tests with `test-` prefixed entities per
+  `CLAUDE.md` rule 7 for: the RLS sweep (including a full Realtime
+  round-trip after the fix), rate limiting wiring, and all four upload
+  hardening cases (valid/spoofed avatar, valid/spoofed post photo — the
+  spoofed cases confirmed rejected and removed from Storage). All test
+  data removed afterward.
 
 ## [0.25.0] — 2026-08-03
 
