@@ -25,6 +25,9 @@ export default function ApplyPage({
       <a href="/" className="btn-ghost mt-10 inline-block">
         Return home
       </a>
+      <p className="mt-12 font-cormorant text-[0.8rem] italic text-ob-subtle">
+        Obsidian Club is a private community for adults 18+.
+      </p>
     </main>
   );
 }

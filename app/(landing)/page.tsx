@@ -295,7 +295,10 @@ export default async function LandingPage() {
             </a>
           </nav>
         </div>
-        <div className="mx-auto mt-[52px] flex max-w-[1180px] flex-wrap items-center justify-between gap-4 border-t pt-7" style={{ borderColor: "var(--color-border-subtle)" }}>
+        <p className="mx-auto mt-[52px] max-w-[1180px] text-center font-cormorant text-[0.85rem] italic text-ob-subtle">
+          Obsidian Club is a private community for adults 18+.
+        </p>
+        <div className="mx-auto mt-5 flex max-w-[1180px] flex-wrap items-center justify-between gap-4 border-t pt-7" style={{ borderColor: "var(--color-border-subtle)" }}>
           <span className="text-ob-subtle font-inter text-[0.68rem] tracking-[0.14em]">
             © MMXXVI OBSIDIAN CLUB. ALL RIGHTS RESERVED.
           </span>

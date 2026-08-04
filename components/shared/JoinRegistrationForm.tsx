@@ -123,6 +123,10 @@ export default function JoinRegistrationForm({ token }: Props) {
       <button type="submit" className="btn-primary w-full" disabled={submitting}>
         {submitting ? "Entering…" : "Enter"}
       </button>
+
+      <p className="text-caption text-center" style={{ color: "var(--color-text-muted)" }}>
+        By continuing you confirm you are 18 or older.
+      </p>
     </form>
   );
 }
