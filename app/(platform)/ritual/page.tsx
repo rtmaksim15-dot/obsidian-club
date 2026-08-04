@@ -6,14 +6,12 @@ import { grantAchievement } from "@/lib/utils/achievements";
 
 const STATUS_LABEL: Record<string, string> = {
   done: "Done",
-  deferred: "Pending",
   todo: "To do",
 };
 
 /**
- * The Initiation Ritual (PRODUCT.md §1 Stage 2). Steps 1, 2, 3 and 4 are
- * real, checkable actions — 5 ("safety & respect guidelines") still needs
- * policy content Max hasn't written yet. See ADR-0013.
+ * The Initiation Ritual (PRODUCT.md §1 Stage 2). All five steps are real,
+ * checkable actions as of 2026-08-03 — see ADR-0013.
  */
 export default async function RitualPage() {
   const user = await getCurrentUser();
@@ -50,12 +48,7 @@ export default async function RitualPage() {
               <span
                 className="text-label shrink-0"
                 style={{
-                  color:
-                    step.status === "done"
-                      ? "var(--color-success)"
-                      : step.status === "deferred"
-                        ? "var(--color-text-muted)"
-                        : "var(--color-accent)",
+                  color: step.status === "done" ? "var(--color-success)" : "var(--color-accent)",
                 }}
               >
                 {STATUS_LABEL[step.status]}
@@ -83,6 +76,11 @@ export default async function RitualPage() {
           {status.steps.some((s) => s.id === "newcomerRoom" && s.status === "todo") ? (
             <a href="/rooms/newcomers" className="btn-secondary inline-block">
               Go to the Newcomers room
+            </a>
+          ) : null}
+          {status.steps.some((s) => s.id === "safetyRules" && s.status === "todo") ? (
+            <a href="/ritual/safety-rules" className="btn-primary inline-block">
+              Read the safety & respect guidelines
             </a>
           ) : null}
         </div>

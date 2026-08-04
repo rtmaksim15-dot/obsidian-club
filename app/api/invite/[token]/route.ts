@@ -43,15 +43,6 @@ async function findAuthUserByEmail(admin: ReturnType<typeof createAdminClient>, 
 
 type Body = { name?: string; password?: string };
 
-// "safetyRules" needs policy content Max hasn't written yet, so it starts
-// explicitly "deferred", never silently faked as complete (see ADR-0013).
-// "newcomerRoom" is computed live from message history
-// (lib/auth/ritual.ts) and ignores this seed value entirely.
-const INITIAL_RITUAL_PROGRESS = {
-  newcomerRoom: "deferred",
-  safetyRules: "deferred",
-};
-
 // POST /api/invite/:token — redeems a one-time invite token (Closed
 // Registration & Invite System, 2026-07-17): creates the real account
 // (Supabase Auth user + `public.users` row) only now, at the moment the
@@ -167,6 +158,8 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
           username: generateUsernameFromEmail(application.email),
           displayName: name,
           age: application.age,
+          ageVerified: application.ageVerified,
+          ageVerifiedAt: application.ageVerifiedAt,
           locationCity: application.city,
           level: 1,
           status: "active",
@@ -177,7 +170,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
         },
       }),
       prisma.userProfile.create({
-        data: { userId: newUserId, ritualProgress: INITIAL_RITUAL_PROGRESS },
+        data: { userId: newUserId },
       }),
       prisma.notification.create({
         data: {

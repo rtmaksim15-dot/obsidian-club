@@ -136,6 +136,12 @@ model User {
   locationCity    String?     @map("location_city")
   locationCountry String?     @map("location_country")
   age             Int?
+  // Age Verification (2026-08-03): field first, no enforcement gate yet —
+  // enforcement policy comes with the first wave (see DECISIONS.md).
+  // Toggled manually by an admin in /admin/members or at application
+  // approval; not derived from the self-reported `age` above.
+  ageVerified     Boolean     @default(false) @map("age_verified")
+  ageVerifiedAt   DateTime?   @map("age_verified_at")
   level           Int         @default(1) // 1-6
   reputation      Decimal     @default(0) @db.Decimal(3, 2) // 0.00 - 5.00, peer-review star average — independent of REP as of the 2026-07-05 CLAUDE.md migration (see ADR-0015)
   rep             Int         @default(0) // "REP" — a discrete point ledger (CLAUDE.md's earn/lose tables), replaces the old weighted `rating` score; see ADR-0015. Sum of RepHistory.delta
@@ -188,11 +194,11 @@ model User {
   partnerInviteTokensCreated InviteToken[]     @relation("PartnerInviteTokens")
   redeemedInviteToken        InviteToken?      @relation("RedeemedInviteToken")
   likes                      Like[]
-  comments          Comment[]
-  houseMemberships  HouseMembership[]
-  analyticsEvents   AnalyticsEvent[]
-  following         Follow[]          @relation("Following")
-  followers         Follow[]          @relation("Followers")
+  comments                   Comment[]
+  houseMemberships           HouseMembership[]
+  analyticsEvents            AnalyticsEvent[]
+  following                  Follow[]          @relation("Following")
+  followers                  Follow[]          @relation("Followers")
 
   @@map("users")
 }
@@ -583,6 +589,13 @@ model Waitlist {
   status            WaitlistStatus @default(pending)
   reviewedAt        DateTime?      @map("reviewed_at")
   reviewedBy        String?        @map("reviewed_by") @db.Uuid
+  // Age Verification (2026-08-03): set by the admin at approval time,
+  // staged here since the `User` row doesn't exist yet — copied onto
+  // User.ageVerified/ageVerifiedAt when the invite is redeemed (see
+  // app/api/invite/[token]/route.ts). Independent of the self-reported
+  // `age` field above.
+  ageVerified       Boolean        @default(false) @map("age_verified")
+  ageVerifiedAt     DateTime?      @map("age_verified_at")
   // Closed Registration & Invite System (2026-07-17): approving no
   // longer creates the account immediately — it generates this token,
   // shown to the admin to copy and send manually (see DECISIONS.md for

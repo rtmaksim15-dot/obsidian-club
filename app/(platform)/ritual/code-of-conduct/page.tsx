@@ -63,6 +63,12 @@ export default async function CodeOfConductPage() {
           By accepting, you bind yourself to the Code. A decision on violations, if any, is final.
         </p>
 
+        <p className="text-caption mt-4">
+          <a href="/codex" style={{ color: "var(--color-text-muted)" }}>
+            Read the full Codex &rarr;
+          </a>
+        </p>
+
         <div className="mt-8">
           {alreadyAccepted ? (
             <a href="/ritual" className="btn-secondary block w-full text-center">

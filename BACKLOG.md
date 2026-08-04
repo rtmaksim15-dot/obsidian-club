@@ -63,15 +63,17 @@ unilaterally.
       (blocked — needs Max's account; needed to verify avatar upload)
 - [ ] Set `NEXT_PUBLIC_APP_URL` in Vercel once the domain is live (see
       `TECH_DEBT.md`)
-- [ ] **Max to provide real content** for Initiation Ritual steps 2/3/5:
+- [x] ~~**Max to provide real content** for Initiation Ritual steps 2/3/5:
       Code of Conduct text, Lord Obsidian's introductory material,
-      safety/respect guidelines (see `TECH_DEBT.md`) — blocks the ritual
-      from being real, not just technical wiring
-- [ ] **Open question, not decided:** can `Obsidian Codex.docx`'s actual
-      prose (real, on-brand Code of Conduct + rules text) be reused for
-      the item above? The text itself doesn't depend on the
-      Circle/Warden hierarchy it shipped alongside, but that hierarchy
-      was superseded — see `DECISIONS.md`, 2026-07-04.
+      safety/respect guidelines~~ — resolved 2026-08-03: all three
+      supplied and shipped (`v0.25.0`); the ritual is fully real, no
+      step renders a "pending" state anymore.
+- [x] ~~**Open question:** can `Obsidian Codex.docx`'s actual prose (real,
+      on-brand Code of Conduct + rules text) be reused for the item
+      above?~~ — resolved 2026-08-03: Max supplied fresh Codex prose
+      (Eight Principles + Red Lines) directly for the new `/codex` page,
+      independent of the Circle/Warden hierarchy question this was
+      originally tied to.
 - [x] ~~Reconcile `OC_MASTER.md` pivot with existing build~~ — resolved
       2026-07-04: existing foundation kept, new scope added as "Later"
       below. See [ADR-0014](docs/ADR/0014-adopt-oc-master-as-strategic-source.md).

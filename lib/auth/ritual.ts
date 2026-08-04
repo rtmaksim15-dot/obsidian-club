@@ -2,7 +2,7 @@ import type { User, UserProfile } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { awardRep, REP_TABLE } from "@/lib/rating/rep-engine";
 
-export type RitualStepStatus = "done" | "deferred" | "todo";
+export type RitualStepStatus = "done" | "todo";
 
 export type RitualStatus = {
   complete: boolean;
@@ -20,23 +20,20 @@ export type RitualStatus = {
  * profile") is derived live from User fields. Step 4 ("newcomers' room")
  * is real too (`v0.5`), checked live against actual message history, now
  * that Rooms exist (`v0.4`) — ADR-0013 flagged this as the exact trigger
- * to revisit once Rooms shipped. Steps 2/3 (Code of Conduct, Lord
- * Obsidian's introduction) are now real as of 2026-07-15 — Max supplied
- * the actual content, so `codeOfConduct`/`introMaterial` no longer honor
- * the "deferred" sentinel the way `safetyRules` still does (no content
- * for that one yet): anyone whose `ritualProgress` predates this change
+ * to revisit once Rooms shipped. Steps 2/3/5 (Code of Conduct, Lord
+ * Obsidian's introduction, Safety & Respect Guidelines) are all real now
+ * — `safetyRules` got its content 2026-08-03, the last of the three to
+ * drop the "deferred" sentinel (Code of Conduct/introMaterial did so
+ * 2026-07-15). Anyone whose `ritualProgress` predates this change
  * (stored `"deferred"` from `INITIAL_RITUAL_PROGRESS`) is correctly
  * re-surfaced as `"todo"` — they never actually read/accepted anything,
  * since the content didn't exist. Set via `POST /api/ritual/progress`
- * from `/ritual/code-of-conduct` and `/ritual/introduction`.
+ * from `/ritual/code-of-conduct`, `/ritual/introduction`, and
+ * `/ritual/safety-rules`.
  */
 export async function getRitualStatus(user: User, profile: UserProfile | null): Promise<RitualStatus> {
   const profileComplete = Boolean(user.bio && user.avatarUrl);
   const progress = (profile?.ritualProgress ?? {}) as Record<string, unknown>;
-
-  // Only used for safetyRules now — see doc comment above.
-  const asStatus = (value: unknown): RitualStepStatus =>
-    value === true ? "done" : value === "deferred" ? "deferred" : "todo";
 
   const introducedInNewcomerRoom =
     (await prisma.message.count({
@@ -88,12 +85,12 @@ export async function getRitualStatus(user: User, profile: UserProfile | null): 
     {
       id: "safetyRules",
       label: "Confirm the safety & respect guidelines",
-      status: asStatus(progress.safetyRules),
-      note: "Content pending.",
+      status: progress.safetyRules === true ? "done" : "todo",
+      note: progress.safetyRules === true ? undefined : "What protects you — and what will remove you.",
     },
   ];
 
-  const complete = steps.every((s) => s.status === "done" || s.status === "deferred");
+  const complete = steps.every((s) => s.status === "done");
 
   return { complete, steps };
 }

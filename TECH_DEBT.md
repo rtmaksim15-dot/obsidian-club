@@ -303,27 +303,27 @@ when this env var isn't set — meaning OpenGraph/canonical URLs will
 resolve incorrectly (to localhost) if deployed without setting it. **Must
 be set in Vercel's environment variables at deploy time.**
 
-## Initiation Ritual: step 5 still needs content that doesn't exist
+## Initiation Ritual: step 5 needed content that didn't exist — fixed 2026-08-03
 
-`PRODUCT.md` §1 Stage 2's 5-step ritual is real infrastructure (`/ritual`,
-`lib/auth/ritual.ts`, gates the Hall). Steps 1 (complete profile), 2
-(Code of Conduct), 3 (Lord Obsidian's intro material), and 4 (newcomers'
-room) are all real and actionable as of 2026-07-15. Only step 5
-(safety/respect rules) still renders an honest "pending" state — **needs
-Max to provide the actual safety-guidelines text** before it can become
-real; nothing here is faked complete in the meantime. See `DECISIONS.md`
-(2026-07-02, 2026-07-15) and
+All 5 steps of `PRODUCT.md` §1 Stage 2's ritual (`/ritual`,
+`lib/auth/ritual.ts`) are now real and actionable. Step 5
+(`app/(platform)/ritual/safety-rules/page.tsx`) got its real Safety &
+Respect copy from Max 2026-08-03, the last of the three content steps to
+drop the `"deferred"` sentinel (Code of Conduct/introMaterial did so
+2026-07-15). See `DECISIONS.md` (2026-07-02, 2026-07-15, 2026-08-03) and
 [ADR-0013](docs/ADR/0013-initiation-ritual-step4-deferred.md).
 
-Steps 2/3 (`app/(platform)/ritual/code-of-conduct/page.tsx`,
-`app/(platform)/ritual/introduction/page.tsx`) store real per-user
-acceptance state in `UserProfile.ritualProgress` (a JSON field, no schema
-migration needed) — `{step}: true` plus a `{step}At` ISO timestamp,
-written by `POST /api/ritual/progress`. Any member whose `ritualProgress`
-predates this change (stored `"deferred"` for these two keys, from the
-old `INITIAL_RITUAL_PROGRESS`) is correctly re-surfaced as `"todo"` —
-they never actually read or accepted anything, since the content didn't
-exist yet.
+All three content steps (`codeOfConduct`, `introMaterial`, `safetyRules`)
+now store real per-user acceptance state in `UserProfile.ritualProgress`
+(a JSON field, no schema migration needed) — `{step}: true` plus a
+`{step}At` ISO timestamp, written by `POST /api/ritual/progress`. Any
+member whose `ritualProgress` predates this change (stored `"deferred"`
+from the old `INITIAL_RITUAL_PROGRESS`) is correctly re-surfaced as
+`"todo"` for whichever step(s) they never actually read or accepted,
+since the content didn't exist yet. The `"deferred"` sentinel itself and
+`RitualStepStatus`'s third state are now fully retired from the codebase
+— `newcomerRoom` (step 4) was already computed live, not from this
+sentinel, well before this change.
 
 ## "Steady activity" / "high activity" have no defined metric
 

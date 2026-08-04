@@ -177,17 +177,22 @@ when Supabase isn't configured — see the near-miss recorded in
 component had its own auth check regardless, so this was a
 defense-in-depth gap, not an actual hole.
 
-## Initiation Ritual & the Hall (actual, `v0.3`)
+## Initiation Ritual & the Hall (actual, `v0.3`–`v0.25`)
 
 `lib/auth/ritual.ts#getRitualStatus()` computes ritual completion from
 real data — step 1 (complete profile) is derived live from
-`User.bio`/`avatarUrl`, never a self-reported flag. Steps 2/3/5 (Code of
-Conduct, Lord Obsidian's intro material, safety rules) and step 4
-(newcomers' room) all start `"deferred"` at account creation — there is
-no real content or Rooms feature to back them yet, and nothing here fakes
-that there is. See [ADR-0013](ADR/0013-initiation-ritual-step4-deferred.md)
-(step 4's rationale extends to steps 2/3/5 — same underlying problem,
-same resolution, confirmed with Max 2026-07-02).
+`User.bio`/`avatarUrl`, never a self-reported flag; step 4 (newcomers'
+room) is checked live against real message history once Rooms shipped
+(`v0.4`/`v0.5`). Steps 2/3/5 (Code of Conduct, Lord Obsidian's intro
+material, Safety & Respect Guidelines) originally had no real content
+behind them and started `"deferred"` at account creation (see
+[ADR-0013](ADR/0013-initiation-ritual-step4-deferred.md), confirmed with
+Max 2026-07-02) — all three are real as of `v0.25` (2026-08-03), Max
+having supplied the actual policy/narrative text for each. The
+`"deferred"` sentinel is fully retired: every step now resolves to
+either `"done"` (real acceptance recorded in
+`UserProfile.ritualProgress` via `POST /api/ritual/progress`, or live
+message history for step 4) or `"todo"`.
 
 `lib/rating/level-progress.ts#getLevelProgress()` shows real
 progress-to-next-level criteria (reputation stars, referral count) with

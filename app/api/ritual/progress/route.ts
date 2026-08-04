@@ -4,11 +4,10 @@ import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 
 // Steps a member can mark complete themselves from real content (Code of
-// Conduct, Lord Obsidian's introduction) — deliberately excludes
-// "newcomerRoom" (computed live from message history) and "safetyRules"
-// (no policy content exists yet, see ADR-0013) so this route can't be used
-// to self-report either of those.
-const SELF_REPORTABLE_STEPS = ["codeOfConduct", "introMaterial"] as const;
+// Conduct, Lord Obsidian's introduction, Safety & Respect Guidelines) —
+// deliberately excludes "newcomerRoom", which is computed live from
+// message history and can't be self-reported through this route.
+const SELF_REPORTABLE_STEPS = ["codeOfConduct", "introMaterial", "safetyRules"] as const;
 type SelfReportableStep = (typeof SELF_REPORTABLE_STEPS)[number];
 
 type Body = { step?: string };

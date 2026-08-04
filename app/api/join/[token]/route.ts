@@ -26,13 +26,6 @@ async function findAuthUserByEmail(admin: ReturnType<typeof createAdminClient>, 
   return null;
 }
 
-// Same sentinel as app/api/invite/[token]/route.ts's local copy — no
-// shared module for this yet, see that file's own comment.
-const INITIAL_RITUAL_PROGRESS = {
-  newcomerRoom: "deferred",
-  safetyRules: "deferred",
-};
-
 type Body = { name?: string; email?: string; password?: string };
 
 // POST /api/join/:token — redeems a purchase-card, member-invite, or
@@ -147,7 +140,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
         },
       }),
       prisma.userProfile.create({
-        data: { userId: newUserId, ritualProgress: INITIAL_RITUAL_PROGRESS },
+        data: { userId: newUserId },
       }),
       prisma.notification.create({
         data: {

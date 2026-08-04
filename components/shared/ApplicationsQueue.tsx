@@ -34,6 +34,11 @@ export default function ApplicationsQueue({ initial }: { initial: Application[] 
   const [applications, setApplications] = useState(initial);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [errorId, setErrorId] = useState<string | null>(null);
+  // Age Verification (2026-08-03): admin's manual confirmation, checked
+  // at approval time — independent of the applicant's self-reported
+  // `age` above. Keyed by application id since multiple cards render at
+  // once. No enforcement gate yet; see DECISIONS.md.
+  const [ageVerified, setAgeVerified] = useState<Record<string, boolean>>({});
   // Approving no longer creates the account — it returns a one-time
   // invite link the admin has to copy and send themselves (Closed
   // Registration & Invite System, 2026-07-17). Kept in local state,
@@ -53,7 +58,9 @@ export default function ApplicationsQueue({ initial }: { initial: Application[] 
       const res = await fetch(`/api/admin/applications/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify(
+          action === "approve" ? { action, ageVerified: Boolean(ageVerified[id]) } : { action },
+        ),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error();
@@ -105,21 +112,31 @@ export default function ApplicationsQueue({ initial }: { initial: Application[] 
                 </p>
               </div>
               {!inviteUrl ? (
-                <div className="flex shrink-0 gap-2">
-                  <button
-                    className="btn-secondary"
-                    disabled={pendingId === a.id}
-                    onClick={() => review(a.id, "decline")}
-                  >
-                    Decline
-                  </button>
-                  <button
-                    className="btn-primary"
-                    disabled={pendingId === a.id}
-                    onClick={() => review(a.id, "approve")}
-                  >
-                    {pendingId === a.id ? "…" : "Approve"}
-                  </button>
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  <label className="text-caption flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(ageVerified[a.id])}
+                      onChange={(e) => setAgeVerified((prev) => ({ ...prev, [a.id]: e.target.checked }))}
+                    />
+                    Age verified
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      className="btn-secondary"
+                      disabled={pendingId === a.id}
+                      onClick={() => review(a.id, "decline")}
+                    >
+                      Decline
+                    </button>
+                    <button
+                      className="btn-primary"
+                      disabled={pendingId === a.id}
+                      onClick={() => review(a.id, "approve")}
+                    >
+                      {pendingId === a.id ? "…" : "Approve"}
+                    </button>
+                  </div>
                 </div>
               ) : null}
             </div>

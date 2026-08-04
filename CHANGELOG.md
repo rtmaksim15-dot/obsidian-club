@@ -8,7 +8,55 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.24.0` is the current released version.
+Nothing yet — `v0.25.0` is the current released version.
+
+## [0.25.0] — 2026-08-03
+
+Ritual completion + Codex + Age Verification field. Closes the last
+open Initiation Ritual content gap (`ADR-0013`, `TECH_DEBT.md`) and adds
+the club's full Codex plus an admin-facing Age Verification flag.
+
+### Added
+
+- **Safety & Respect Guidelines** — the Initiation Ritual's 5th and
+  final step (`/ritual/safety-rules`) now has real content from Max,
+  replacing the "pending" placeholder. A single "I Understand and
+  Accept" button records acceptance in `UserProfile.ritualProgress` via
+  `POST /api/ritual/progress` (now accepts `"safetyRules"`), identical
+  to how Code of Conduct/introduction already work. The ritual's
+  `"deferred"` sentinel — a "no content yet" placeholder introduced for
+  this exact gap — is fully retired: `RitualStepStatus` drops the
+  `"deferred"` member, the ritual page's status badge only ever renders
+  "Done" or "To do," and new members simply start every content step
+  at "todo."
+- **`/codex`** — the club's full Codex (Eight Principles + Red Lines),
+  styled like the Code of Conduct page (roman numerals, serif, dark).
+  Reference material, not a ritual step — no completion tracking, no
+  "accept" button. Linked quietly from `/ritual/safety-rules` and
+  `/ritual/code-of-conduct` ("Read the full Codex →").
+- **Age Verification field** — `User.ageVerified`/`ageVerifiedAt` (also
+  staged on `Waitlist`, since account creation happens later at invite
+  redemption, not at approval). An "Age verified" checkbox in
+  `ApplicationsQueue.tsx`'s approve action stages it on the `Waitlist`
+  row; it's copied onto the new `User` row at `/invite/[token]`
+  redemption, same as `age`/`locationCity`. New `/admin/members` page
+  (no admin member-list page existed before this) shows every active
+  member with a toggle, via a new `PATCH /api/admin/members/:id` route.
+  Field first, no enforcement gate yet — that's a separate decision for
+  a later wave.
+
+### Verified
+
+- Live: submitted a `test-` prefixed application, approved it with Age
+  Verified checked, confirmed the flag landed on `Waitlist` then copied
+  onto the new `User` row at invite redemption; walked the new member
+  through `/ritual` → `/ritual/safety-rules` → confirmed → step showed
+  Done and the ritual page's action button disappeared; visited
+  `/codex` from both quiet links; toggled Age Verified on `/admin/members`
+  for a second test account. All test entities (2 `User` rows, their
+  Supabase Auth identities, 1 `Waitlist` row) were fully removed
+  afterward per `CLAUDE.md` rule 7 — verified the database matches its
+  pre-session state exactly.
 
 ## [0.24.0] — 2026-08-01
 

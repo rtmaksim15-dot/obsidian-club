@@ -1722,3 +1722,53 @@ way, since it's a genuine product call (do these three new paths
 deserve the same REP/Trust-Score treatment as the old one, or are they
 intentionally lighter-weight?) that wasn't asked and shouldn't be
 guessed.
+
+### 2026-08-03 — Ritual step 5 content delivered; `"deferred"` sentinel fully retired; `/codex` and Age Verification added
+
+Max supplied the real Safety & Respect Guidelines text (`v0.25.0`),
+closing the gap opened 2026-07-02 and tracked since in `TECH_DEBT.md`
+and [ADR-0013](docs/ADR/0013-initiation-ritual-step4-deferred.md). With
+all three content steps (`codeOfConduct`, `introMaterial`,
+`safetyRules`) now real, the `"deferred"` `RitualStepStatus` value —
+introduced specifically as a "no content yet" placeholder — no longer
+has any legitimate use anywhere in the codebase (`newcomerRoom`, the one
+remaining non-`true`/`todo` step, was always computed live and never
+actually read this sentinel). Removed it entirely from
+`RitualStepStatus`, `getRitualStatus()`'s `asStatus` helper, the ritual
+page's status-badge rendering, and the two `INITIAL_RITUAL_PROGRESS`
+seed objects — new members simply start every content step at `"todo"`
+(no seed key at all), identical to how `codeOfConduct`/`introMaterial`
+already worked.
+
+**`/codex`, a separate page, not a ritual step.** Max also supplied the
+club's full Codex (Eight Principles + Red Lines) — this is reference
+material a member can read any time, not something to accept or track
+completion of, so it got its own route with no `ritualProgress` entry,
+linked quietly from both `/ritual/safety-rules` and
+`/ritual/code-of-conduct` ("Read the full Codex →"). This also resolves
+`BACKLOG.md`'s open question about reusing `Obsidian Codex.docx` prose —
+moot now that Max provided fresh Codex text directly for this task,
+independent of the superseded Circle/Warden hierarchy that document
+originally shipped alongside.
+
+**Age Verification: field first, no enforcement, staged on `Waitlist`
+because the `User` row doesn't exist yet at approval time.** Added
+`ageVerified`/`ageVerifiedAt` to both `User` and `Waitlist` — the admin
+checks it manually in `ApplicationsQueue.tsx` at approval time (staged
+on the `Waitlist` row, since account creation happens later at
+`/invite/[token]` redemption, not at approval), and it's copied onto the
+new `User` row exactly like `age`/`locationCity` already are. This is
+independent of the self-reported `age` field — an admin's own
+confirmation, not a copy of what the applicant typed. No gate anywhere
+reads this flag yet; per the task's own brief, enforcement policy is a
+separate decision for a later wave, not something to invent now.
+
+**No existing admin member-list page — built one.** The task asked for
+an "admin member view" to host this toggle for members who already have
+an account (as opposed to applicants, who go through
+`ApplicationsQueue.tsx`), but no such page existed anywhere in the app —
+only `/admin/applications`, `/admin/rep`, and `/admin/invite-batches`.
+Built `/admin/members` matching those three pages' established minimal
+style exactly (plain list, `notFound()` not a redirect for
+non-admins, no styling polish beyond base tokens) rather than skip the
+requirement or invent a heavier admin panel than what was asked for.

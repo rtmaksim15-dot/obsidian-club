@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { track } from "@/lib/analytics/track";
 
-type Body = { action?: "approve" | "decline" };
+type Body = { action?: "approve" | "decline"; ageVerified?: boolean };
 
 // PATCH /api/admin/applications/:id — approve or decline a waitlist entry.
 //
@@ -64,6 +64,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   // --- approve: generate the one-time invite token, nothing else yet ---
   const inviteToken = randomBytes(24).toString("hex");
+  const ageVerified = Boolean(body.ageVerified);
 
   await prisma.waitlist.update({
     where: { id: application.id },
@@ -72,6 +73,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       reviewedAt: new Date(),
       reviewedBy: admin.id,
       inviteToken,
+      ageVerified,
+      ageVerifiedAt: ageVerified ? new Date() : null,
     },
   });
 
