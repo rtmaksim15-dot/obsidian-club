@@ -8,7 +8,45 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.26.0` is the current released version.
+Nothing yet — `v0.27.0` is the current released version.
+
+## [0.27.0] — 2026-08-04
+
+August hardening pass (ROADMAP v3.1), Block 3: brand-styled error pages,
+and a real gap closed in how forms surface failures.
+
+### Added
+
+- **`app/not-found.tsx`, `app/error.tsx`, `app/global-error.tsx`** —
+  Next.js's generic 404/500 fallbacks replaced with on-brand pages
+  (same dark/serif shell as `/apply`, `/login`). `global-error.tsx`
+  covers the rare case of the root layout itself throwing — uses inline
+  styles deliberately, since it replaces the whole document and can't
+  rely on `app/layout.tsx`'s font providers or `globals.css` loading.
+
+### Fixed
+
+- **Forms no longer surface raw exception text.** Seven client
+  components (`ApplicationForm`, `JoinRegistrationForm`,
+  `InviteRegistrationForm`, `ContentComposer`, `CommentSection`,
+  `RepAdjustmentForm`, `InviteBatchGenerator`) caught a server error
+  response, re-threw it as `new Error(body.error)`, then displayed
+  `err.message` in a shared `catch` block — which also caught a raw
+  `fetch()` network exception (offline, DNS, CORS) with no
+  human-authored message and displayed *that* verbatim too. Every one
+  now branches directly on the response instead of throwing, so a raw
+  browser/network error can never reach the screen — only this app's
+  own curated copy or a fixed fallback.
+
+### Verified
+
+- Live: `/this-page-does-not-exist` renders the new 404; a deliberately
+  throwing test route (added and removed within this session) renders
+  the new error boundary correctly; the waitlist application form's
+  success path still works end-to-end after the refactor. Invite-token
+  edge cases (invalid, expired, already-used) were already handled with
+  dignified messages before this session — confirmed by reading
+  `/invite/[token]` and `/join/[token]`, no changes needed there.
 
 ## [0.26.0] — 2026-08-04
 

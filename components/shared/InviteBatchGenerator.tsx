@@ -25,11 +25,18 @@ export default function InviteBatchGenerator() {
         body: JSON.stringify({ count }),
       });
       const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body?.error ?? "Could not generate batch.");
+      if (!res.ok) {
+        setStatus("error");
+        setError(body?.error ?? "Could not generate batch.");
+        return;
+      }
       router.push(`/admin/invite-batches/${body.batchId}`);
-    } catch (err) {
+    } catch {
+      // Block 3 (August hardening pass, 2026-08-04): a raw fetch()
+      // failure (offline, DNS, CORS) never carries a human-authored
+      // message — show the fixed fallback instead of err.message.
       setStatus("error");
-      setError(err instanceof Error ? err.message : "Could not generate batch.");
+      setError("Could not generate batch.");
     }
   }
 

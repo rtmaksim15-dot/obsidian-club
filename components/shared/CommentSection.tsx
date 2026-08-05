@@ -36,15 +36,21 @@ export default function CommentSection({ postId, initial }: { postId: string; in
         body: JSON.stringify({ content }),
       });
       const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body?.error ?? "Could not post your comment.");
+      if (!res.ok) {
+        setError(body?.error ?? "Could not post your comment.");
+        return;
+      }
       setComments((prev) => [...prev, body.comment]);
       setDraft("");
       // Instant local update above for the list; refresh so the
       // server-rendered comment count on the card above (and on /feed,
       // if the caller navigates back) catches up too.
       router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not post your comment.");
+    } catch {
+      // Block 3 (August hardening pass, 2026-08-04): a raw fetch()
+      // failure never carries a human-authored message — fixed
+      // fallback, not err.message.
+      setError("Could not post your comment.");
     } finally {
       setSubmitting(false);
     }

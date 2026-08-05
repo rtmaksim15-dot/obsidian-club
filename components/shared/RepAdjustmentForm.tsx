@@ -23,13 +23,20 @@ export default function RepAdjustmentForm() {
         body: JSON.stringify(data),
       });
       const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body?.error ?? "Something went wrong.");
+      if (!res.ok) {
+        setStatus("error");
+        setMessage(body?.error ?? "Something went wrong.");
+        return;
+      }
       setStatus("success");
       setMessage(`Done — ${data.email} is now at ${body.rep} REP.`);
       form.reset();
-    } catch (err) {
+    } catch {
+      // Block 3 (August hardening pass, 2026-08-04): a raw fetch()
+      // failure never carries a human-authored message — fixed
+      // fallback, not err.message.
       setStatus("error");
-      setMessage(err instanceof Error ? err.message : "Something went wrong.");
+      setMessage("Something went wrong.");
     }
   }
 

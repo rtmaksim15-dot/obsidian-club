@@ -75,7 +75,12 @@ export default function ContentComposer({ houses = [] }: Props) {
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
-  async function uploadPhoto(file: File): Promise<string> {
+  // Returns a curated error message on failure instead of throwing —
+  // a raw fetch() network exception (offline, DNS, CORS) never carries
+  // a human-authored message, so handleSubmit's catch can't safely
+  // distinguish "ours" from "raw" if this throws (Block 3, August
+  // hardening pass, 2026-08-04).
+  async function uploadPhoto(file: File): Promise<{ url: string } | { error: string }> {
     const signRes = await fetch("/api/posts/photo", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -83,7 +88,7 @@ export default function ContentComposer({ houses = [] }: Props) {
     });
     const signBody = await signRes.json().catch(() => ({}));
     if (!signRes.ok) {
-      throw new Error(signBody?.error ?? "Could not upload photo.");
+      return { error: signBody?.error ?? "Could not upload photo." };
     }
 
     const supabase = createClient();
@@ -91,10 +96,10 @@ export default function ContentComposer({ houses = [] }: Props) {
       .from(signBody.bucket)
       .uploadToSignedUrl(signBody.path, signBody.token, file, { contentType: file.type });
     if (uploadError) {
-      throw new Error("Could not upload photo. Try again shortly.");
+      return { error: "Could not upload photo. Try again shortly." };
     }
 
-    return signBody.publicUrl;
+    return { url: signBody.publicUrl };
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -107,13 +112,13 @@ export default function ContentComposer({ houses = [] }: Props) {
 
     let photoUrl: string | undefined;
     if (photo) {
-      try {
-        photoUrl = await uploadPhoto(photo);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Could not upload photo.");
+      const result = await uploadPhoto(photo).catch(() => ({ error: "Could not upload photo." }));
+      if ("error" in result) {
+        setError(result.error);
         setSubmitting(false);
         return;
       }
+      photoUrl = result.url;
     }
 
     const res = await fetch("/api/posts", {

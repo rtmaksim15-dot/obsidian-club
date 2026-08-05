@@ -24,12 +24,17 @@ export default function ApplicationForm() {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body?.error ?? "Something went wrong.");
+        setError(body?.error ?? "Something went wrong.");
+        setStatus("error");
+        return;
       }
       setStatus("success");
       form.reset();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+    } catch {
+      // Block 3 (August hardening pass, 2026-08-04): a raw fetch()
+      // failure never carries a human-authored message — fixed
+      // fallback, not err.message.
+      setError("Something went wrong.");
       setStatus("error");
     }
   }

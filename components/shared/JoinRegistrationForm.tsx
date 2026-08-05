@@ -39,7 +39,11 @@ export default function JoinRegistrationForm({ token }: Props) {
         body: JSON.stringify({ name: name.trim(), email: email.trim(), password }),
       });
       const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body?.error ?? "Could not complete registration.");
+      if (!res.ok) {
+        setError(body?.error ?? "Could not complete registration.");
+        setSubmitting(false);
+        return;
+      }
 
       if (body.signedIn) {
         router.push("/feed");
@@ -47,8 +51,11 @@ export default function JoinRegistrationForm({ token }: Props) {
       } else {
         router.push("/login?next=/feed");
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not complete registration.");
+    } catch {
+      // Block 3 (August hardening pass, 2026-08-04): a raw fetch()
+      // failure never carries a human-authored message — fixed
+      // fallback, not err.message.
+      setError("Could not complete registration.");
       setSubmitting(false);
     }
   }
