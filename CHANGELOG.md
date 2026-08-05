@@ -8,7 +8,34 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.27.0` is the current released version.
+Nothing yet — `v0.27.1` is the current released version.
+
+## [0.27.1] — 2026-08-05
+
+August hardening pass (ROADMAP v3.1), Block 4: full persona regression
+walkthrough on production (mobile viewport).
+
+### Fixed
+
+- **Follower/following counts didn't update after Follow/Unfollow.**
+  `FollowButton.tsx` toggled its own label correctly but never
+  refreshed the page, so the follower count next to it (a
+  server-rendered prop) stayed stale until a manual reload. Added a
+  `router.refresh()` call after a successful toggle, matching the
+  pattern `CommentSection.tsx` already uses.
+
+### Verified
+
+- Full persona walkthrough on `obsidianclub.online` (mobile viewport):
+  purchase-card signup → all 5 ritual steps (including the new Safety &
+  Respect Guidelines) → profile completion (avatar + bio) → first post
+  with a real photo → comment → like → members list → follow/unfollow
+  (bug found and fixed above) → member-invite link generation →
+  partner-link generation and redemption, confirmed bidirectional
+  "Partner of" display on both accounts. No console errors at any
+  point. All test entities (2 users, 1 post, 1 room message, 3 invite
+  tokens, Storage objects) fully removed afterward; confirmed the
+  production database matches its exact pre-session state.
 
 ## [0.27.0] — 2026-08-04
 
