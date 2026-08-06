@@ -54,6 +54,20 @@ with a real level tier is active (currently just Newcomers). Revisit if
 Supabase's Realtime RLS join-authorization limitation gets fixed
 upstream, or if a second gated room goes live.
 
+**Safety net added 2026-08-06, after the exact failure mode repeated
+itself within days**: `npm run check:rls` (`scripts/check-rls.ts`)
+queries `pg_class.relrowsecurity` for every table in `public` and fails
+loudly if any has RLS disabled. Written specifically because a schema
+change can silently reintroduce this gap with no warning — and did,
+almost immediately: `rate_limit_hits` (added in Block 2, the same day
+as the sweep above) was never included in that migration, so it sat
+with RLS off until this script's first run caught it (fixed same day,
+`supabase/migrations/20260806000000_rls_rate_limit_hits.sql`). Not
+wired into `postinstall`/`build` — a DB-dependent gate on every install
+or build would break in environments without connectivity (fresh env
+setup, some CI runs); it's a required manual step after schema changes
+instead, per `CLAUDE.md` rule 8.
+
 ## Houses / Vault / Apple Sign-In gaps (2026-07-08/09, see ADR-0016)
 
 - **8 more houses have no names yet** — CLAUDE.md says "9 more houses

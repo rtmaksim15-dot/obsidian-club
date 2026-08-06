@@ -8,7 +8,24 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.28.0` is the current released version.
+Nothing yet — `v0.28.1` is the current released version.
+
+## [0.28.1] — 2026-08-06
+
+### Added
+
+- **`npm run check:rls`** (`scripts/check-rls.ts`) — fails loudly if RLS
+  is disabled on any table, so a future schema change can't silently
+  reopen the gap closed in `v0.26.0`. `CLAUDE.md` rule 8: run it after
+  every `prisma db push` / schema migration.
+
+### Fixed
+
+- **`rate_limit_hits` had no RLS.** Added in `v0.26.0`'s Block 2, after
+  that block's RLS sweep migration was already written, so it was never
+  included — found by this script's very first run. Deny-all, same as
+  nearly every other table (Prisma-only access, no browser client ever
+  touches it). `supabase/migrations/20260806000000_rls_rate_limit_hits.sql`.
 
 ## [0.28.0] — 2026-08-06
 

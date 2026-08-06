@@ -1,13 +1,14 @@
 {
   "name": "obsidian-club",
-  "version": "0.28.0",
+  "version": "0.28.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "check:rls": "tsx scripts/check-rls.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
