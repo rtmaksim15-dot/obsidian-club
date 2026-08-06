@@ -95,7 +95,7 @@ export default async function VaultPage() {
                   <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-ob bg-ob-surface">
                     {item.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
+                      <img src={item.imageUrl} alt={item.name} loading="lazy" className="h-full w-full object-cover" />
                     ) : (
                       <Gem size={32} strokeWidth={1.25} style={{ color: "var(--color-text-muted)" }} />
                     )}

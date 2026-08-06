@@ -8,7 +8,38 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.27.1` is the current released version.
+Nothing yet — `v0.28.0` is the current released version.
+
+## [0.28.0] — 2026-08-06
+
+August hardening pass (ROADMAP v3.1), Block 5: performance quick wins.
+
+### Added
+
+- **Feed pagination** — `/feed` had a hard `take: 30` ceiling with no
+  way to reach anything published before that. Added offset-based
+  pagination (`GET /api/feed`, `components/shared/FeedList.tsx`'s "Load
+  more" button), sharing one query function (`lib/feed/query.ts`)
+  between the initial server render and "load more" so the two can
+  never disagree about what belongs in the feed.
+- **`loading="lazy"` on list/feed images** — post photos and avatars in
+  the feed, comments, room chat, members list, and Vault items now
+  defer off-screen loading. Left untouched: the brand logo (always
+  above the fold), the landing page's already-`next/image`-optimized
+  hero, and single always-visible avatars (profile header, edit form)
+  where lazy-loading has no benefit.
+
+### Verified
+
+- Image compression was already wired correctly for both upload paths
+  (avatar via `AvatarUploadButton.tsx`, post photos via
+  `ContentComposer.tsx`) — both resize to a 2048px long side and
+  re-encode as JPEG client-side before upload, confirmed by reading
+  each component; no fix needed.
+- Feed pagination tested live with 25 `test-` prefixed posts: 20 shown
+  initially, "Load more" correctly fetched the rest, and the button
+  correctly disappeared once exhausted. All test data removed
+  afterward.
 
 ## [0.27.1] — 2026-08-05
 

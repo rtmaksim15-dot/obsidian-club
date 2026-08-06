@@ -72,7 +72,7 @@ export default function PostCard({ post, linkComments = true, compact = false }:
 
       {photo ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={photo} alt="" className="mt-3 max-h-[480px] w-full rounded-ob object-cover" />
+        <img src={photo} alt="" loading="lazy" className="mt-3 max-h-[480px] w-full rounded-ob object-cover" />
       ) : null}
 
       <div className="mt-3 flex items-center gap-5">
@@ -103,7 +103,7 @@ export default function PostCard({ post, linkComments = true, compact = false }:
       <div className={`avatar h-9 w-9 shrink-0 ${LEVELS_UI_ENABLED ? `avatar-level-${post.author.level}` : ""}`}>
         {post.author.avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={post.author.avatarUrl} alt={post.author.displayName} className="h-full w-full object-cover" />
+          <img src={post.author.avatarUrl} alt={post.author.displayName} loading="lazy" className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-ob-surface text-sm">
             {post.author.displayName.charAt(0).toUpperCase()}

@@ -135,7 +135,7 @@ export default function RoomChat({ room, currentUserId, initialMessages }: Props
               <div className={`avatar avatar-level-${m.user.level} h-9 w-9 shrink-0`}>
                 {m.user.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={m.user.avatarUrl} alt={m.user.displayName} className="h-full w-full object-cover" />
+                  <img src={m.user.avatarUrl} alt={m.user.displayName} loading="lazy" className="h-full w-full object-cover" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center bg-ob-surface text-sm">
                     {m.user.displayName.charAt(0).toUpperCase()}

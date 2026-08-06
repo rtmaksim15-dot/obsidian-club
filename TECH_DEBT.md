@@ -533,10 +533,25 @@ Feed & Posts MVP task named Supabase Storage specifically (see
 DECISIONS.md). Still not built: multiple photos per post, video
 (`PRODUCT.md`'s content types imply both eventually).
 
-## Content feed has no pagination beyond "latest 20"
+## Content feed had no pagination beyond "latest 30" — fixed 2026-08-05
 
-Same shape of gap as Rooms' "latest 50 messages" — fine at zero real
-usage, needs cursor-based pagination before real content volume exists.
+August hardening pass (ROADMAP v3.1), Block 5. `/feed` fetched `take:
+30` with no way to reach anything published before that — a hard
+ceiling on the whole feed, not just a missing "next page" affordance.
+Fixed with offset (`skip`) pagination and a "Load more" button
+(`components/shared/FeedList.tsx`, `GET /api/feed`), sharing one query
+function (`lib/feed/query.ts`) between the initial SSR render and the
+"load more" fetch so the two can never disagree about what belongs in
+the feed. Offset-based, not cursor-based: simpler, and sufficient at
+this app's real scale — same reasoning already applied to Rooms'
+"latest 50 messages" (below) and this session's rate limiter. Revisit
+if/when post volume is large enough for offset pagination's usual
+issue (a new post while paging shifts every subsequent page by one) to
+actually matter in practice.
+
+Rooms' "latest 50 messages" gap (below) is the same shape and still
+open — not addressed here, since the task that prompted this fix named
+the feed specifically.
 
 ## Lord Obsidian reference portraits exist but aren't wired into the product
 

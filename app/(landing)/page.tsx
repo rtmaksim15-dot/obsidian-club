@@ -168,6 +168,7 @@ export default async function LandingPage() {
                 alt="Lord Obsidian"
                 width={1122}
                 height={1402}
+                loading="lazy"
                 className="block aspect-[1122/1402] w-full shadow-[0_0_40px_rgba(0,0,0,0.6)]"
               />
               <div className="mt-7 text-center">

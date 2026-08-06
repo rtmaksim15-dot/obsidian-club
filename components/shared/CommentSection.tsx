@@ -69,7 +69,7 @@ export default function CommentSection({ postId, initial }: { postId: string; in
               <div className={`avatar avatar-level-${c.author.level} h-8 w-8 shrink-0`}>
                 {c.author.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={c.author.avatarUrl} alt={c.author.displayName} className="h-full w-full object-cover" />
+                  <img src={c.author.avatarUrl} alt={c.author.displayName} loading="lazy" className="h-full w-full object-cover" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center bg-ob-surface text-xs">
                     {c.author.displayName.charAt(0).toUpperCase()}

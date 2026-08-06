@@ -1,11 +1,9 @@
 import { redirect } from "next/navigation";
-import type { PostType } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { getRitualStatus } from "@/lib/auth/ritual";
-import PostList from "@/components/shared/PostList";
-
-const FEED_TYPES: PostType[] = ["post", "story"];
+import { getFeedPosts, FEED_PAGE_SIZE } from "@/lib/feed/query";
+import FeedList from "@/components/shared/FeedList";
 
 /**
  * Feed (`/feed`) — CLAUDE.md's (2026-07-05) nav tab 1: "community posts,
@@ -35,40 +33,12 @@ export default async function FeedPage() {
   const ritual = await getRitualStatus(user, profile);
   if (!ritual.complete) redirect("/ritual");
 
-  const memberships = await prisma.houseMembership.findMany({
-    where: { userId: user.id },
-    select: { house: { select: { id: true, name: true } } },
-  });
-  const joinedHouseIds = memberships.map((m) => m.house.id);
-
-  const posts = await prisma.post.findMany({
-    where: {
-      isPublished: true,
-      minLevel: { lte: user.level },
-      type: { in: FEED_TYPES },
-      OR: [{ houseId: null }, { houseId: { in: joinedHouseIds } }],
-    },
-    orderBy: { publishedAt: "desc" },
-    take: 30,
-    select: {
-      id: true,
-      title: true,
-      content: true,
-      mediaUrls: true,
-      type: true,
-      likesCount: true,
-      createdAt: true,
-      author: { select: { id: true, displayName: true, avatarUrl: true, level: true, rep: true } },
-      house: { select: { id: true, name: true, slug: true } },
-      likes: { where: { userId: user.id }, select: { userId: true } },
-      _count: { select: { comments: true } },
-    },
-  });
+  const { posts, hasMore } = await getFeedPosts(user);
 
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
       <div className="mx-auto max-w-2xl">
-        <PostList posts={posts} />
+        <FeedList initialPosts={posts} initialHasMore={hasMore} pageSize={FEED_PAGE_SIZE} />
       </div>
     </main>
   );
