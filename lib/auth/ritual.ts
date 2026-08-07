@@ -30,10 +30,20 @@ export type RitualStatus = {
  * since the content didn't exist. Set via `POST /api/ritual/progress`
  * from `/ritual/code-of-conduct`, `/ritual/introduction`, and
  * `/ritual/safety-rules`.
+ *
+ * Step 1 ("profile") now also requires `progress.usernameChosen`
+ * (Username-in-the-Ritual, 2026-08-06) — set by `PATCH /api/profile`
+ * the first time a member's username actually changes (their ritual-time
+ * pick counts as that change; see that route). Every member who existed
+ * before this shipped was backfilled with `usernameChosen: true`
+ * directly in the database (not through this code path) specifically so
+ * this new requirement can't retroactively re-open an already-complete
+ * ritual for a real, currently-active member — see DECISIONS.md.
  */
 export async function getRitualStatus(user: User, profile: UserProfile | null): Promise<RitualStatus> {
-  const profileComplete = Boolean(user.bio && user.avatarUrl);
   const progress = (profile?.ritualProgress ?? {}) as Record<string, unknown>;
+  const usernameChosen = progress.usernameChosen === true;
+  const profileComplete = Boolean(user.bio && user.avatarUrl && usernameChosen);
 
   const introducedInNewcomerRoom =
     (await prisma.message.count({
@@ -57,12 +67,24 @@ export async function getRitualStatus(user: User, profile: UserProfile | null): 
     }
   }
 
+  let profileNote: string | undefined;
+  if (!profileComplete) {
+    const needsBioOrAvatar = !user.bio || !user.avatarUrl;
+    if (needsBioOrAvatar && !usernameChosen) {
+      profileNote = "Add a bio and avatar, and choose your name in the Circle.";
+    } else if (!usernameChosen) {
+      profileNote = "Choose your name in the Circle.";
+    } else {
+      profileNote = "Add a bio and avatar to your profile.";
+    }
+  }
+
   const steps: RitualStatus["steps"] = [
     {
       id: "profile",
       label: "Complete your profile",
       status: profileComplete ? "done" : "todo",
-      note: profileComplete ? undefined : "Add a bio and avatar to your profile.",
+      note: profileNote,
     },
     {
       id: "codeOfConduct",

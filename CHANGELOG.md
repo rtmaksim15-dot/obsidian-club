@@ -8,7 +8,48 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.28.1` is the current released version.
+Nothing yet — `v0.29.0` is the current released version.
+
+## [0.29.0] — 2026-08-07
+
+Pre-launch block (ROADMAP v3.1), Task 1: username in the Ritual.
+
+### Added
+
+- **"Choose your name in the Circle" ritual step.** New members now pick
+  a real username (3-20 chars, lowercase letters/digits/underscores,
+  unique, live availability check as they type) instead of keeping the
+  auto-generated `email_1a2b`-style placeholder — the ritual's "Complete
+  your profile" step no longer completes for a new member until they've
+  chosen one. `GET /api/profile/username-check` powers the live check;
+  `PATCH /api/profile` enforces format + uniqueness + the one-change
+  lock server-side, not just in the UI.
+- **`User.usernameChangedAt`** — a single nullable timestamp models "one
+  lifetime username change" for both cases at once: a new member's
+  ritual-time pick *is* that one change, and an existing member's
+  one-time courtesy change (`/profile/edit`) reuses the exact same
+  check. No new-vs-existing branching anywhere in the code.
+
+### Changed
+
+- `generateUsernameFromEmail` (`lib/utils/codes.ts`) now produces
+  underscore-separated, 20-char-max placeholders matching the new
+  format — the placeholder still exists (an account needs *a* username
+  before the ritual), it's just never meant to be kept.
+
+### Fixed
+
+- Format validation in `PATCH /api/profile` was running on every save,
+  not just on an actual username change — would have broken saving any
+  other field (bio, city, role...) for a grandfathered member whose
+  existing username doesn't match the new stricter pattern (e.g.
+  contains a hyphen). Now scoped to `username !== user.username`, same
+  guard as the one-change lock.
+
+Existing members were backfilled with `ritualProgress.usernameChosen:
+true` directly in the database before this shipped, so the new
+requirement can't retroactively reopen an already-complete ritual for a
+real, currently-active member.
 
 ## [0.28.1] — 2026-08-06
 

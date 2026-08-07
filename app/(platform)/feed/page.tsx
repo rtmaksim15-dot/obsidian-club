@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { getRitualStatus } from "@/lib/auth/ritual";
-import { getFeedPosts, FEED_PAGE_SIZE } from "@/lib/feed/query";
+import { getFeedPosts } from "@/lib/feed/query";
 import FeedList from "@/components/shared/FeedList";
 
 /**
@@ -38,7 +38,7 @@ export default async function FeedPage() {
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
       <div className="mx-auto max-w-2xl">
-        <FeedList initialPosts={posts} initialHasMore={hasMore} pageSize={FEED_PAGE_SIZE} />
+        <FeedList initialPosts={posts} initialHasMore={hasMore} />
       </div>
     </main>
   );

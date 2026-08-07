@@ -386,11 +386,17 @@ engine (`v0.5`) to have real trigger points for these transitions.
 `Notification.isRead` exists and is displayed on `/hall`, but nothing
 ever sets it to `true` — there's no read/unread interaction yet.
 
-## Username collisions surface a generic error, no alternative suggestion
+## Username collisions surface a generic error, no alternative suggestion — resolved 2026-08-07
 
-`PATCH /api/profile` returns `409` on a taken username with no "try
-`name-2` instead" affordance — acceptable for a first pass, worth
-revisiting once profile editing gets real usage.
+`PATCH /api/profile` still returns `409` on a taken username as a
+server-side backstop, but as of Username-in-the-Ritual
+(`OBSIDIAN_ROADMAP_v3.1`) the UI now has a live availability check
+(`GET /api/profile/username-check`, debounced) that tells the member
+before they submit — the blind-submit-then-generic-error path this
+entry was about no longer happens in normal use. No "try `name-2`
+instead" suggestion was added; not asked for, and the live check
+already prevents the frustrating case (finding out only after
+clicking Save).
 
 ## `(auth)/apply/` folder purpose — resolved 2026-07-15/17
 
@@ -416,16 +422,17 @@ verification flow (Path 1), and a referral-link registration flow
 (Path 2). Still a guess, not a confirmed answer — the underlying
 question hasn't been asked directly.
 
-## Username is auto-generated; no self-edit flow exists
+## Username is auto-generated; no self-edit flow exists — resolved 2026-08-07
 
-The application form never collects a username (not specified anywhere in
-`DESIGN.md`/`PRODUCT.md`). `lib/utils/codes.ts#generateUsernameFromEmail`
-derives a placeholder from the applicant's email on approval. There's no
-"edit my profile" page yet for a member to change it (or their bio,
-avatar via the profile page rather than the Hall, etc.) — avatar upload
-currently lives on `/hall` somewhat awkwardly, since there's no dedicated
-settings page. Expected to be resolved as part of the Initiation
-Ritual / full Hall UI (`v0.3`).
+Stale on two counts even before this task: `/profile/edit` has existed
+since `v0.16` (bio, avatar, city, role, interests), and as of
+Username-in-the-Ritual (`OBSIDIAN_ROADMAP_v3.1`) username itself is
+editable there too — one lifetime change, enforced server-side via
+`User.usernameChangedAt`. The application form still never collects a
+username (unchanged, and still correct — `generateUsernameFromEmail`
+placeholder exists only so an account has *something* before a member
+deliberately picks one, either at ritual time or later in Edit
+Profile).
 
 ## Supabase Auth user creation isn't atomic with the `users` row write
 
@@ -868,10 +875,10 @@ they're each a deliberate call, not an oversight:
   gap): no search input exists, and none is planned until membership
   passes ~30 people. No `follow`/`follower` feed filtering yet either —
   deliberately deferred, see BACKLOG.md `v0.23`.
-- **Username selection in the Initiation Ritual** — roadmap names this
+- ~~**Username selection in the Initiation Ritual** — roadmap names this
   as a new v1 requirement (replacing the auto-generated
-  `email-numbers` username); not built. Same category as the item
-  above — a real gap, not a hidden-but-present UI element.
+  `email-numbers` username); not built.~~ — **resolved 2026-08-07**,
+  see this file's "Username is auto-generated" entry further up.
 - **Safety & Respect Guidelines** — still the pre-existing "Content
   pending" placeholder in the ritual; unchanged by this pass, already
   tracked further up this file.

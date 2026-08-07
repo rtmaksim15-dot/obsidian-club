@@ -127,48 +127,58 @@ enum MarketplaceType {
 // ============================================================
 
 model User {
-  id              String      @id @default(uuid()) @db.Uuid
-  email           String      @unique
-  username        String      @unique
-  displayName     String      @map("display_name")
-  avatarUrl       String?     @map("avatar_url")
-  bio             String?
-  locationCity    String?     @map("location_city")
-  locationCountry String?     @map("location_country")
-  age             Int?
+  id                String      @id @default(uuid()) @db.Uuid
+  email             String      @unique
+  username          String      @unique
+  // Username-in-the-Ritual (2026-08-06): null means "never deliberately
+  // changed" — still allowed to set/change it once. Non-null means
+  // they've used their one lifetime change (see
+  // app/api/profile/route.ts). New members' ritual-time choice (their
+  // first deliberate pick, replacing the auto-generated placeholder from
+  // lib/utils/codes.ts#generateUsernameFromEmail) IS that one change —
+  // there's no separate "free first pick" concept, which is what lets
+  // existing members' grandfathered one-time courtesy change (see
+  // DECISIONS.md) reuse the exact same mechanism with no special-casing.
+  usernameChangedAt DateTime?   @map("username_changed_at")
+  displayName       String      @map("display_name")
+  avatarUrl         String?     @map("avatar_url")
+  bio               String?
+  locationCity      String?     @map("location_city")
+  locationCountry   String?     @map("location_country")
+  age               Int?
   // Age Verification (2026-08-03): field first, no enforcement gate yet —
   // enforcement policy comes with the first wave (see DECISIONS.md).
   // Toggled manually by an admin in /admin/members or at application
   // approval; not derived from the self-reported `age` above.
-  ageVerified     Boolean     @default(false) @map("age_verified")
-  ageVerifiedAt   DateTime?   @map("age_verified_at")
-  level           Int         @default(1) // 1-6
-  reputation      Decimal     @default(0) @db.Decimal(3, 2) // 0.00 - 5.00, peer-review star average — independent of REP as of the 2026-07-05 CLAUDE.md migration (see ADR-0015)
-  rep             Int         @default(0) // "REP" — a discrete point ledger (CLAUDE.md's earn/lose tables), replaces the old weighted `rating` score; see ADR-0015. Sum of RepHistory.delta
-  trustScore      Int         @default(100) @map("trust_score")
-  status          UserStatus  @default(pending)
-  isAdmin         Boolean     @default(false) @map("is_admin") // not in ARCHITECTURE.md's User table — see ADR-0011
-  role            MemberRole? // chosen at onboarding, CLAUDE.md's registration flow — see ADR-0015
-  interests       String[]    @default([]) // chosen at onboarding; not yet used to rank the Feed — see TECH_DEBT.md
-  currentStreak   Int         @default(0) @map("current_streak") // consecutive days logged in, for the daily-login REP bonus
-  longestStreak   Int         @default(0) @map("longest_streak")
-  lastLoginDate   DateTime?   @map("last_login_date") // date-only (not datetime) touch point for streak computation — see lib/rating/rep-engine.ts#touchDailyLogin
-  invitedById     String?     @map("invited_by") @db.Uuid
-  referralCode    String?     @unique @map("referral_code")
-  referralCount   Int         @default(0) @map("referral_count")
+  ageVerified       Boolean     @default(false) @map("age_verified")
+  ageVerifiedAt     DateTime?   @map("age_verified_at")
+  level             Int         @default(1) // 1-6
+  reputation        Decimal     @default(0) @db.Decimal(3, 2) // 0.00 - 5.00, peer-review star average — independent of REP as of the 2026-07-05 CLAUDE.md migration (see ADR-0015)
+  rep               Int         @default(0) // "REP" — a discrete point ledger (CLAUDE.md's earn/lose tables), replaces the old weighted `rating` score; see ADR-0015. Sum of RepHistory.delta
+  trustScore        Int         @default(100) @map("trust_score")
+  status            UserStatus  @default(pending)
+  isAdmin           Boolean     @default(false) @map("is_admin") // not in ARCHITECTURE.md's User table — see ADR-0011
+  role              MemberRole? // chosen at onboarding, CLAUDE.md's registration flow — see ADR-0015
+  interests         String[]    @default([]) // chosen at onboarding; not yet used to rank the Feed — see TECH_DEBT.md
+  currentStreak     Int         @default(0) @map("current_streak") // consecutive days logged in, for the daily-login REP bonus
+  longestStreak     Int         @default(0) @map("longest_streak")
+  lastLoginDate     DateTime?   @map("last_login_date") // date-only (not datetime) touch point for streak computation — see lib/rating/rep-engine.ts#touchDailyLogin
+  invitedById       String?     @map("invited_by") @db.Uuid
+  referralCode      String?     @unique @map("referral_code")
+  referralCount     Int         @default(0) @map("referral_count")
   // Invitation & Partner system v1 (2026-08-01) — how many personal
   // member-invite links this member may still create. Redeeming one
   // decrements it; generating one does not (see DECISIONS.md). Partners
   // get 0 here by default, set explicitly at redemption — the schema
   // default of 1 only applies to purchase-card/member-invite joins.
-  inviteAllowance Int         @default(1) @map("invite_allowance")
+  inviteAllowance   Int         @default(1) @map("invite_allowance")
   // One partner per member, symmetric: whichever side redeemed the
   // partner-source InviteToken has `partnerId` pointing at the other;
   // read "my partner" as `partner ?? partnerOf` from either side.
-  partnerId       String?     @unique @map("partner_id") @db.Uuid
-  joinedAt        DateTime?   @map("joined_at")
-  lastActiveAt    DateTime?   @map("last_active_at")
-  createdAt       DateTime    @default(now()) @map("created_at")
+  partnerId         String?     @unique @map("partner_id") @db.Uuid
+  joinedAt          DateTime?   @map("joined_at")
+  lastActiveAt      DateTime?   @map("last_active_at")
+  createdAt         DateTime    @default(now()) @map("created_at")
 
   // self-referential invites
   invitedBy User?  @relation("UserInvites", fields: [invitedById], references: [id])

@@ -23,6 +23,7 @@ export default async function ProfileEditPage() {
             locationCity: user.locationCity ?? "",
             role: user.role,
             interests: user.interests,
+            usernameChangeUsed: Boolean(user.usernameChangedAt),
           }}
         />
       </div>

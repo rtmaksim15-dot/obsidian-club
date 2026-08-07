@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
-import type { MemberRole } from "@prisma/client";
+import type { MemberRole, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import { checkProfileCompleteBonus } from "@/lib/rating/rep-engine";
 
 const VALID_ROLES: MemberRole[] = ["dominant", "submissive", "switch", "observer", "newcomer"];
 const MAX_INTERESTS = 10;
+// Username-in-the-Ritual (2026-08-06): 3-20 chars, lowercase letters/
+// digits/underscore. Tightened from the old 3-30-with-hyphens rule —
+// see lib/utils/codes.ts's generateUsernameFromEmail for the matching
+// placeholder-format update.
+const USERNAME_PATTERN = /^[a-z0-9_]{3,20}$/;
 
 type Body = {
   displayName?: string;
@@ -40,10 +45,32 @@ export async function PATCH(request: Request) {
   if (!displayName) {
     return NextResponse.json({ error: "Display name is required." }, { status: 422 });
   }
-  if (!username || !/^[a-z0-9-]{3,30}$/.test(username)) {
+  if (!username) {
+    return NextResponse.json({ error: "Username is required." }, { status: 422 });
+  }
+  const usernameIsChanging = username !== user.username;
+  // Format is only enforced when the value is actually changing — a
+  // grandfathered username from before this rule tightened (e.g. one
+  // with a hyphen, allowed under the old 3-30 rule) must stay saveable
+  // as-is on every other field, or a member editing just their bio
+  // would get rejected over a username they never touched.
+  if (usernameIsChanging && !USERNAME_PATTERN.test(username)) {
     return NextResponse.json(
-      { error: "Username must be 3-30 characters: lowercase letters, numbers, hyphens." },
+      { error: "Username must be 3-20 characters: lowercase letters, numbers, underscores." },
       { status: 422 }
+    );
+  }
+  // Username-in-the-Ritual (2026-08-06): one lifetime change. A brand
+  // new member's ritual-time pick (replacing their auto-generated
+  // placeholder) IS that one change — there's no separate "free first
+  // pick," which is exactly what lets an existing member's grandfathered
+  // one-time courtesy change reuse this same check with no
+  // special-casing (see lib/auth/ritual.ts and prisma/schema.prisma's
+  // usernameChangedAt comment).
+  if (usernameIsChanging && user.usernameChangedAt) {
+    return NextResponse.json(
+      { error: "You've already used your one username change." },
+      { status: 422 },
     );
   }
   if (bio && bio.length > 300) {
@@ -79,8 +106,23 @@ export async function PATCH(request: Request) {
         ...(locationCity !== undefined ? { locationCity: locationCity || null } : {}),
         ...(role !== undefined ? { role } : {}),
         ...(interests !== undefined ? { interests } : {}),
+        ...(usernameIsChanging ? { usernameChangedAt: new Date() } : {}),
       },
     });
+
+    // Marks the ritual's profile step's username requirement satisfied
+    // (lib/auth/ritual.ts) — only on an actual change, matching
+    // usernameChangedAt above; re-saving the same username (e.g. just
+    // editing bio) doesn't need this read-modify-write.
+    if (usernameIsChanging) {
+      const profile = await prisma.userProfile.findUnique({ where: { userId: user.id } });
+      const progress = (profile?.ritualProgress ?? {}) as Prisma.InputJsonObject;
+      await prisma.userProfile.upsert({
+        where: { userId: user.id },
+        create: { userId: user.id, ritualProgress: { usernameChosen: true } },
+        update: { ritualProgress: { ...progress, usernameChosen: true } },
+      });
+    }
 
     // Non-critical side effect — never fail the save over it.
     await checkProfileCompleteBonus(user.id).catch((err) =>

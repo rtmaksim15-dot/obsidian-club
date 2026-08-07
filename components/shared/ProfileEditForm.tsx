@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import AvatarUploadButton from "./AvatarUploadButton";
 
@@ -13,8 +13,16 @@ type Props = {
     locationCity: string;
     role: string | null;
     interests: string[];
+    // Username-in-the-Ritual (2026-08-06): true once this member has
+    // already used their one lifetime username change (see
+    // app/api/profile/route.ts) — locks the field instead of letting
+    // them type a value the server will reject on submit.
+    usernameChangeUsed: boolean;
   };
 };
+
+type UsernameCheckState = "idle" | "checking" | "available" | "taken" | "invalid" | "own";
+const USERNAME_PATTERN = /^[a-z0-9_]{3,20}$/;
 
 const ROLES = [
   { value: "", label: "Prefer not to say" },
@@ -36,6 +44,38 @@ export default function ProfileEditForm({ user }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [usernameCheck, setUsernameCheck] = useState<UsernameCheckState>("idle");
+  const usernameCheckSeq = useRef(0);
+
+  // Live availability check (Username-in-the-Ritual, 2026-08-06),
+  // debounced — skipped entirely once the change is locked, since
+  // there's nothing to check for a field the user can't edit.
+  useEffect(() => {
+    if (user.usernameChangeUsed) return;
+    if (username === user.username) {
+      setUsernameCheck("own");
+      return;
+    }
+    if (!USERNAME_PATTERN.test(username)) {
+      setUsernameCheck(username.length > 0 ? "invalid" : "idle");
+      return;
+    }
+
+    setUsernameCheck("checking");
+    const seq = ++usernameCheckSeq.current;
+    const timeout = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/profile/username-check?username=${encodeURIComponent(username)}`);
+        const body = await res.json().catch(() => ({}));
+        if (seq !== usernameCheckSeq.current) return; // a newer keystroke already superseded this check
+        setUsernameCheck(body.available ? "available" : "taken");
+      } catch {
+        if (seq === usernameCheckSeq.current) setUsernameCheck("idle");
+      }
+    }, 400);
+
+    return () => clearTimeout(timeout);
+  }, [username, user.username, user.usernameChangeUsed]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -115,11 +155,43 @@ export default function ProfileEditForm({ user }: Props) {
             id="username"
             className="input"
             value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            pattern="[a-z0-9-]{3,30}"
-            placeholder="lowercase, numbers, hyphens"
+            onChange={(e) => setUsername(e.target.value.toLowerCase())}
+            pattern="[a-z0-9_]{3,20}"
+            placeholder="lowercase, numbers, underscores"
+            disabled={user.usernameChangeUsed}
             required
           />
+          {user.usernameChangeUsed ? (
+            <p className="text-caption mt-1" style={{ color: "var(--color-text-muted)" }}>
+              You&apos;ve already used your one username change.
+            </p>
+          ) : (
+            <>
+              {usernameCheck === "checking" ? (
+                <p className="text-caption mt-1" style={{ color: "var(--color-text-muted)" }}>
+                  Checking…
+                </p>
+              ) : null}
+              {usernameCheck === "available" ? (
+                <p className="text-caption mt-1" style={{ color: "var(--color-success)" }}>
+                  Available.
+                </p>
+              ) : null}
+              {usernameCheck === "taken" ? (
+                <p className="text-caption mt-1" style={{ color: "var(--color-error)" }}>
+                  That name is already taken.
+                </p>
+              ) : null}
+              {usernameCheck === "invalid" ? (
+                <p className="text-caption mt-1" style={{ color: "var(--color-error)" }}>
+                  3-20 characters: lowercase letters, numbers, underscores.
+                </p>
+              ) : null}
+              <p className="text-caption mt-1 italic" style={{ color: "var(--color-text-secondary)" }}>
+                This name is how the Circle will know you. You may change it once.
+              </p>
+            </>
+          )}
         </div>
 
         <div>
@@ -190,7 +262,11 @@ export default function ProfileEditForm({ user }: Props) {
           </p>
         ) : null}
 
-        <button type="submit" className="btn-primary w-full" disabled={submitting}>
+        <button
+          type="submit"
+          className="btn-primary w-full"
+          disabled={submitting || usernameCheck === "taken" || usernameCheck === "invalid" || usernameCheck === "checking"}
+        >
           {submitting ? "Saving…" : "Save"}
         </button>
       </form>

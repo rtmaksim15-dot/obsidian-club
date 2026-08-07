@@ -3,7 +3,7 @@
 import { useState } from "react";
 import PostList, { type FeedPost } from "./PostList";
 
-type Props = { initialPosts: FeedPost[]; initialHasMore: boolean; pageSize: number };
+type Props = { initialPosts: FeedPost[]; initialHasMore: boolean };
 
 /**
  * /feed with real pagination (Block 5, August hardening pass,
@@ -13,7 +13,7 @@ type Props = { initialPosts: FeedPost[]; initialHasMore: boolean; pageSize: numb
  * list views (no infinite-scroll pattern exists anywhere else in the
  * codebase to be consistent with).
  */
-export default function FeedList({ initialPosts, initialHasMore, pageSize }: Props) {
+export default function FeedList({ initialPosts, initialHasMore }: Props) {
   const [posts, setPosts] = useState(initialPosts);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [loading, setLoading] = useState(false);
