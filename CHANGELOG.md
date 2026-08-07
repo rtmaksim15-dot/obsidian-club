@@ -8,7 +8,69 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.29.0` is the current released version.
+Nothing yet — `v0.30.0` is the current released version.
+
+## [0.30.0] — 2026-08-07
+
+Pre-launch block (ROADMAP v3.1), Task 2: batch channels + Resend email infra.
+
+### Added
+
+- **`InviteBatch.channel`** (`print` | `email` | `letter`, defaults to
+  `print`) **+ `campaign`** (free-text label). Every batch before this
+  was implicitly a printed purchase card — now that's explicit, and two
+  new delivery channels exist alongside it. Batch creation form and
+  batch list/detail pages all show channel + campaign.
+- **Admin-triggered invitation emails.** On an email-channel batch, an
+  admin uploads a CSV of `(email, name)`; each valid row is paired with
+  one of the batch's unused tokens and sent a real invitation email via
+  Resend (`POST /api/admin/invite-batches/:id/send-emails`). Pairing is
+  all-or-nothing — if the batch doesn't have enough unused tokens for
+  every valid row, nothing is claimed or sent. No open self-serve
+  sending exists anywhere; this endpoint is the only sender, and it's
+  admin-only.
+- **Per-token send-status logging** — `InviteToken.sentToEmail`,
+  `sentToName`, `emailSentAt`, `emailSendError`. A token is claimed the
+  moment it's paired with a CSV row (even before the send attempt), so
+  a second upload can't double-pair it; the batch detail page shows
+  real per-token status (sent / failed with reason / unused) instead of
+  a single redeemed/unused split.
+- **On-brand invitation email template** (`lib/utils/email.ts#sendInvitationEmail`)
+  — dark background, serif type, the real OC monogram (`logo-mark.png`,
+  not a redrawn asset), one button: "Enter the Circle." Reuses the same
+  `emailShell` as the existing waitlist confirmation email.
+- **Card numbers are print-only now.** Email/letter batches no longer
+  burn numbers out of the global print sequence — `cardNumber` stays
+  `null` for every token in a non-print batch.
+
+### Fixed
+
+- **Resend SDK errors were silently swallowed.** `resend.emails.send()`
+  doesn't throw on an API-level failure (bad key, invalid recipient,
+  quota exceeded...) — it resolves with `{ data: null, error: {...} }`
+  instead; only network-level failures throw. The shared `sendEmail`
+  wrapper only had a `try`/`catch`, so every API-level failure was
+  silently treated as a success. Found live while verifying this
+  feature with a deliberately invalid Resend key — the send reported
+  `ok: true`. Fixed by checking the response's `error` field before
+  reporting success; this also fixes `sendWaitlistConfirmation`'s
+  (pre-existing, undetected) same blind spot, since both share the
+  wrapper.
+- **A join link with no domain now refuses to send** rather than
+  emailing a real inbox a broken link — `sendInvitationEmail` checks
+  `NEXT_PUBLIC_APP_URL` before building the link, not after. Same
+  standing gap as the purchase-card CSV export (see TECH_DEBT.md), but
+  for email a broken link reaches a real person instead of just sitting
+  in a downloaded file.
+
+`NEXT_PUBLIC_APP_URL` is still unset in this environment — it **must**
+be set to `https://obsidianclub.online` in Vercel before either the
+print CSV's QR-code links or these invitation emails produce a working
+URL. Verified end-to-end against real database writes with a
+`test-`-prefixed batch (CSV parsing including quoted-comma names and
+invalid-row skipping, token claiming, and all three `sendInvitationEmail`
+failure paths); cleaned up afterward. The actual send-succeeds path
+can't be verified until a real `RESEND_API_KEY` is set.
 
 ## [0.29.0] — 2026-08-07
 

@@ -16,13 +16,16 @@ export default function InviteBatchGenerator() {
     setError(null);
 
     const form = e.currentTarget;
-    const count = Number(new FormData(form).get("count"));
+    const formData = new FormData(form);
+    const count = Number(formData.get("count"));
+    const channel = String(formData.get("channel") || "print");
+    const campaign = String(formData.get("campaign") || "").trim();
 
     try {
       const res = await fetch("/api/admin/invite-batches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ count }),
+        body: JSON.stringify({ count, channel, campaign: campaign || undefined }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -41,10 +44,10 @@ export default function InviteBatchGenerator() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card flex items-end gap-4" noValidate>
+    <form onSubmit={handleSubmit} className="card flex flex-wrap items-end gap-4" noValidate>
       <div>
         <label htmlFor="count" className="input-label">
-          Number of cards
+          Number of tokens
         </label>
         <input
           id="count"
@@ -55,6 +58,28 @@ export default function InviteBatchGenerator() {
           required
           className="input"
           placeholder="e.g. 50"
+        />
+      </div>
+      <div>
+        <label htmlFor="channel" className="input-label">
+          Channel
+        </label>
+        <select id="channel" name="channel" className="input" defaultValue="print">
+          <option value="print">Print</option>
+          <option value="email">Email</option>
+          <option value="letter">Letter</option>
+        </select>
+      </div>
+      <div>
+        <label htmlFor="campaign" className="input-label">
+          Campaign (optional)
+        </label>
+        <input
+          id="campaign"
+          name="campaign"
+          type="text"
+          className="input"
+          placeholder="e.g. Founders List"
         />
       </div>
       <button type="submit" className="btn-primary" disabled={status === "submitting"}>

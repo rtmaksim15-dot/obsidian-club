@@ -641,18 +641,36 @@ model RateLimitHit {
 // INVITATION & PARTNER SYSTEM v1 (OBSIDIAN_ROADMAP_v3.1, 2026-08-01)
 // ============================================================
 
-// A batch of purchase-card tokens generated together at
-// /admin/invite-batches. `count` records what was requested at creation
-// time — the batch list additionally computes a live redeemed count from
-// `InviteToken` rather than trusting a second stored counter.
+// A batch of tokens generated together at /admin/invite-batches. `count`
+// records what was requested at creation time — the batch list
+// additionally computes a live redeemed count from `InviteToken` rather
+// than trusting a second stored counter.
+//
+// `channel` + `campaign` (Batch Channels, 2026-08-07): every batch was
+// implicitly a printed purchase card before this — `channel` makes that
+// explicit and adds `email` (paired with a CSV upload + Resend send,
+// see InviteToken's send-log fields below) and `letter` (physical mail,
+// same CSV-export mechanic as `print`, no send automation — nothing
+// else was asked for `letter` beyond making it a distinct, reportable
+// channel). `campaign` is a free-text label ("Q4 Print Run",
+// "Founders List") for the admin's own tracking — not read by any
+// logic.
 model InviteBatch {
-  id        String   @id @default(uuid()) @db.Uuid
+  id        String        @id @default(uuid()) @db.Uuid
   count     Int
-  createdAt DateTime @default(now()) @map("created_at")
+  channel   InviteChannel @default(print)
+  campaign  String?
+  createdAt DateTime      @default(now()) @map("created_at")
 
   tokens InviteToken[]
 
   @@map("invite_batches")
+}
+
+enum InviteChannel {
+  print
+  email
+  letter
 }
 
 // One single-use invite/partner token, redeemed at /join/[token]
@@ -681,6 +699,19 @@ model InviteToken {
   redeemedAt   DateTime? @map("redeemed_at")
   redeemedById String?   @unique @map("redeemed_by_id") @db.Uuid
   createdAt    DateTime  @default(now()) @map("created_at")
+
+  // email-channel batches only (Batch Channels + Email Infra,
+  // 2026-08-07) — set together, at CSV-upload time, the moment a token
+  // is paired with a row (claiming it out of the batch's unused pool
+  // even if the send itself then fails, so a retried upload can't
+  // double-pair the same token to two different people). `emailSentAt`
+  // is the actual send-succeeded marker; `emailSendError` holds the
+  // reason when it didn't, so the batch detail page can show real
+  // per-token status instead of a single boolean.
+  sentToEmail    String?   @map("sent_to_email")
+  sentToName     String?   @map("sent_to_name")
+  emailSentAt    DateTime? @map("email_sent_at")
+  emailSendError String?   @map("email_send_error")
 
   batch      InviteBatch? @relation(fields: [batchId], references: [id])
   inviter    User?        @relation("MemberInviteTokens", fields: [inviterId], references: [id])

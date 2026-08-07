@@ -320,6 +320,15 @@ when this env var isn't set — meaning OpenGraph/canonical URLs will
 resolve incorrectly (to localhost) if deployed without setting it. **Must
 be set in Vercel's environment variables at deploy time.**
 
+Two more things depend on it as of Batch Channels + Email Infra
+(2026-08-07): the purchase-card CSV export's QR-code links (see
+"Invitation & Partner system v1" further down) and — new, higher
+stakes — `sendInvitationEmail` (`lib/utils/email.ts`), which now
+**refuses to send** rather than emailing a real inbox a broken link
+when this is unset. Must be set to `https://obsidianclub.online` before
+either the print batch's card links or any email-channel batch's
+invitations will actually work.
+
 ## Initiation Ritual: step 5 needed content that didn't exist — fixed 2026-08-03
 
 All 5 steps of `PRODUCT.md` §1 Stage 2's ritual (`/ritual`,

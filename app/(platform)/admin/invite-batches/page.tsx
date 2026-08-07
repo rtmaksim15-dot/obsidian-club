@@ -26,7 +26,7 @@ export default async function InviteBatchesPage() {
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
       <div className="mx-auto max-w-2xl">
         <p className="text-label mb-2">Admin</p>
-        <h1 className="text-h1 mb-10">Purchase-Card Batches</h1>
+        <h1 className="text-h1 mb-10">Invite Batches</h1>
 
         <InviteBatchGenerator />
 
@@ -37,9 +37,15 @@ export default async function InviteBatchesPage() {
             batches.map((b, i) => (
               <a key={b.id} href={`/admin/invite-batches/${b.id}`} className="card group block">
                 <div className="flex items-center justify-between">
-                  <p className="text-data transition-colors group-hover:text-ob-accent">
-                    {new Date(b.createdAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}
-                  </p>
+                  <div>
+                    <p className="text-data transition-colors group-hover:text-ob-accent">
+                      {new Date(b.createdAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}
+                    </p>
+                    <p className="text-caption mt-1" style={{ color: "var(--color-text-muted)" }}>
+                      {b.channel}
+                      {b.campaign ? ` — ${b.campaign}` : ""}
+                    </p>
+                  </div>
                   <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
                     {redeemedCounts[i]} / {b._count.tokens} redeemed
                   </p>
