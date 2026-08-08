@@ -5,7 +5,13 @@ import { Resend } from "resend";
 // this file is the one deliberate exception to "no hardcoded hex"
 // (DESIGN.md rule), scoped to email markup only.
 
-const FROM = "Obsidian Club <hello@obsidianclub.com>";
+// obsidianclub.online is this project's one real production domain
+// (see NEXT_PUBLIC_APP_URL usage throughout, TECH_DEBT.md, DECISIONS.md) —
+// this FROM address previously pointed at the unrelated .com domain,
+// a mismatch caught 2026-08-08 while preparing Resend DNS setup
+// instructions: the domain verified in Resend has to be the one
+// actually used here, or every send fails at the API level.
+const FROM = "Obsidian Club <hello@obsidianclub.online>";
 
 function emailShell(bodyHtml: string) {
   return `

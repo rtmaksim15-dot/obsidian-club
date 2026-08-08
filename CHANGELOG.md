@@ -8,7 +8,23 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.31.0` is the current released version.
+Nothing yet — `v0.31.1` is the current released version.
+
+## [0.31.1] — 2026-08-08
+
+### Fixed
+
+- **Transactional email FROM address pointed at the wrong domain.**
+  `lib/utils/email.ts` sent as `hello@obsidianclub.com` — every other
+  reference in this project (`NEXT_PUBLIC_APP_URL`, `TECH_DEBT.md`,
+  `DECISIONS.md`, `CHANGELOG.md`) uses `obsidianclub.online` as the one
+  real production domain. Caught while preparing Resend DNS setup
+  instructions: the domain verified in Resend has to match the FROM
+  address actually used in code, or every send fails. Now
+  `hello@obsidianclub.online`. Affects both `sendWaitlistConfirmation`
+  and the new `sendInvitationEmail` (v0.30.0) — neither has sent a real
+  email yet in this environment (`RESEND_API_KEY` still unset), so this
+  fixes a latent bug before it ever reached a real inbox.
 
 ## [0.31.0] — 2026-08-08
 
