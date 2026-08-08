@@ -8,7 +8,52 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.32.0` is the current released version.
+Nothing yet — `v0.33.0` is the current released version.
+
+## [0.33.0] — 2026-08-08
+
+Pre-launch cleanup 1: the Doors mechanic (October 1 cohort launch gate).
+
+### Added
+
+- **`DOORS_OPEN_DATE`** — a runtime env var (`lib/config/doors.ts`),
+  unlike `feature-flags.ts`'s compile-time booleans. When set to a
+  future date, every ritual-complete non-admin member is redirected to
+  a new `/antechamber` page instead of real content, from all four
+  pages that gate on ritual completion (`/feed`, `/hall`, `/compose`,
+  `/members`) — confirmed via a grep that these are the complete set;
+  there's no shared layout covering just them, so the check was added
+  to each individually, matching how the ritual-complete check itself
+  is already duplicated per page. Admins always bypass. Unset the var
+  (or let the date pass) and everything opens with no code change —
+  verified live, including that this is a fresh per-request check, not
+  something requiring a restart once deployed.
+- **Fails closed on a malformed date.** An unset var means "feature
+  off, nothing locked" — but a *set-and-unparseable* value keeps the
+  antechamber active rather than accidentally opening the club early;
+  a typo should mean "members wait a little longer," not "the cohort
+  gate silently didn't work." Verified live with a deliberately bad
+  value.
+- **`/antechamber`**: "The Hall opens [Month] [day]{ordinal}." + a live
+  count of ritual-complete members ("N members stand at the doors"),
+  styled to match the existing `/library`/`/houses` teaser idiom. New
+  `getRitualCompleteMemberCount()` (`lib/auth/ritual.ts`) computes the
+  count as 3 set-intersection queries instead of N per-member
+  `getRitualStatus()` calls (which would mean N separate `Message`
+  queries) — verified this returns the correct, real count against
+  live data (not a test-only number).
+- **Sign Out on `/antechamber`** — `/hall` is one of the gated pages,
+  so without this a waiting member would have had no way to sign out
+  at all while the antechamber is active. Reuses the same
+  `SignOutButton` from `/hall` (v0.31.0).
+
+Verified live end-to-end with a `test-`-prefixed ritual-complete
+account: normal access confirmed with the var unset; redirect to
+`/antechamber` (with correct date formatting and a real member count)
+confirmed from all four gated pages with the var set to a future date;
+admin bypass confirmed by flipping the same account's `isAdmin` flag;
+fail-closed behavior confirmed with a malformed value. Cleaned up
+afterward, including restoring `.env.local` to its unset default.
 
 ## [0.32.0] — 2026-08-08
 

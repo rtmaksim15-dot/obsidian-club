@@ -116,3 +116,49 @@ export async function getRitualStatus(user: User, profile: UserProfile | null): 
 
   return { complete, steps };
 }
+
+/**
+ * Live count of ritual-complete members — powers the antechamber's "N
+ * members stand at the doors" (Doors mechanic, 2026-08-08). Mirrors
+ * `getRitualStatus`'s completion definition exactly, but as a set
+ * operation instead of N per-user `getRitualStatus` calls (which would
+ * mean N separate `Message` queries) — three queries total regardless
+ * of member count: `ritualProgress` JSON completeness, bio/avatar
+ * presence, and one distinct-userId newcomers-room message query,
+ * intersected in application code.
+ */
+export async function getRitualCompleteMemberCount(): Promise<number> {
+  const jsonComplete = await prisma.userProfile.findMany({
+    where: {
+      AND: [
+        { ritualProgress: { path: ["usernameChosen"], equals: true } },
+        { ritualProgress: { path: ["codeOfConduct"], equals: true } },
+        { ritualProgress: { path: ["introMaterial"], equals: true } },
+        { ritualProgress: { path: ["safetyRules"], equals: true } },
+      ],
+    },
+    select: { userId: true },
+  });
+  if (jsonComplete.length === 0) return 0;
+
+  const profileComplete = await prisma.user.findMany({
+    where: {
+      id: { in: jsonComplete.map((p) => p.userId) },
+      bio: { not: null },
+      avatarUrl: { not: null },
+    },
+    select: { id: true },
+  });
+  if (profileComplete.length === 0) return 0;
+
+  const room = await prisma.room.findUnique({ where: { slug: "newcomers" }, select: { id: true } });
+  if (!room) return 0;
+
+  const introduced = await prisma.message.findMany({
+    where: { roomId: room.id, userId: { in: profileComplete.map((u) => u.id) } },
+    select: { userId: true },
+    distinct: ["userId"],
+  });
+
+  return introduced.length;
+}

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { getRitualStatus } from "@/lib/auth/ritual";
+import { getDoorsState } from "@/lib/config/doors";
 import { getLevelProgress } from "@/lib/rating/level-progress";
 import { syncReferralLifecycle } from "@/lib/rating/referral-lifecycle";
 import { checkLevelUp } from "@/lib/rating/level-progression";
@@ -51,6 +52,10 @@ export default async function HallPage() {
   const profile = await prisma.userProfile.findUnique({ where: { userId: user.id } });
   const ritual = await getRitualStatus(user, profile);
   if (!ritual.complete) redirect("/ritual");
+
+  // Doors mechanic (2026-08-08) — admins always bypass; everyone else
+  // sees the antechamber instead of real content while doors.active.
+  if (!user.isAdmin && getDoorsState().active) redirect("/antechamber");
 
   // No real cron yet (see TECH_DEBT.md) — check referral lifecycle
   // transitions and level-up eligibility opportunistically whenever a

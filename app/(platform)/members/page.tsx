@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { getRitualStatus } from "@/lib/auth/ritual";
+import { getDoorsState } from "@/lib/config/doors";
 
 /**
  * Members (`/members`) — OBSIDIAN_ROADMAP_v3.1 "Members and Follows."
@@ -17,6 +18,10 @@ export default async function MembersPage() {
   const profile = await prisma.userProfile.findUnique({ where: { userId: user.id } });
   const ritual = await getRitualStatus(user, profile);
   if (!ritual.complete) redirect("/ritual");
+
+  // Doors mechanic (2026-08-08) — admins always bypass; everyone else
+  // sees the antechamber instead of real content while doors.active.
+  if (!user.isAdmin && getDoorsState().active) redirect("/antechamber");
 
   const members = await prisma.user.findMany({
     where: { status: "active" },
