@@ -8,7 +8,52 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.31.1` is the current released version.
+Nothing yet — `v0.32.0` is the current released version.
+
+## [0.32.0] — 2026-08-08
+
+Pre-launch block (ROADMAP v3.1), Task 3: PWA manifest + iOS home-screen support.
+
+### Changed
+
+- **`manifest.json`'s `short_name`**: `"OC"` → `"Obsidian"` — this is
+  the label iOS/Android show under the home-screen icon; `manifest.json`
+  itself, the 192/512 OC-monogram icons, `theme_color`/`background_color`,
+  and `display: "standalone"` already existed from an earlier pass
+  (`v0.1`, "Wire PWA manifest + brand icons") and needed no other
+  changes — verified they were already correct rather than
+  regenerating anything that wasn't broken.
+- **`theme_color`/`background_color` kept at `#0A0908`**, not the
+  `#0A0A0A` named in this task's brief — `#0A0908` is this project's
+  actual, already-finalized "Obsidian Black" (`tailwind.config.ts`,
+  `app/globals.css`'s `--color-bg-primary`, and the existing manifest
+  itself all agree on it; CLAUDE.md rule 2 says not to touch finalized
+  visual identity). `#0A0A0A` is close enough that it reads as the same
+  intent typed from memory, not a deliberate new value — introducing a
+  second near-black would be the actual regression here.
+
+### Added
+
+- **iOS "Add to Home Screen" now opens fullscreen, not a Safari
+  bookmark.** `app/layout.tsx`'s `metadata.appleWebApp` (`capable: true`,
+  `statusBarStyle: "black-translucent"`, `title: "Obsidian"`) — this is
+  the piece that actually switches iOS's behavior; the manifest and
+  icons alone are cosmetic without it. `black-translucent` draws
+  content under the status bar, safe here because `globals.css` already
+  pads every page with `env(safe-area-inset-*)`. Also added the
+  non-Apple-prefixed `mobile-web-app-capable` meta tag for parity.
+- **Splash screen**: no hand-crafted `apple-touch-startup-image` set —
+  that's roughly a dozen separate PNGs per iPhone/iPad screen size and
+  orientation, disproportionate for a single flat-color monogram mark.
+  iOS auto-generates a splash screen from the manifest's icon +
+  `background_color` once `apple-mobile-web-app-capable` is set, which
+  is what "the right splash" needs here.
+
+Verified live in a 375×812 mobile viewport: `manifest.json` fetches and
+parses correctly with the updated `short_name`; `<head>` carries the
+apple-touch-icon link and all four apple/mobile-web-app meta tags with
+the expected values; no console errors; landing page renders correctly
+at mobile width.
 
 ## [0.31.1] — 2026-08-08
 
