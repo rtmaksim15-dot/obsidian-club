@@ -8,7 +8,38 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.30.0` is the current released version.
+Nothing yet — `v0.30.1` is the current released version.
+
+## [0.30.1] — 2026-08-08
+
+### Fixed
+
+- **Regression: Max's real account showed a completed ritual as
+  "TO DO" again.** The Task-1 (v0.29.0) backfill script wrote
+  `ritualProgress: { usernameChosen: true }` as a plain overwrite
+  instead of reading the existing value first — destroyed the real
+  `codeOfConduct`/`introMaterial`/`safetyRules` completion flags on
+  both real accounts (Max's and Lord Obsidian's). Investigated before
+  changing anything: confirmed via `DECISIONS.md`'s own history that
+  Lord Obsidian's account had never actually completed those three
+  steps for real (nothing to restore there), while Max's account had —
+  real completion timestamps from 2026-07-25 (Code of Conduct,
+  Introduction) documented in this project's own history, plus direct
+  confirmation the account was fully ritual-complete immediately before
+  the backfill (meaning Safety & Respect was also genuinely accepted,
+  sometime between its 2026-08-03 content drop and the 2026-08-07
+  backfill). By the time the fix ran, the account had already
+  self-healed — the real user had re-clicked through the ritual steps
+  live in the time between the bug report and the fix — so the planned
+  restoration write was a correctness-preserving no-op, not a live data
+  change. Both currently-live code paths that write `ritualProgress`
+  (`app/api/profile/route.ts`, `app/api/ritual/progress/route.ts`)
+  already correctly read-merge-write; the bug was isolated to the
+  one-off script, which no longer exists.
+- **`CLAUDE.md` rule 9** — any future one-off script touching a JSON
+  field on a real account must read-merge-write, never plain-overwrite.
+  Same "codify after an incident" response as rule 8 after the RLS
+  regression.
 
 ## [0.30.0] — 2026-08-07
 
