@@ -9,6 +9,8 @@ import { LEVEL_NAMES } from "@/lib/rating/levels";
 import PostList, { type FeedPost } from "@/components/shared/PostList";
 import CreateMemberInviteButton from "@/components/shared/CreateMemberInviteButton";
 import CreatePartnerButton from "@/components/shared/CreatePartnerButton";
+import CopyShareLink from "@/components/shared/CopyShareLink";
+import SignOutButton from "@/components/shared/SignOutButton";
 import { REP_UI_ENABLED, LEVELS_UI_ENABLED, REFERRALS_UI_ENABLED } from "@/lib/config/feature-flags";
 
 /**
@@ -32,7 +34,15 @@ import { REP_UI_ENABLED, LEVELS_UI_ENABLED, REFERRALS_UI_ENABLED } from "@/lib/c
  * restored. Member invites spend `inviteAllowance` at redemption, not
  * creation (see DECISIONS.md); "my partner" reads as `partner ??
  * partnerOf` since the relationship is written from whichever side
- * redeemed the link.
+ * redeemed the link. A still-live token renders full-URL + Copy/Share
+ * (`CopyShareLink`, 2026-08-08) — once redeemed, its card only ever
+ * shows the human outcome ("Invitation accepted — name, date" / "Partner
+ * of name"); `t.token` is never read past the redeemed branch, so a
+ * dead token can't end up serialized into a client component's props.
+ *
+ * Sign Out (2026-08-08) is a plain `<form method="POST">` to
+ * `/api/auth/sign-out` — full server-side session invalidation, no
+ * client JS required for the sign-out itself.
  */
 export default async function HallPage() {
   let user = await getCurrentUser();
@@ -243,20 +253,25 @@ export default async function HallPage() {
             </p>
 
             {memberInviteTokens.length > 0 ? (
-              <ul className="space-y-2 mb-3">
-                {memberInviteTokens.map((t) => (
-                  <li key={t.id} className="text-caption">
-                    {t.redeemedBy ? (
-                      <span style={{ color: "var(--color-success)" }}>
-                        Joined by {t.redeemedBy.displayName}
-                      </span>
-                    ) : (
-                      <span className="break-all" style={{ color: "var(--color-text-secondary)" }}>
-                        {baseUrl}/join/{t.token}
-                      </span>
-                    )}
-                  </li>
-                ))}
+              <ul className="space-y-3 mb-3">
+                {memberInviteTokens.map((t) =>
+                  // Redeemed: the human outcome only — never the token,
+                  // in this render or anywhere downstream. `t.token` is
+                  // simply never referenced past this branch, so a
+                  // redeemed token can't leak into a client component's
+                  // serialized props (see CopyShareLink below, only
+                  // ever given a URL for a still-live token).
+                  t.redeemedBy ? (
+                    <li key={t.id} className="text-caption" style={{ color: "var(--color-success)" }}>
+                      Invitation accepted — {t.redeemedBy.displayName},{" "}
+                      {new Date(t.redeemedAt!).toLocaleDateString("en-US", { dateStyle: "medium", timeZone: "UTC" })}
+                    </li>
+                  ) : (
+                    <li key={t.id}>
+                      <CopyShareLink url={`${baseUrl}/join/${t.token}`} />
+                    </li>
+                  ),
+                )}
               </ul>
             ) : null}
 
@@ -270,9 +285,7 @@ export default async function HallPage() {
                 Partner of {resolvedPartner.displayName}
               </p>
             ) : partnerToken ? (
-              <p className="text-caption break-all" style={{ color: "var(--color-text-secondary)" }}>
-                {baseUrl}/join/{partnerToken.token}
-              </p>
+              <CopyShareLink url={`${baseUrl}/join/${partnerToken.token}`} />
             ) : (
               <CreatePartnerButton />
             )}
@@ -326,6 +339,10 @@ export default async function HallPage() {
           <p className="text-label mb-3">Your Posts</p>
           <PostList posts={posts as FeedPost[]} compact />
         </section>
+
+        <div className="mt-10">
+          <SignOutButton />
+        </div>
       </div>
     </main>
   );

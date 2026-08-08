@@ -8,7 +8,53 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.30.1` is the current released version.
+Nothing yet — `v0.31.0` is the current released version.
+
+## [0.31.0] — 2026-08-08
+
+/hall UX: invite links and Sign Out.
+
+### Added
+
+- **Full invite/partner URLs with Copy + Share** — "My Invitation" on
+  `/hall` now shows the complete `https://…/join/{token}` URL for any
+  still-live token, with a Copy button (clipboard write + a brief
+  "Copied" confirmation) and, on a device that supports it, a native
+  Share button (`navigator.share`). New shared component:
+  `components/shared/CopyShareLink.tsx`.
+- **Redeemed tokens show the human outcome only, never the URL again**
+  — a redeemed member invite renders "Invitation accepted — {name},
+  {date}"; a redeemed partner link renders "Partner of {name}" (this
+  branch already existed). `t.token` is never read past the redeemed
+  branch in either case, so a dead token can't end up serialized into
+  `CopyShareLink`'s props — verified live: the redeemed token string
+  was confirmed absent from the full rendered HTML source (not just
+  the visible text), while the still-live token's URL was present as
+  expected.
+- **Sign Out** — a quiet text link at the bottom of `/hall`, styled
+  identically to "Edit profile". Full server-side sign-out
+  (`POST /api/auth/sign-out`, new route): builds its own Supabase
+  client bound to the request/response cookies (same pattern
+  `app/auth/callback/route.ts` already established, since
+  `lib/auth/supabase-server.ts`'s cookie writes don't attach to a
+  hand-constructed response), calls `supabase.auth.signOut()` server-
+  side, and redirects to the landing page with the cleared cookies
+  attached. A plain `<form method="POST">` — no client JS required for
+  the sign-out itself. Verified live: `/feed` correctly redirects to
+  `/login` after sign-out (session actually invalidated, not just a
+  client-side redirect), and the browser's back button lands on the
+  login page, not a cached authenticated page.
+
+### Verified
+
+- Admin batch detail (`/admin/invite-batches/:id`) already showed
+  "Redeemed by {name} ({date})" for every channel, never the token —
+  confirmed by rereading the file and grepping for any `.token`
+  reference (none found); no change needed there.
+
+Verified end-to-end with two `test-`-prefixed accounts (real Supabase
+Auth identities + Prisma rows, one redeemed invite, one live invite,
+a formed partner relationship) — cleaned up afterward.
 
 ## [0.30.1] — 2026-08-08
 
