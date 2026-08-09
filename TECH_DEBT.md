@@ -638,6 +638,31 @@ whether a component references it). See `DECISIONS.md`, 2026-07-04.
   data-layer admin calls. Until this toggle is off, closed registration
   isn't airtight at the infrastructure level, even though every path
   inside the app itself is now closed. See DECISIONS.md, 2026-07-17.
+- **New (2026-08-09), legal package — none of this is app code:**
+  - The actual 9 legal document markdown files (public: Terms of
+    Service, Privacy Policy, Acceptable Use Policy, DMCA Policy,
+    Registration Consent Clickwrap; internal: plan/risk assessment,
+    decisions/parameters, 2257/2257A memo, Section 230 memo) —
+    `/legal/` currently holds `[DRAFT_PENDING]`/`[LAWYER ...]`
+    placeholder stubs only (see `scripts/check-legal.ts`, which
+    correctly fails the build until real content lands). Real content
+    needs to come from Max/his lawyer — not something to draft here.
+  - Business entity registration — needed **before** the cohort opens,
+    per Max's own stated blocker list.
+  - An age-verification provider — integration + test needed before
+    October 1.
+  - DMCA agent registration with the U.S. Copyright Office ($6, renews
+    every 3 years) — the `/dmca` page (once real content exists) is
+    only actually enforceable once this is done.
+  - `support@`/`privacy@`/`dmca@`/`safety@` email aliases — DNS/mail-
+    provider configuration (Resend, or wherever inbound mail for
+    `obsidianclub.online` is routed), not something this codebase can
+    configure. `safety@` per Max's spec needs a separate, monitored
+    notification — flagging that requirement here so it isn't lost,
+    but the actual routing setup is external.
+  - A review of Vercel's and Supabase's own acceptable-use terms
+    against this platform's content — a compliance question for
+    Max/his lawyer, not something to resolve in code.
 
 These aren't "debt" in the sense of a shortcut taken — they're
 external dependencies the implementer has no way to self-serve. Tracked

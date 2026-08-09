@@ -43,6 +43,11 @@ export default function ContentComposer({ houses = [] }: Props) {
   const [houseId, setHouseId] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  // Member protection mechanics (pre-launch legal package, 2026-08-09):
+  // required, unchecked by default, only relevant (and only rendered)
+  // once a photo is actually attached — a text-only post has no one
+  // depicted in it to consent for.
+  const [imageConsent, setImageConsent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [compressing, setCompressing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,6 +77,7 @@ export default function ContentComposer({ houses = [] }: Props) {
   function clearPhoto() {
     setPhoto(null);
     setPhotoPreview(null);
+    setImageConsent(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
@@ -106,6 +112,7 @@ export default function ContentComposer({ houses = [] }: Props) {
     e.preventDefault();
     const trimmed = content.trim();
     if (!trimmed) return;
+    if (photo && !imageConsent) return;
 
     setSubmitting(true);
     setError(null);
@@ -129,6 +136,7 @@ export default function ContentComposer({ houses = [] }: Props) {
         content: trimmed,
         houseId: houseId || undefined,
         photoUrl,
+        imageConsentGiven: photo ? imageConsent : undefined,
       }),
     });
 
@@ -182,6 +190,17 @@ export default function ContentComposer({ houses = [] }: Props) {
           >
             <X size={14} strokeWidth={2} style={{ color: "var(--color-text-primary)" }} />
           </button>
+          <label className="mt-3 flex items-start gap-2">
+            <input
+              type="checkbox"
+              checked={imageConsent}
+              onChange={(e) => setImageConsent(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span className="text-caption" style={{ color: "var(--color-text-secondary)" }}>
+              All depicted are adults who consented to this publication.
+            </span>
+          </label>
         </div>
       ) : (
         <label
@@ -206,7 +225,11 @@ export default function ContentComposer({ houses = [] }: Props) {
         </p>
       ) : null}
 
-      <button type="submit" className="btn-primary" disabled={submitting || compressing || !content.trim()}>
+      <button
+        type="submit"
+        className="btn-primary"
+        disabled={submitting || compressing || !content.trim() || (Boolean(photo) && !imageConsent)}
+      >
         {submitting ? "Publishing…" : "Publish"}
       </button>
     </form>

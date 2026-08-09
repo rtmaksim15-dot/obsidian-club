@@ -3,7 +3,7 @@
 import { useState } from "react";
 import PostList, { type FeedPost } from "./PostList";
 
-type Props = { initialPosts: FeedPost[]; initialHasMore: boolean };
+type Props = { initialPosts: FeedPost[]; initialHasMore: boolean; viewerId?: string; viewerIsAdmin?: boolean };
 
 /**
  * /feed with real pagination (Block 5, August hardening pass,
@@ -13,7 +13,7 @@ type Props = { initialPosts: FeedPost[]; initialHasMore: boolean };
  * list views (no infinite-scroll pattern exists anywhere else in the
  * codebase to be consistent with).
  */
-export default function FeedList({ initialPosts, initialHasMore }: Props) {
+export default function FeedList({ initialPosts, initialHasMore, viewerId, viewerIsAdmin }: Props) {
   const [posts, setPosts] = useState(initialPosts);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [loading, setLoading] = useState(false);
@@ -40,7 +40,7 @@ export default function FeedList({ initialPosts, initialHasMore }: Props) {
 
   return (
     <div>
-      <PostList posts={posts} />
+      <PostList posts={posts} viewerId={viewerId} viewerIsAdmin={viewerIsAdmin} />
       {hasMore ? (
         <div className="mt-6 flex flex-col items-center gap-2">
           <button type="button" className="btn-secondary" onClick={loadMore} disabled={loading}>

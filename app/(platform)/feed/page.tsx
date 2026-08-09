@@ -43,7 +43,7 @@ export default async function FeedPage() {
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
       <div className="mx-auto max-w-2xl">
-        <FeedList initialPosts={posts} initialHasMore={hasMore} />
+        <FeedList initialPosts={posts} initialHasMore={hasMore} viewerId={user.id} viewerIsAdmin={user.isAdmin} />
       </div>
     </main>
   );

@@ -21,13 +21,14 @@ export default async function AdminDashboardPage() {
     notFound();
   }
 
-  const [activeMembers, ritualComplete, pendingApplications, publishedPosts, ageVerifiedMembers, batches] =
+  const [activeMembers, ritualComplete, pendingApplications, publishedPosts, ageVerifiedMembers, openReports, batches] =
     await Promise.all([
       prisma.user.count({ where: { status: "active" } }),
       getRitualCompleteMemberCount(),
       prisma.waitlist.count({ where: { status: "pending" } }),
       prisma.post.count({ where: { isPublished: true } }),
       prisma.user.count({ where: { status: "active", ageVerified: true } }),
+      prisma.report.count({ where: { status: "open" } }),
       prisma.inviteBatch.findMany({
         orderBy: { createdAt: "desc" },
         include: { _count: { select: { tokens: true } } },
@@ -44,6 +45,7 @@ export default async function AdminDashboardPage() {
     { label: "Pending applications", value: pendingApplications },
     { label: "Published posts", value: publishedPosts },
     { label: "Age verified", value: `${ageVerifiedMembers} / ${activeMembers}` },
+    { label: "Open reports", value: openReports },
   ];
 
   return (
@@ -106,6 +108,9 @@ export default async function AdminDashboardPage() {
           </a>
           <a href="/admin/members" className="text-caption" style={{ color: "var(--color-text-muted)" }}>
             Members →
+          </a>
+          <a href="/admin/reports" className="text-caption" style={{ color: "var(--color-text-muted)" }}>
+            Reports →
           </a>
         </div>
       </div>

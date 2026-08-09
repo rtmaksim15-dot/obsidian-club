@@ -8,7 +8,90 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.34.0` is the current released version.
+Nothing yet — `v0.35.0` is the current released version.
+
+## [0.35.0] — 2026-08-09
+
+Legal package placement (Blocks 1, 3, 5, and the non-content parts of Block 6).
+
+### Added
+
+- **`/legal/` structure** — 5 public documents (Terms of Service,
+  Privacy Policy, Acceptable Use Policy, DMCA Policy, Registration
+  Consent Clickwrap) + `/legal/internal/` (plan/risk assessment,
+  decisions/parameters, 2257/2257A memo, Section 230 memo, plus a
+  one-line `README.md`: "Internal documents. Do not publish. Do not
+  import into the app."). The 9 real documents don't exist yet
+  anywhere on this machine (checked three separate locations before
+  concluding this) — every file is currently a `[DRAFT_PENDING]`/
+  `[LAWYER ...]` placeholder stub with empty `effective_date`
+  frontmatter, deliberately not drafted here: these are lawyer-authored
+  legal text, not something to fabricate.
+- **`npm run check:legal`** (`scripts/check-legal.ts`, same trip-wire
+  pattern as `check:rls`) — fails the build if any public `/legal/*.md`
+  still has an unfilled `[PLACEHOLDER]`, a `[LAWYER ...]` footnote, a
+  missing `effective_date`, or if anything under `app/`/`components/`/
+  `lib/` actually imports from `legal/internal/`. Wired into
+  `prebuild`, so `npm run build` cannot succeed while any of this is
+  true — verified live against the current (intentionally incomplete)
+  stub files.
+- **Member protection mechanics** (product features in their own
+  right, not a legal formality — see DECISIONS.md):
+  - **Report** — one-step, reachable from every post and every profile,
+    no nested menus. Six categories (underage, non-consensual, threat,
+    doxxing, commercial solicitation, other); the first three are
+    "red line" and sort first in admin review. New `Report` model,
+    `POST /api/reports`.
+  - **Block** — mutual in effect (`lib/moderation/block.ts`), tears
+    down any existing follow relationship in both directions, hides
+    both profiles from each other. New `Block` model,
+    `POST /api/users/:id/block`.
+  - **Self-service deletion** — post deletion (existing, previously
+    unwired `DELETE /api/posts/:id` route now has a real Delete
+    button) and full account closure (`POST /api/account/close`,
+    "Close my account" on `/profile/edit`) — both immediate, no
+    explanation or third-party approval.
+  - **Moderation log** — new `ModerationAction` model, deliberately
+    separate from `RepHistory` (REP-specific) and `AnalyticsEvent`
+    (behavioral analytics, not actor-audited). Every admin report
+    action (`dismiss`/`review`/`preserve`) logs who, when, what,
+    against which category.
+  - **Red-line preservation** — `Post.isPreserved`: a red-line report,
+    once actioned via the new `/admin/reports` review queue,
+    unpublishes the post and marks it preserved instead of deleting it
+    — content is evidence, not something to destroy. New
+    `PATCH /api/admin/reports/:id`.
+  - **Image-upload consent** — `Post.imageConsentAt`; the composer
+    requires an explicit, unchecked-by-default "all depicted are
+    adults who consented to this publication" checkbox before a photo
+    post can publish, enforced server-side (`POST /api/posts`) as well
+    as in the UI.
+- **`app/robots.ts`** — disallows `/legal/internal/` (defensive; it's
+  a source directory, never an actual route, but the rule is in place
+  before anything could accidentally expose it). Public legal pages
+  stay indexable, same reasoning as the landing page's own metadata.
+
+### Fixed
+
+- **`check:legal`'s internal-import detector had a false-positive** —
+  it flagged `app/robots.ts` for merely mentioning the literal string
+  `"legal/internal/"` in its Disallow rule, not for actually importing
+  anything. Narrowed to match real `import`/`require`/dynamic-`import`
+  statements only. Caught live, on this task's own first build attempt.
+
+Verified live end-to-end with three `test-`-prefixed accounts: a
+red-line report filed by one member against another's post, reviewed
+and preserved by an admin (confirmed the post was unpublished but its
+content stayed intact in the database, not deleted); a second,
+non-red-line report dismissed; both actions confirmed in the
+moderation log with full detail; mutual block confirmed from both
+sides (neutral "not available" profile page) with the follow
+relationship torn down; self-delete confirmed via the wired button;
+the image-consent gate confirmed rejecting a server-side bypass
+attempt with no checkbox. `check:legal` confirmed correctly blocking
+`npm run build` against the current placeholder content, and
+confirmed clean once the false-positive was fixed. All test accounts,
+posts, reports, blocks, and moderation-log entries removed afterward.
 
 ## [0.34.0] — 2026-08-09
 

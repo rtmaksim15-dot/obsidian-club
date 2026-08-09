@@ -6,7 +6,14 @@ export type { FeedPost };
  *  divided rendering (see PostCard), just a different filter feeding
  *  it. No extra gap between items — each PostCard's own bottom border
  *  is the only separator, Threads-style. */
-export default function PostList({ posts, compact = false }: { posts: FeedPost[]; compact?: boolean }) {
+type Props = {
+  posts: FeedPost[];
+  compact?: boolean;
+  viewerId?: string;
+  viewerIsAdmin?: boolean;
+};
+
+export default function PostList({ posts, compact = false, viewerId, viewerIsAdmin }: Props) {
   if (posts.length === 0) {
     return <p className="text-body">Nothing here yet.</p>;
   }
@@ -14,7 +21,7 @@ export default function PostList({ posts, compact = false }: { posts: FeedPost[]
   return (
     <div>
       {posts.map((post) => (
-        <PostCard key={post.id} post={post} compact={compact} />
+        <PostCard key={post.id} post={post} compact={compact} viewerId={viewerId} viewerIsAdmin={viewerIsAdmin} />
       ))}
     </div>
   );

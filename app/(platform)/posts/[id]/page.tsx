@@ -45,7 +45,13 @@ export default async function PostDetailPage({ params }: { params: { id: string 
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
       <div className="mx-auto max-w-2xl">
-        <PostCard post={post} linkComments={false} />
+        <PostCard
+          post={post}
+          linkComments={false}
+          viewerId={user.id}
+          viewerIsAdmin={user.isAdmin}
+          deleteRedirectTo="/feed"
+        />
 
         <section className="mt-8">
           <CommentSection

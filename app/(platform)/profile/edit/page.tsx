@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import ProfileEditForm from "@/components/shared/ProfileEditForm";
+import CloseAccountButton from "@/components/shared/CloseAccountButton";
 
 // Self-edit only — no [id]/[username] param at all, since this can only
 // ever be the caller's own profile. The API route re-derives the user
@@ -26,6 +27,10 @@ export default async function ProfileEditPage() {
             usernameChangeUsed: Boolean(user.usernameChangedAt),
           }}
         />
+
+        <div className="mt-10">
+          <CloseAccountButton />
+        </div>
       </div>
     </main>
   );

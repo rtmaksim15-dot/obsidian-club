@@ -209,6 +209,11 @@ model User {
   analyticsEvents            AnalyticsEvent[]
   following                  Follow[]          @relation("Following")
   followers                  Follow[]          @relation("Followers")
+  reportsFiled               Report[]          @relation("ReportsFiled")
+  reportsReviewed            Report[]          @relation("ReportsReviewed")
+  blocksInitiated            Block[]           @relation("BlocksInitiated")
+  blocksReceived             Block[]           @relation("BlocksReceived")
+  moderationActions          ModerationAction[]
 
   @@map("users")
 }
@@ -329,6 +334,19 @@ model Post {
   houseId     String?   @map("house_id") @db.Uuid
   createdAt   DateTime  @default(now()) @map("created_at")
   publishedAt DateTime? @map("published_at")
+  // Member protection mechanics (pre-launch legal package, 2026-08-09).
+  // imageConsentAt: set only when the composer actually had a photo
+  // attached and the "all depicted are adults who consented to this
+  // publication" checkbox was checked at submit time — null for
+  // text-only posts, never backfilled after the fact.
+  imageConsentAt DateTime? @map("image_consent_at")
+  // isPreserved: set by a red-line report action (underage /
+  // non-consensual / threat) instead of deleting the post — content is
+  // evidence, not something to destroy. Combined with isPublished:false
+  // (already the feed-visibility gate) so preserved content is
+  // invisible everywhere ordinary queries look, without a second
+  // visibility check to keep in sync.
+  isPreserved Boolean   @default(false) @map("is_preserved")
 
   author   User      @relation(fields: [authorId], references: [id])
   house    House?    @relation(fields: [houseId], references: [id])
@@ -752,4 +770,102 @@ model AnalyticsEvent {
   @@index([type, createdAt])
   @@index([entity, entityId])
   @@map("analytics_events")
+}
+
+// ============================================================
+// MEMBER PROTECTION (pre-launch legal package, 2026-08-09)
+// ============================================================
+// Report, Block, and ModerationAction exist for their own sake, not as
+// a legal formality — see DECISIONS.md. Report/Block are independent
+// of the /legal document set (they don't need real legal text to be
+// real, working product features); ModerationAction gives admin
+// actions a real audit trail, which none of RepHistory (REP-specific)
+// or AnalyticsEvent (behavioral analytics, not actor-audited) provided.
+
+enum ReportTargetType {
+  post
+  profile
+}
+
+// underage/non_consensual/threat are the "red line" categories (see
+// Report.isRedLine below) — everything else is a normal-priority report.
+enum ReportCategory {
+  underage
+  non_consensual
+  threat
+  doxxing
+  commercial_solicitation
+  other
+}
+
+enum ReportStatus {
+  open
+  reviewed
+  dismissed
+}
+
+model Report {
+  id           String           @id @default(uuid()) @db.Uuid
+  targetType   ReportTargetType @map("target_type")
+  targetId     String           @map("target_id") @db.Uuid
+  reporterId   String           @map("reporter_id") @db.Uuid
+  category     ReportCategory
+  // Computed once at creation from `category` (see lib/moderation/report.ts)
+  // rather than re-derived at read time — a category's red-line status
+  // is a point-in-time policy decision that shouldn't silently change
+  // for an already-filed report if the taxonomy is ever edited later.
+  isRedLine    Boolean          @default(false) @map("is_red_line")
+  status       ReportStatus     @default(open)
+  note         String?
+  createdAt    DateTime         @default(now()) @map("created_at")
+  reviewedAt   DateTime?        @map("reviewed_at")
+  reviewedById String?          @map("reviewed_by_id") @db.Uuid
+
+  reporter   User  @relation("ReportsFiled", fields: [reporterId], references: [id])
+  reviewedBy User? @relation("ReportsReviewed", fields: [reviewedById], references: [id])
+
+  @@index([status])
+  @@index([targetType, targetId])
+  @@map("reports")
+}
+
+// One-directional row; a real mutual block is enforced in application
+// code by checking both (blockerId, blockedId) and (blockedId,
+// blockerId) — same shape choice as this schema's existing `partner`
+// self-relation comment about reading a relationship from either side.
+model Block {
+  id        String   @id @default(uuid()) @db.Uuid
+  blockerId String   @map("blocker_id") @db.Uuid
+  blockedId String   @map("blocked_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  blocker User @relation("BlocksInitiated", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("BlocksReceived", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@map("blocks")
+}
+
+// General-purpose admin-action audit log — deliberately separate from
+// RepHistory (REP-point deltas only) and AnalyticsEvent (behavioral
+// analytics, subject-keyed by `userId`, not actor-audited). `action` is
+// a free-text namespaced string ("report.dismissed",
+// "post.preserved") rather than an enum, matching AnalyticsEvent's own
+// `type` field's reasoning — this is a log, not a state machine, and a
+// growing action taxonomy shouldn't require a schema migration per
+// entry.
+model ModerationAction {
+  id         String   @id @default(uuid()) @db.Uuid
+  adminId    String   @map("admin_id") @db.Uuid
+  action     String
+  targetType String?  @map("target_type")
+  targetId   String?  @map("target_id") @db.Uuid
+  aupSection String?  @map("aup_section")
+  note       String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  admin User @relation(fields: [adminId], references: [id])
+
+  @@index([targetType, targetId])
+  @@map("moderation_actions")
 }

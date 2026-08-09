@@ -71,6 +71,7 @@ type Body = {
   minLevel?: number;
   houseId?: string;
   photoUrl?: string;
+  imageConsentGiven?: boolean;
 };
 
 // POST /api/posts — create + publish immediately (no draft workflow is
@@ -138,6 +139,14 @@ export async function POST(request: Request) {
   }
 
   const photoUrl = body.photoUrl?.trim();
+  // Member protection mechanics (pre-launch legal package, 2026-08-09):
+  // a photo can't be published without the "all depicted are adults
+  // who consented to this publication" checkbox — enforced here, not
+  // just in the composer's UI, since the UI-level disable is
+  // trivially bypassable by anyone calling this route directly.
+  if (photoUrl && !body.imageConsentGiven) {
+    return NextResponse.json({ error: "Image consent is required to publish a photo." }, { status: 422 });
+  }
   if (photoUrl) {
     // Block 2 (August hardening pass, 2026-08-04): must be our own
     // post-photos bucket, not an arbitrary https URL a client could
@@ -181,6 +190,7 @@ export async function POST(request: Request) {
         mediaUrls: photoUrl ? [photoUrl] : [],
         isPublished: true,
         publishedAt: new Date(),
+        imageConsentAt: photoUrl ? new Date() : null,
       },
       select: postSelect(user.id),
     });

@@ -101,7 +101,7 @@ export default async function HouseDetailPage({ params }: { params: { slug: stri
 
         <section className="mt-10">
           <p className="text-label mb-3">Content</p>
-          <PostList posts={posts} />
+          <PostList posts={posts} viewerId={user.id} viewerIsAdmin={user.isAdmin} />
         </section>
       </div>
     </main>

@@ -1,5 +1,7 @@
 import type { PostType } from "@prisma/client";
 import LikeButton from "./LikeButton";
+import ReportButton from "./ReportButton";
+import DeletePostButton from "./DeletePostButton";
 import { REP_UI_ENABLED, HOUSES_UI_ENABLED, LEVELS_UI_ENABLED } from "@/lib/config/feature-flags";
 
 export type FeedPost = {
@@ -20,7 +22,22 @@ function firstPhoto(mediaUrls: unknown): string | null {
   return Array.isArray(mediaUrls) && typeof mediaUrls[0] === "string" ? mediaUrls[0] : null;
 }
 
-type Props = { post: FeedPost; linkComments?: boolean; compact?: boolean };
+type Props = {
+  post: FeedPost;
+  linkComments?: boolean;
+  compact?: boolean;
+  // Member protection mechanics (pre-launch legal package, 2026-08-09)
+  // — computed client-side from `viewerId`/`viewerIsAdmin` rather than
+  // baked into `FeedPost` at the query layer, so every existing
+  // `postSelect` shape across /feed, /hall, /posts/[id], /houses/[slug],
+  // and profile stays untouched. Both default to "logged out, not
+  // admin," which safely shows neither control.
+  viewerId?: string;
+  viewerIsAdmin?: boolean;
+  // /posts/[id] needs this — deleting the post you're currently viewing
+  // in full leaves nothing to refresh back to.
+  deleteRedirectTo?: string;
+};
 
 /** Shared post-card rendering for /feed, /hall, /profile/[username], and
  *  /posts/[id] — the detail page just omits `linkComments` since the
@@ -31,8 +48,18 @@ type Props = { post: FeedPost; linkComments?: boolean; compact?: boolean };
  *  `compact` drops the avatar/name header — for "Your Posts" on /hall,
  *  where the owner's own avatar and name are already shown once at the
  *  top of the page; repeating them per-post was pure redundancy. */
-export default function PostCard({ post, linkComments = true, compact = false }: Props) {
+export default function PostCard({
+  post,
+  linkComments = true,
+  compact = false,
+  viewerId,
+  viewerIsAdmin = false,
+  deleteRedirectTo,
+}: Props) {
   const photo = firstPhoto(post.mediaUrls);
+  const isOwn = viewerId != null && post.author.id === viewerId;
+  const canDelete = isOwn || (viewerId != null && viewerIsAdmin);
+  const canReport = viewerId != null && !isOwn;
   const timestamp = new Date(post.createdAt).toLocaleString("en-US", {
     dateStyle: "medium",
     timeStyle: "short",
@@ -86,6 +113,8 @@ export default function PostCard({ post, linkComments = true, compact = false }:
             {commentsLabel}
           </span>
         )}
+        {canDelete ? <DeletePostButton postId={post.id} redirectTo={deleteRedirectTo} /> : null}
+        {canReport ? <ReportButton targetType="post" targetId={post.id} /> : null}
       </div>
     </div>
   );

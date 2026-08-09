@@ -342,7 +342,7 @@ export default async function HallPage() {
         {/* Own posts */}
         <section className="mt-10">
           <p className="text-label mb-3">Your Posts</p>
-          <PostList posts={posts as FeedPost[]} compact />
+          <PostList posts={posts as FeedPost[]} compact viewerId={user.id} viewerIsAdmin={user.isAdmin} />
         </section>
 
         <div className="mt-10">

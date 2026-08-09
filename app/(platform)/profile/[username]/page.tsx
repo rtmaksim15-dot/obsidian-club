@@ -3,7 +3,10 @@ import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import ReviewForm from "@/components/shared/ReviewForm";
 import FollowButton from "@/components/shared/FollowButton";
+import BlockButton from "@/components/shared/BlockButton";
+import ReportButton from "@/components/shared/ReportButton";
 import PostCard, { type FeedPost } from "@/components/shared/PostCard";
+import { isBlockedEitherWay } from "@/lib/moderation/block";
 import { LEVEL_NAMES } from "@/lib/rating/levels";
 import { REP_UI_ENABLED, HOUSES_UI_ENABLED, LEVELS_UI_ENABLED } from "@/lib/config/feature-flags";
 
@@ -46,6 +49,24 @@ export default async function ProfilePage({ params }: { params: { username: stri
 
   const viewer = await getCurrentUser();
   const isOwnProfile = viewer?.id === user.id;
+
+  // Member protection mechanics (pre-launch legal package, 2026-08-09):
+  // a block is mutual in effect — neither side sees the other's
+  // content. Checked before any other query runs, so a blocked
+  // relationship never even reaches the point of fetching posts/follow
+  // state for a profile neither party should be looking at.
+  const blocked = viewer && !isOwnProfile ? await isBlockedEitherWay(viewer.id, user.id) : false;
+  if (blocked) {
+    return (
+      <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
+        <div className="mx-auto max-w-2xl">
+          <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
+            This profile isn&apos;t available.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   const [reviews, repHistory, memberships, posts, followerCount, followingCount, isFollowing] =
     await Promise.all([
@@ -182,8 +203,10 @@ export default async function ProfilePage({ params }: { params: { username: stri
         ) : null}
 
         {viewer && !isOwnProfile ? (
-          <div className="mt-6">
+          <div className="mt-6 flex items-center gap-4">
             <FollowButton userId={user.id} initialFollowing={Boolean(isFollowing)} />
+            <BlockButton userId={user.id} initialBlocked={false} />
+            <ReportButton targetType="profile" targetId={user.id} />
           </div>
         ) : null}
 
@@ -281,7 +304,12 @@ export default async function ProfilePage({ params }: { params: { username: stri
           ) : (
             <div className="space-y-6">
               {posts.map((post) => (
-                <PostCard key={post.id} post={post as FeedPost} />
+                <PostCard
+                  key={post.id}
+                  post={post as FeedPost}
+                  viewerId={viewer?.id}
+                  viewerIsAdmin={viewer?.isAdmin}
+                />
               ))}
             </div>
           )}
