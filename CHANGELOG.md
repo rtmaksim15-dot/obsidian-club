@@ -8,7 +8,31 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.33.0` is the current released version.
+Nothing yet — `v0.34.0` is the current released version.
+
+## [0.34.0] — 2026-08-09
+
+Pre-launch cleanup 2: `/admin` dashboard.
+
+### Added
+
+- **`/admin`** — previously had no `page.tsx` of its own (only its
+  subroutes did), so it 404'd. Now a numbers-only glance dashboard:
+  active members, ritual-complete count (reuses
+  `getRitualCompleteMemberCount()` from the Doors mechanic, v0.33.0),
+  pending applications, published posts, age-verified vs. total, and a
+  per-batch unused/redeemed breakdown for every invite batch (linking
+  through to `/admin/invite-batches/:id` for detail). Same
+  not-discoverable `requireAdmin()` + `notFound()` pattern as every
+  other admin page. Links out to Applications/Invite Batches/Members
+  for anything needing more than a glance.
+
+Verified live against real production data with a temporary admin
+test account (cleaned up immediately after): 3 active members, 1
+ritual-complete (matches the real, currently-accurate state), 0
+pending applications, 0 published posts, 0/3 age-verified, no invite
+batches — all correct against the actual database, not synthetic
+numbers.
 
 ## [0.33.0] — 2026-08-08
 
