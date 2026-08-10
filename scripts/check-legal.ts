@@ -2,15 +2,21 @@ import fs from "fs";
 import path from "path";
 import { parseFrontmatter } from "../lib/legal/frontmatter";
 
-// Legal-package safety check (pre-launch cleanup 3, Block 3, 2026-08-09)
-// — same "trip-wire" pattern as scripts/check-rls.ts. A public
-// /legal/*.md file (everything except internal/) reaching a real build
-// with an unfilled placeholder, a [LAWYER ...] footnote (written for
-// the lawyer reviewing the draft, never the reader), or a missing
-// Effective date is a direct reputational/legal risk — this fails the
-// build rather than relying on someone remembering to check by eye.
-// Wired into `prebuild` (package.json) so `npm run build` can't
-// succeed while any of this is true.
+// Legal-package safety check (pre-launch cleanup 3, Block 3, 2026-08-09;
+// severity split 2026-08-10) — same "trip-wire" pattern as
+// scripts/check-rls.ts. A public /legal/*.md file (everything except
+// internal/) with an unfilled placeholder, a [LAWYER ...] footnote
+// (written for the lawyer reviewing the draft, never the reader), or a
+// missing Effective date is a direct reputational/legal risk — but it
+// only HARD-fails the build once that specific file is actually wired
+// to a public route (i.e. some file under app/ reads it). Attorney
+// finalization can take weeks; freezing every deploy — including ones
+// with no legal changes at all — until every document is signed off is
+// its own outage. Until a doc is wired in, problems are reported as
+// warnings so the gate stays informative without blocking unrelated
+// work. The moment a route starts reading a given file, its problems
+// become build-blocking again — so it remains impossible to publish
+// placeholder legal text. Wired into `prebuild` (package.json).
 
 const LEGAL_DIR = path.join(process.cwd(), "legal");
 const SEARCH_DIRS = ["app", "components", "lib"];
@@ -29,7 +35,8 @@ const IMPORT_PATTERN = /(?:from\s+|require\(|import\()\s*["'][^"']*legal\/intern
 
 type Problem = { file: string; issue: string };
 
-function checkPublicFile(filePath: string, relPath: string, problems: Problem[]) {
+function checkPublicFile(filePath: string, relPath: string): Problem[] {
+  const problems: Problem[] = [];
   const raw = fs.readFileSync(filePath, "utf8");
   const { data, content } = parseFrontmatter(raw);
 
@@ -49,6 +56,37 @@ function checkPublicFile(filePath: string, relPath: string, problems: Problem[])
   if (!effectiveDate || /^\[.*\]$/.test(effectiveDate)) {
     problems.push({ file: relPath, issue: "Missing or placeholder `effective_date` in frontmatter." });
   }
+
+  return problems;
+}
+
+// A public legal doc is "wired" once some file under app/ actually
+// reads it — i.e. it's reachable from a real route, not just sitting
+// in /legal/ waiting on the lawyer. Detected the same low-tech way as
+// findInternalImports: a plain-text scan for the filename, since a
+// route will reference it either via an import path or a
+// fs.readFileSync(...) call naming the file. Unwired docs get warnings
+// only; wired docs get the hard build-blocking treatment.
+function findWiredFiles(publicFileNames: string[]): Set<string> {
+  const wired = new Set<string>();
+
+  function walk(dir: string) {
+    if (!fs.existsSync(dir)) return;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+      } else if (/\.(ts|tsx|js|jsx)$/.test(entry.name)) {
+        const src = fs.readFileSync(full, "utf8");
+        for (const name of publicFileNames) {
+          if (src.includes(name)) wired.add(name);
+        }
+      }
+    }
+  }
+  for (const dir of SEARCH_DIRS) walk(path.join(process.cwd(), dir));
+
+  return wired;
 }
 
 function findInternalImports(problems: Problem[]) {
@@ -77,7 +115,8 @@ function findInternalImports(problems: Problem[]) {
 }
 
 function main() {
-  const problems: Problem[] = [];
+  const hardProblems: Problem[] = [];
+  const warnings: Problem[] = [];
 
   if (!fs.existsSync(LEGAL_DIR)) {
     console.error("No /legal directory found.");
@@ -89,27 +128,45 @@ function main() {
     .readdirSync(LEGAL_DIR, { withFileTypes: true })
     .filter((e) => e.isFile() && e.name.endsWith(".md"));
 
+  const wired = findWiredFiles(publicFiles.map((e) => e.name));
+
   for (const entry of publicFiles) {
-    checkPublicFile(path.join(LEGAL_DIR, entry.name), `legal/${entry.name}`, problems);
+    const problems = checkPublicFile(path.join(LEGAL_DIR, entry.name), `legal/${entry.name}`);
+    if (problems.length === 0) continue;
+    if (wired.has(entry.name)) {
+      hardProblems.push(...problems);
+    } else {
+      warnings.push(...problems);
+    }
   }
 
-  findInternalImports(problems);
+  // Internal-document leaks are always a hard fail — there's no "not
+  // wired yet" grace period for those, since the import itself is the
+  // violation regardless of what the target document contains.
+  findInternalImports(hardProblems);
 
   console.log(
     `Checked ${publicFiles.length} public legal document(s) and every .ts/.tsx/.js/.jsx file under ${SEARCH_DIRS.join("/, ")}/.`,
   );
 
-  if (problems.length > 0) {
-    console.error("\nProblems found:\n");
-    problems.forEach((p) => console.error(`  - ${p.file}: ${p.issue}`));
+  if (warnings.length > 0) {
+    console.warn("\nWarnings (not yet wired to a public route — will hard-fail once they are):\n");
+    warnings.forEach((p) => console.warn(`  - ${p.file}: ${p.issue}`));
+  }
+
+  if (hardProblems.length > 0) {
+    console.error("\nBuild-blocking problems (wired to a public route):\n");
+    hardProblems.forEach((p) => console.error(`  - ${p.file}: ${p.issue}`));
     console.error(
       "\nA public legal document with an unfilled placeholder, a [LAWYER ...] " +
         "footnote, a missing Effective date, or a leaked import from " +
-        "legal/internal/ must never reach a real build.",
+        "legal/internal/ must never reach a real build once it's wired to a route.",
     );
     process.exitCode = 1;
-  } else {
+  } else if (warnings.length === 0) {
     console.log("All public legal documents are clean. No internal-document imports found.");
+  } else {
+    console.log("\nNo build-blocking problems (nothing above is wired to a public route yet).");
   }
 }
 

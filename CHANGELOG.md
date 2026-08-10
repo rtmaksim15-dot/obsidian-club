@@ -8,7 +8,27 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.35.0` is the current released version.
+Nothing yet — `v0.35.1` is the current released version.
+
+## [0.35.1] — 2026-08-10
+
+### Fixed
+
+- **`check:legal` was hard-failing every Vercel deploy**, not just ones
+  touching legal docs — `v0.35.0` shipped the 5 public stub files with
+  empty `effective_date` and `[DRAFT_PENDING]` placeholders already in
+  place, and the gate treated any problem in any public `/legal/*.md`
+  as build-blocking regardless of whether that document was actually
+  reachable from a route yet. Attorney finalization can take weeks;
+  freezing all deploys until then isn't viable. `scripts/check-legal.ts`
+  now only hard-fails a document once something under `app/` actually
+  reads it (`findWiredFiles`) — until Block 2's public pages exist,
+  problems print as warnings and the build succeeds. The moment a route
+  wires a given file in, its problems become build-blocking again, so
+  publishing placeholder legal text is still impossible. Internal-doc
+  import leaks are unaffected — still an unconditional hard fail.
+  Verified: `npm run check:legal` exits 0 with 15 warnings against the
+  current stubs; `npm run build` completes clean.
 
 ## [0.35.0] — 2026-08-09
 

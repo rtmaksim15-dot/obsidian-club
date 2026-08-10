@@ -644,9 +644,12 @@ whether a component references it). See `DECISIONS.md`, 2026-07-04.
     Registration Consent Clickwrap; internal: plan/risk assessment,
     decisions/parameters, 2257/2257A memo, Section 230 memo) —
     `/legal/` currently holds `[DRAFT_PENDING]`/`[LAWYER ...]`
-    placeholder stubs only (see `scripts/check-legal.ts`, which
-    correctly fails the build until real content lands). Real content
-    needs to come from Max/his lawyer — not something to draft here.
+    placeholder stubs only (see `scripts/check-legal.ts`, which reports
+    problems in these stubs as warnings — it only hard-fails the build
+    once a given public document is actually wired to a route; see
+    v0.35.1 in CHANGELOG.md for why the earlier unconditional hard-fail
+    had to be relaxed). Real content needs to come from Max/his lawyer —
+    not something to draft here.
   - Business entity registration — needed **before** the cohort opens,
     per Max's own stated blocker list.
   - An age-verification provider — integration + test needed before
