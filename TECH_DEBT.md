@@ -638,34 +638,47 @@ whether a component references it). See `DECISIONS.md`, 2026-07-04.
   data-layer admin calls. Until this toggle is off, closed registration
   isn't airtight at the infrastructure level, even though every path
   inside the app itself is now closed. See DECISIONS.md, 2026-07-17.
-- **Updated (2026-08-11), legal package — the app-code side is now
-  built; what's left is genuinely external:**
-  - **`npm run build` / Vercel deploys are hard-blocked right now** by
-    `scripts/check-legal.ts` — `/terms`, `/privacy`, `/guidelines`, and
-    `/dmca` (v0.36.0) are wired to real routes rendering the real
-    attorney-drafted documents, and those documents still have real
-    unfilled `[BRACKET]` placeholders (`[LEGAL ENTITY NAME]`,
-    `[SUPPORT EMAIL]`, `[EFFECTIVE DATE]`, `[NOTICE ADDRESS]`,
-    `[AGE VERIFICATION PROVIDER]`, `[AAA / JAMS]`, `[COUNTY]`, several
-    more per-document — run `npm run check:legal` for the exact current
-    list) and `[LAWYER ...]` notes. This is the gate working exactly as
-    designed (see DECISIONS.md, v0.35.1 and v0.36.0 entries) — it stays
-    blocked until Max/his lawyer supply the real values and the
-    `[LAWYER ...]` notes are resolved/removed. Editing the *wording* of
-    these documents is a legal decision, not something to touch here.
-  - Business entity registration — needed **before** the cohort opens,
-    per Max's own stated blocker list.
-  - An age-verification provider — integration + test needed before
-    October 1.
-  - DMCA agent registration with the U.S. Copyright Office ($6, renews
-    every 3 years) — `/dmca` is live, but only actually enforceable
-    once this is done.
-  - `support@`/`privacy@`/`dmca@`/`safety@` email aliases — DNS/mail-
+- **Updated (2026-08-11, v0.36.1), legal package — build unblocked with
+  founder-approved v1 content; several real gaps remain, tracked here
+  so they don't get lost:**
+  - **Not a real legal entity yet.** Every document currently reads
+    "Obsidian Club (operated by `[legal entity — formation in
+    progress]`)" — needed **before** the cohort opens, per Max's own
+    stated blocker list.
+  - **No real notice address.** `[notice address — to be added]`
+    appears in the Terms, Privacy Policy, and DMCA policy — required
+    for the contact/notice provisions to actually function, and for
+    DMCA Copyright Office registration.
+  - **No DMCA agent identified or registered.** `/dmca` is live and
+    reads honestly (`[copyright agent name/title — to be designated]`,
+    phone `[to be added]`), but the process it describes isn't
+    actually actionable yet — needs a real named agent, a completed
+    $6 U.S. Copyright Office registration (renews every 3 years), and
+    the on-site info kept identical to that registration (see the
+    internal checklist in `legal/06-dmca-policy.md`'s Part B).
+  - **Arbitration administrator and venue county undecided** —
+    `[arbitration administrator — to be designated by counsel]` /
+    `[county — to be designated by counsel]` in the Terms §14/§15.
+  - **An age-verification provider** — the launch cohort uses manual
+    review by administration (now stated plainly in the Terms/Privacy
+    Policy, not a placeholder); a real third-party provider is still
+    needed before general availability, per the original plan.
+  - **The substantive `[LAWYER]`-flagged legal-judgment calls are
+    still open** — the §2257 explicit-content line, the CCPA
+    sensitive-personal-information classification, arbitration
+    severability strategy, and the others listed in each document's
+    "Attorney-review footnotes" section. These founder-approved v1
+    documents are published and functional, but not attorney-reviewed
+    — real counsel review is still needed before this is a final
+    Terms of Service, not just a build-passing one.
+  - `support@`/`privacy@`/`dmca@`/`safety@` are now the real addresses
+    referenced throughout the four public documents — DNS/mail-
     provider configuration (Resend, or wherever inbound mail for
-    `obsidianclub.online` is routed), not something this codebase can
-    configure. `safety@` per Max's spec needs a separate, monitored
-    notification — flagging that requirement here so it isn't lost,
-    but the actual routing setup is external.
+    `obsidianclub.online` is routed) to actually receive mail at them
+    is still needed; not something this codebase can configure.
+    `safety@` per Max's spec needs a separate, monitored notification —
+    flagging that requirement here so it isn't lost, but the actual
+    routing setup is external.
   - A review of Vercel's and Supabase's own acceptable-use terms
     against this platform's content — a compliance question for
     Max/his lawyer, not something to resolve in code.

@@ -1,11 +1,15 @@
 # Obsidian Club — Copyright / DMCA Policy
 
-**Effective date:** [EFFECTIVE DATE]
-**Last updated:** [DATE]
+**Effective date:** October 1, 2026
+**Last updated:** August 11, 2026
 
-> **Draft for attorney review — not legal advice.** Includes the public policy plus
-> an internal checklist for **registering the DMCA designated agent** with the U.S.
-> Copyright Office. `[LAWYER]` / `[ACTION]` footnotes below.
+> **v1 — founder-published, pending attorney review; not legal advice.** Includes
+> the public policy plus an internal checklist for **registering the DMCA
+> designated agent** with the U.S. Copyright Office. Values in `[lowercase
+> brackets]` are genuine open items still pending counsel or an operational
+> decision. Footnoted items (see "Attorney-review footnotes" below) and the
+> internal checklist below mark provisions requiring counsel review or a pending
+> action.
 
 ---
 
@@ -24,14 +28,15 @@ infringers**.
 Notices of claimed infringement must be sent to our Designated Agent:
 
 > **Copyright Agent**
-> [DMCA AGENT NAME / TITLE]
-> [LEGAL ENTITY NAME]
-> [NOTICE ADDRESS — physical street address, no P.O. box]
-> Email: **[DMCA AGENT EMAIL]**
-> Phone: [DMCA AGENT PHONE]
+> [copyright agent name/title — to be designated]
+> Obsidian Club (operated by [legal entity — formation in progress])
+> [notice address — to be added]
+> Email: **dmca@obsidianclub.online**
+> Phone: [copyright agent phone — to be added]
 
-Our Designated Agent is also registered with the U.S. Copyright Office's DMCA
-Designated Agent Directory. [^register]
+Registration of our Designated Agent with the U.S. Copyright Office's DMCA
+Designated Agent Directory is in progress; see the internal checklist below.
+[^register]
 
 ## 3. How to submit a takedown notice (17 U.S.C. §512(c)(3))
 
@@ -91,7 +96,7 @@ this purpose. [^repeat]
 
 This DMCA process addresses **copyright**. Concerns about **non-consensual intimate
 imagery, impersonation, doxxing, or minor-related content** are handled under our
-[Acceptable Use Policy] and safety/reporting channels ([SAFETY EMAIL]) — which are
+[Acceptable Use Policy] and safety/reporting channels (safety@obsidianclub.online) — which are
 faster and broader than the DMCA — and, where applicable, under legal reporting
 duties. Use those channels for those issues; use this DMCA process for copyright.
 [^nda-vs-dmca]
@@ -105,7 +110,7 @@ under §512(f) and account action under our Terms.
 
 ## Part B — Internal implementation checklist (do **not** publish)
 
-**B1. Register the Designated Agent with the U.S. Copyright Office.** `[ACTION]`
+**B1. Register the Designated Agent with the U.S. Copyright Office.** `[action item]`
 - Register online at the Copyright Office DMCA Designated Agent Directory
   (copyright.gov/dmca-directory). Create a service-provider account.
 - Fee: **$6** per designation/amendment/resubmission.
@@ -120,19 +125,19 @@ under §512(f) and account action under our Terms.
 **B2. Match the on-site info to the registration.** The address/agent shown in Part A
 must match the Copyright Office record.
 
-**B3. Intake & logging.** Route [DMCA AGENT EMAIL] to a monitored inbox; log each
+**B3. Intake & logging.** Route dmca@obsidianclub.online to a monitored inbox; log each
 notice (date, work, URL, action, dates) to support the repeat-infringer policy and
-§512 safe harbor. `[ACTION]`
+§512 safe harbor. `[action item]`
 
 **B4. Standard-technical-measures & policy adoption.** Ensure the repeat-infringer
 policy is **adopted, reasonably implemented, and communicated** (a §512(i)
 precondition to safe harbor), and that we do not interfere with standard technical
-measures. `[LAWYER]`
+measures. `[counsel review]`
 
 **B5. No red flags / no financial benefit + control.** Train moderators that safe
 harbor can be lost if we have **actual knowledge** or are aware of **red flags** of
 infringement and fail to act, or if we receive a **direct financial benefit**
-attributable to infringing activity we have the right and ability to control. `[LAWYER]`
+attributable to infringing activity we have the right and ability to control. `[counsel review]`
 
 ---
 

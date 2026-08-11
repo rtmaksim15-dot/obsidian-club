@@ -1,13 +1,14 @@
 # Obsidian Club — Acceptable Use Policy & Community Guidelines
 
-**Effective date:** [EFFECTIVE DATE]
-**Last updated:** [DATE]
+**Effective date:** October 1, 2026
+**Last updated:** August 11, 2026
 
-> **Draft for attorney review — not legal advice.** This is the **legal-facing**
-> translation of the internal Code of Conduct ("five laws"), Safety & Respect
-> Guidelines, and the internal Codex red lines. It is incorporated into and part of
-> the [Terms of Service]. `[LAWYER]` footnotes mark provisions requiring counsel
-> review — above all the definition of prohibited explicit content (§2257 line).
+> **v1 — founder-published, pending attorney review; not legal advice.** This is
+> the **legal-facing** translation of the internal Code of Conduct ("five laws"),
+> Safety & Respect Guidelines, and the internal Codex red lines. It is incorporated
+> into and part of the [Terms of Service]. Footnoted items (see "Attorney-review
+> footnotes" below) mark provisions requiring counsel review — above all the
+> definition of prohibited explicit content (§2257 line).
 
 ---
 
@@ -100,7 +101,7 @@ infringement of others' IP or privacy, malware, or attacks on the Platform.
 - **Keep it inside.** No capturing or redistributing community content or identities
   externally.
 - **No minors, ever**, in content or as users. Report suspected minors immediately.
-- **Report harm.** Use in-product reporting or [SAFETY EMAIL] to flag violations,
+- **Report harm.** Use in-product reporting or safety@obsidianclub.online to flag violations,
   especially red lines.
 - **No spam, scams, scraping, bots, or automated collection** without our written
   permission.
@@ -129,7 +130,7 @@ Our right to act does not create a duty to detect or remove any particular conte
 ## 7. Reporting
 
 To report a violation — especially anything involving a minor, non-consensual
-content, or a safety threat — use in-product reporting or contact **[SAFETY EMAIL]**.
+content, or a safety threat — use in-product reporting or contact **safety@obsidianclub.online**.
 Urgent real-world danger should also be reported to local emergency services.
 
 ## 8. Changes

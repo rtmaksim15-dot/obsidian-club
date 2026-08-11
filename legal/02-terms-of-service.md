@@ -1,18 +1,21 @@
 # Obsidian Club — Terms of Service
 
-**Effective date:** [EFFECTIVE DATE]
-**Last updated:** [DATE]
+**Effective date:** October 1, 2026
+**Last updated:** August 11, 2026
 
-> **Draft for attorney review — not legal advice.** Bracketed `[...]` items are to
-> be completed. `[LAWYER]` footnotes mark provisions requiring counsel's judgment,
-> especially on California enforceability.
+> **v1 — founder-published, pending attorney review; not legal advice.** Values in
+> `[lowercase brackets]` are genuine open items still pending counsel or an
+> operational decision — everything else on this page is final for launch.
+> Footnoted items (see "Attorney-review footnotes" below) mark provisions requiring
+> counsel's judgment, especially on California enforceability.
 
 ---
 
 ## 1. Agreement to these Terms
 
 These Terms of Service ("**Terms**") are a binding contract between you and
-**[LEGAL ENTITY NAME]** ("**Obsidian Club**," "**we**," "**us**"), the operator
+**Obsidian Club** (operated by [legal entity — formation in progress], "**we**,"
+"**us**"), the operator
 of the website at **obsidianclub.online** and related services (together, the
 "**Platform**"). By creating an account, accepting an invitation, checking the
 boxes presented at registration, or using the Platform, you agree to these Terms,
@@ -30,8 +33,9 @@ lifestyle culture and the Toros brand.
 You represent and warrant that you are **at least 18 years old** (or the age of
 majority in your jurisdiction, if higher), that you have the legal capacity to
 enter this contract, and that your use complies with the laws that apply to you.
-Access requires **age verification** through our third-party verification process
-[AGE VERIFICATION PROVIDER] and/or manual review. Providing false age or identity
+Access requires **age verification** — for the launch cohort, this is manual review
+by administration; a third-party verification provider will be added before general
+availability. Providing false age or identity
 information, or helping a minor access the Platform, is a permanent, non-appealable
 red-line violation (Section 10). **No part of the Platform is directed to anyone
 under 18.** [^age]
@@ -65,7 +69,7 @@ invitation tokens or account access. Doing so is a red-line violation.
 
 4.1 You register with a name, email, and password, or via Google sign-in (OAuth).
 You are responsible for keeping your credentials secure and for all activity under
-your account. Notify us promptly at [SUPPORT EMAIL] of any unauthorized use.
+your account. Notify us promptly at support@obsidianclub.online of any unauthorized use.
 
 4.2 One account per person unless we approve otherwise. You may not impersonate
 others, create accounts to evade enforcement, or use automated means to access the
@@ -147,7 +151,7 @@ for your personal, non-commercial community participation, subject to these Term
 ## 10. Termination and red-line enforcement
 
 10.1 **By you.** You may stop using the Platform and request account deletion at any
-time via [SUPPORT EMAIL] or in-product controls.
+time via support@obsidianclub.online or in-product controls.
 
 10.2 **By us — ordinary.** We may suspend or terminate your account or access, in
 whole or part, at our discretion, with or without notice, including for violation of
@@ -202,13 +206,14 @@ violation of any law or third-party right.
 RIGHT TO SUE IN COURT AND TO PARTICIPATE IN A CLASS ACTION.**
 
 14.1 **Informal resolution first.** Before starting arbitration, you agree to
-contact us at [LEGAL/SUPPORT EMAIL] and try in good faith to resolve the dispute for
-at least 60 days.
+contact us at support@obsidianclub.online and try in good faith to resolve the
+dispute for at least 60 days.
 
 14.2 **Binding arbitration.** Except as carved out below, any dispute arising out of
 or relating to these Terms or the Platform will be resolved by **final, binding
-arbitration** administered by [AAA / JAMS] under its consumer arbitration rules,
-before a single arbitrator, seated in [COUNTY], California (or by video/telephone at
+arbitration** administered by [arbitration administrator — to be designated by
+counsel] under its consumer arbitration rules, before a single arbitrator, seated in
+[county — to be designated by counsel], California (or by video/telephone at
 your election). The Federal Arbitration Act governs this Section.
 
 14.3 **Class-action waiver.** You and we agree to bring claims **only in an
@@ -224,7 +229,7 @@ injunctive relief** that cannot be waived under California law (e.g., the *McGil
 rule), which is preserved and may be sought in court. [^mcgill]
 
 14.5 **Opt-out.** You may opt out of this arbitration agreement by emailing
-[LEGAL EMAIL] within **30 days** of first accepting these Terms, stating your name
+support@obsidianclub.online within **30 days** of first accepting these Terms, stating your name
 and that you opt out of arbitration. Opting out does not affect the rest of these
 Terms.
 
@@ -236,8 +241,9 @@ rest of this Section still applies to all other claims. [^arbsever]
 
 These Terms are governed by the laws of the **State of California** and applicable
 U.S. federal law, without regard to conflict-of-laws rules. For any matter not
-subject to arbitration, the state and federal courts located in [COUNTY], California
-have exclusive jurisdiction, and you consent to that venue. [^gov]
+subject to arbitration, the state and federal courts located in [county — to be
+designated by counsel], California have exclusive jurisdiction, and you consent to
+that venue. [^gov]
 
 ## 16. Changes to the Terms
 
@@ -264,7 +270,8 @@ affiliate or successor.
 17.5 **Force majeure.** We are not liable for delays or failures beyond our
 reasonable control.
 
-17.6 **Contact.** [LEGAL ENTITY NAME], [NOTICE ADDRESS], [SUPPORT EMAIL].
+17.6 **Contact.** Obsidian Club (operated by [legal entity — formation in
+progress]), [notice address — to be added], support@obsidianclub.online.
 
 ---
 

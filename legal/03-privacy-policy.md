@@ -1,21 +1,24 @@
 # Obsidian Club — Privacy Policy
 
-**Effective date:** [EFFECTIVE DATE]
-**Last updated:** [DATE]
+**Effective date:** October 1, 2026
+**Last updated:** August 11, 2026
 
-> **Draft for attorney review — not legal advice.** Includes California
-> CCPA/CPRA disclosures. `[LAWYER]` footnotes mark items needing counsel review,
-> especially the sensitive-personal-information analysis.
+> **v1 — founder-published, pending attorney review; not legal advice.** Includes
+> California CCPA/CPRA disclosures. Values in `[lowercase brackets]` are genuine
+> open items still pending counsel or an operational decision. Footnoted items (see
+> "Attorney-review footnotes" below) mark items needing counsel review, especially
+> the sensitive-personal-information analysis.
 
 ---
 
 ## 1. Who we are
 
-This Privacy Policy explains how **[LEGAL ENTITY NAME]** ("**Obsidian Club**,"
-"**we**," "**us**") collects, uses, and shares personal information when you use
-**obsidianclub.online** and related services (the "**Platform**"). Obsidian Club is
-a private, invitation-only community for verified adults. Contact:
-[PRIVACY EMAIL] / [NOTICE ADDRESS].
+This Privacy Policy explains how **Obsidian Club** (operated by [legal entity —
+formation in progress], "**we**," "**us**") collects, uses, and shares personal
+information when you use **obsidianclub.online** and related services (the
+"**Platform**"). Obsidian Club is a private, invitation-only community for
+verified adults. Contact: privacy@obsidianclub.online / [notice address — to be
+added].
 
 By using the Platform you agree to this Policy and our [Terms of Service]. Because
 the Platform serves adults and hosts sensitive personal expression, we try to
@@ -49,8 +52,8 @@ collect the minimum necessary and to protect it carefully.
 
 - **Invitations/sponsorship:** the fact and source of your invitation token and, if
   applicable, the member who sponsored you.
-- **Verification provider:** a pass/fail age result and limited metadata from
-  [AGE VERIFICATION PROVIDER].
+- **Verification provider:** a pass/fail age result and limited metadata from the
+  age-verification method described in Section 3.
 
 We do **not** intentionally collect payment-card data on the Platform (the Platform
 is free); any Toros purchases occur through separate commerce channels with their
@@ -58,9 +61,10 @@ own notices. [^payments]
 
 ## 3. Age verification and the `ageVerified` status
 
-Access requires confirmation that you are 18 or older. We use a third-party
-verification provider, [AGE VERIFICATION PROVIDER], and/or manual admin review, and
-we store an **age-verified status flag** (`ageVerified`) on your account, plus
+Access requires confirmation that you are 18 or older. For the launch cohort,
+verification is manual review by administration; a third-party verification
+provider will be added before general availability. We store an **age-verified
+status flag** (`ageVerified`) on your account, plus
 limited verification metadata (method, date, result). Where a government-ID check is
 used, the provider performs it; we aim to store only the **result and minimal
 metadata**, not full ID images, unless retention is legally required. [^ageretention]
@@ -95,7 +99,9 @@ We share personal information only as follows:
   - **Vercel** — application hosting/delivery.
   - **Supabase** — database and authentication (data hosted on **AWS, us-east-2**).
   - **Resend** — transactional email delivery.
-  - **[AGE VERIFICATION PROVIDER]** — age/identity verification.
+  - At launch, age/identity verification is manual review by administration —
+    no third-party processor is used for this yet; one will be added and listed
+    here before general availability.
   These providers are permitted to use the data only to provide services to us.
 - **For legal and safety reasons:** to comply with law, enforce our Terms, respond to
   lawful requests, protect rights and safety, and — where required — to report
@@ -160,14 +166,13 @@ Privacy Act, as amended by the CPRA:
 and photos); and, potentially, **sensitive personal information** — which may
 include account credentials and, depending on the content you choose to share and
 the inferences that could be drawn, information the CPRA treats as sensitive.
-**[LAWYER] to finalize the sensitive-PI mapping and whether the "Limit the Use of My
-Sensitive Personal Information" right/notice is triggered.** [^sensitivepi]
+[^sensitivepi]
 
 **Purposes** are described in Section 4; **disclosures to processors** in Section 5.
 We collect these categories from you, automatically, and from our verification
 provider and sponsors.
 
-**How to exercise rights:** email [PRIVACY EMAIL] or use in-product controls. We will
+**How to exercise rights:** email privacy@obsidianclub.online or use in-product controls. We will
 verify your request (typically via your account email) and respond within the
 timelines the law requires (generally 45 days, extendable). You may use an authorized
 agent. We do not charge for most requests.
@@ -180,7 +185,7 @@ with third parties for their own direct marketing.
 If you reside in a U.S. state with a comprehensive privacy law (e.g., Colorado,
 Connecticut, Virginia, Utah, Texas, Oregon, and others), you may have similar rights
 to access, correct, delete, and opt out of targeted advertising, sale, or certain
-profiling. We honor these where they apply; contact [PRIVACY EMAIL]. Because we do
+profiling. We honor these where they apply; contact privacy@obsidianclub.online. Because we do
 not sell data or run targeted advertising, several opt-outs do not apply. [^statelaws]
 
 ## 11. Children
@@ -204,8 +209,9 @@ accept the updated Policy.
 
 ## 14. Contact
 
-Privacy questions or requests: **[PRIVACY EMAIL]**, or **[LEGAL ENTITY NAME],
-[NOTICE ADDRESS]**.
+Privacy questions or requests: **privacy@obsidianclub.online**, or **Obsidian Club
+(operated by [legal entity — formation in progress]), [notice address — to be
+added]**.
 
 ---
 

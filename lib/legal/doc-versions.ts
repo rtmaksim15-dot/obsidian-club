@@ -4,7 +4,7 @@
 // current version for any of the three, they see the re-consent
 // interstitial on next login.
 export const LEGAL_DOC_VERSIONS = {
-  terms: "2026-08-10.0",
-  privacy: "2026-08-10.0",
-  aup: "2026-08-10.0",
+  terms: "2026-08-11.0",
+  privacy: "2026-08-11.0",
+  aup: "2026-08-11.0",
 } as const;

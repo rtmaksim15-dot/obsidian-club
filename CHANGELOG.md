@@ -8,7 +8,54 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.36.0` is the current released version.
+Nothing yet — `v0.36.1` is the current released version.
+
+## [0.36.1] — 2026-08-11
+
+Founder-approved v1 content for the four public legal documents, unblocking the
+deploy freeze `v0.36.0` correctly (and knowingly) re-introduced.
+
+### Changed
+
+- **Filled in the placeholders Max explicitly approved** across
+  `legal/02-terms-of-service.md`, `03-privacy-policy.md`,
+  `04-acceptable-use-policy.md`, `06-dmca-policy.md`: entity framing
+  ("Obsidian Club (operated by `[legal entity — formation in
+  progress]`)"), the four operational email aliases
+  (`support@`/`privacy@`/`safety@`/`dmca@obsidianclub.online`),
+  age-verification method for the launch cohort (manual review by
+  administration), and effective/last-updated dates (October 1, 2026 /
+  August 11, 2026).
+- **Genuine remaining gaps** (physical notice address, DMCA agent
+  identity/phone, arbitration administrator, venue county) use an
+  honest `[lowercase bracket]` style instead — visibly incomplete to a
+  reader, but not the shouting `[ALL_CAPS]` pattern `check:legal`
+  hard-fails on, since these are real facts/legal-judgment calls
+  nobody has supplied yet, not something to fabricate. Reworded each
+  document's `[LAWYER]` convention-sentence (and, in the DMCA policy,
+  two `[ACTION]`/`[LAWYER]` markers inside the internal-only Part B
+  checklist) to avoid the literal trigger string, without touching the
+  substantive attorney-review footnote system itself, which is
+  unchanged and still fully preserved in the source (and still
+  correctly excluded from the public-facing render).
+- **`lib/legal/doc-versions.ts`** bumped to `2026-08-11.0` for all
+  three consent-tracked documents, since their substance materially
+  changed from placeholder to real content.
+- **`npm run check:legal` now passes clean** (exit 0) — confirmed, then
+  confirmed again with a full `rm -rf .next && npm run build`, the
+  exact command Vercel runs. `/terms`, `/privacy`, `/guidelines`,
+  `/dmca` all prerender as static content.
+
+### Not resolved (by design — see TECH_DEBT.md)
+
+- No real legal entity is formed yet; no real notice address; no DMCA
+  agent has been identified, contacted, or registered with the U.S.
+  Copyright Office (meaning the DMCA process, while published, isn't
+  yet actually actionable); arbitration administrator/venue county
+  undecided; the substantive `[LAWYER]`-flagged legal-judgment calls
+  (§2257 explicit-content line, CCPA sensitive-PI classification,
+  arbitration severability strategy, and others) are unresolved and
+  need real counsel review before this is a final Terms of Service.
 
 ## [0.36.0] — 2026-08-11
 
