@@ -6,11 +6,13 @@
 > If you find a mismatch that ISN'T explained by a linked ADR, that's a
 > conflict: stop and flag it (see [docs/README.md](README.md)).
 
-Current version: **v0.7.0** (CLAUDE.md v2 Migration). `package.json`'s
-`version` field is the single source of truth for the current version
-number. See [ADR-0015](ADR/0015-claude-md-v2-full-replacement.md) for
-why `v0.7` renamed levels, replaced the reputation engine, and
-restructured navigation mid-stream.
+`package.json`'s `version` field is the single source of truth for the
+current version number — see [CHANGELOG.md](../CHANGELOG.md) for what
+shipped in each release. See
+[ADR-0015](ADR/0015-claude-md-v2-full-replacement.md) for why `v0.7`
+renamed levels, replaced the reputation engine, and restructured
+navigation mid-stream — the single biggest architectural discontinuity
+this document's "as-built" framing exists to track.
 
 ## Stack (as actually installed)
 

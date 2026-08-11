@@ -8,7 +8,40 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.36.1` is the current released version.
+Nothing yet — `v0.36.2` is the current released version.
+
+## [0.36.2] — 2026-08-11
+
+Pre-launch cleanup 3 (docs & repo hygiene) and 4 (final gate).
+
+### Fixed
+
+- **README.md and docs/Architecture.md both claimed "Current version:
+  v0.7.0"** and README.md said "the only real page right now is the
+  landing page" — both untouched since roughly `v0.7`, over two dozen
+  releases and a full member-facing platform ago. Removed the hardcoded
+  version claims (Architecture.md already stated its own policy that
+  `package.json` is the source of truth — it just didn't follow it) and
+  updated README's page inventory to name the real areas: `(platform)`
+  routes, the public legal pages, and the auth/invite flows.
+- **BACKLOG.md's "Now" and "Next" sections still listed Uploadthing as
+  an open blocker** ("Uploadthing account + real
+  `UPLOADTHING_SECRET`/`UPLOADTHING_APP_ID` (blocked — needs Max's
+  account)") and described avatar upload as "wired (uploadthing),
+  unverified" — both obsolete since avatar upload moved to Supabase
+  Storage on 2026-07-20 (already correctly documented as resolved
+  further down the same file, and in `TECH_DEBT.md`/`CLAUDE.md` — just
+  never updated at the point of first mention). Struck through /
+  corrected in place; did not otherwise reorganize `BACKLOG.md`'s
+  historical Now/Next/Later structure, per the file's own stated rule
+  that items only move between sections with Max's approval.
+
+### Verified
+
+- `npm run check:rls` — RLS enabled on all 29 tables.
+- `npx tsc --noEmit` — clean.
+- `rm -rf .next && npm run build` — clean, all routes (including the
+  four new legal pages) build correctly.
 
 ## [0.36.1] — 2026-08-11
 

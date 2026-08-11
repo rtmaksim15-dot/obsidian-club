@@ -1,7 +1,10 @@
 # Obsidian Club
 
-A closed, premium community platform. Current version: **v0.7.0**
-(CLAUDE.md v2 Migration) — see [CHANGELOG.md](CHANGELOG.md).
+A closed, premium community platform. See
+[CHANGELOG.md](CHANGELOG.md) for the current version and what shipped
+in each release (`package.json`'s `version` field is the source of
+truth — this file deliberately doesn't hardcode it, see
+docs/Architecture.md's note on why that goes stale).
 
 ## Documentation first
 
@@ -29,8 +32,13 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The only real page
-right now is the landing page (`app/(landing)/page.tsx`).
+Open [http://localhost:3000](http://localhost:3000). Real member-facing
+areas include the landing page (`app/(landing)/page.tsx`), authenticated
+platform routes under `app/(platform)/` (feed, hall, rooms, vault, houses,
+profile, admin, ritual, codex — gated by `middleware.ts`), the public
+legal pages (`/terms`, `/privacy`, `/guidelines`, `/dmca`), and the
+registration/invite flows under `app/(auth)/`. See
+[docs/Architecture.md](docs/Architecture.md) for the full current map.
 
 ```bash
 npm run build   # production build

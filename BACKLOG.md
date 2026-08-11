@@ -59,8 +59,9 @@ unilaterally.
       `DECISIONS.md`.
 - [ ] Resend account + verified sending domain + real `RESEND_API_KEY`
       (blocked — needs Max's account)
-- [ ] Uploadthing account + real `UPLOADTHING_SECRET`/`UPLOADTHING_APP_ID`
-      (blocked — needs Max's account; needed to verify avatar upload)
+- [x] ~~Uploadthing account~~ — obsolete, 2026-07-20: avatar upload moved
+      to Supabase Storage (no separate account needed). See below and
+      `TECH_DEBT.md`.
 - [ ] Set `NEXT_PUBLIC_APP_URL` in Vercel once the domain is live (see
       `TECH_DEBT.md`)
 - [x] ~~**Max to provide real content** for Initiation Ritual steps 2/3/5:
@@ -101,8 +102,7 @@ unilaterally.
 ## Next
 
 *`v0.2` and `v0.3` are functionally complete (code-wise) — verification
-blocked on the same Supabase/Resend/Uploadthing accounts listed in "Now"
-above.*
+blocked on the same Supabase/Resend accounts listed in "Now" above.*
 
 ### v0.2 — Authentication ✅ (built 2026-07-02, unverified end-to-end)
 
@@ -118,7 +118,9 @@ above.*
       [ADR-0012](docs/ADR/0012-waitlist-status-tracking.md).
 - [x] Basic member profile — `/profile/[id]`, real data, no tabs yet
       (deferred to `v0.3`).
-- [x] Avatar upload — wired (uploadthing), unverified without real keys.
+- [x] Avatar upload — originally wired via Uploadthing (unverified,
+      never provisioned); moved to Supabase Storage 2026-07-20 and
+      verified live. See below.
 - [x] Level system live in the database — approval sets Level I directly;
       **the Initiation Ritual gate is simplified/deferred**, see
       `TECH_DEBT.md`.
