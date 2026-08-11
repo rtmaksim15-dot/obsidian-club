@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/auth/supabase-admin";
 import { generateReferralCode, generateUsernameFromEmail } from "@/lib/utils/codes";
 import { track } from "@/lib/analytics/track";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
+import { recordLegalConsent } from "@/lib/legal/record-consent";
 
 // Same transient-JWKS-staleness workaround as app/api/invite/[token]/route.ts.
 async function withRetry<R extends { error: unknown }>(fn: () => Promise<R>): Promise<R> {
@@ -27,7 +28,14 @@ async function findAuthUserByEmail(admin: ReturnType<typeof createAdminClient>, 
   return null;
 }
 
-type Body = { name?: string; email?: string; password?: string };
+type Body = {
+  name?: string;
+  email?: string;
+  password?: string;
+  ageConfirmed?: boolean;
+  termsAccepted?: boolean;
+  aupAccepted?: boolean;
+};
 
 // POST /api/join/:token — redeems a purchase-card, member-invite, or
 // partner InviteToken (Invitation & Partner system v1,
@@ -77,6 +85,13 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
   }
   if (!password || password.length < 8) {
     return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 422 });
+  }
+  // Registration consent (Block 4, 2026-08-10) — the UI disables submit
+  // until all three are checked, but that's trivially bypassable via a
+  // direct API call, same reasoning as the imageConsent re-check in
+  // app/api/posts/route.ts.
+  if (!body.ageConfirmed || !body.termsAccepted || !body.aupAccepted) {
+    return NextResponse.json({ error: "You must accept all three agreements to continue." }, { status: 422 });
   }
 
   const existingMember = await prisma.user.findUnique({ where: { email } });
@@ -186,6 +201,8 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
       type: "auth.signup",
       meta: { provider: linkedExistingIdentity ? `join-linked-existing:${invite.source}` : `join:${invite.source}` },
     });
+
+    await recordLegalConsent(newUserId, getClientIp(request));
   } catch (err) {
     console.error(
       `[join] Settled ${email} in Supabase Auth (user id ${authUserId}) but failed to write the matching rows — needs manual reconciliation:`,

@@ -198,7 +198,8 @@ export default function ContentComposer({ houses = [] }: Props) {
               className="mt-0.5"
             />
             <span className="text-caption" style={{ color: "var(--color-text-secondary)" }}>
-              All depicted are adults who consented to this publication.
+              Everyone shown is a consenting adult (18+), and I have their specific, informed, revocable consent
+              to post this here.
             </span>
           </label>
         </div>

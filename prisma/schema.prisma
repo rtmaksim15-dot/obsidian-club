@@ -214,6 +214,7 @@ model User {
   blocksInitiated            Block[]           @relation("BlocksInitiated")
   blocksReceived             Block[]           @relation("BlocksReceived")
   moderationActions          ModerationAction[]
+  legalConsents              LegalConsent[]
 
   @@map("users")
 }
@@ -868,4 +869,32 @@ model ModerationAction {
 
   @@index([targetType, targetId])
   @@map("moderation_actions")
+}
+
+// One row per consent EVENT, not per user — append-only, same shape as
+// RepHistory/AnalyticsEvent/ModerationAction. Covers the three
+// registration-time checkboxes (Block 4, 2026-08-10): the age/identity
+// affirmation has no associated document version, but by the time a row
+// exists here all three were checked (submit is disabled until they
+// are), so its existence alone is the record of that one. `*Version`
+// values come from lib/legal/doc-versions.ts, bumped by hand whenever
+// the corresponding /legal/*.md file changes materially — a member
+// whose latest row predates the current version is shown the
+// re-consent interstitial on next login. Code of Conduct / Safety &
+// Respect Guidelines acceptance is tracked separately in
+// UserProfile.ritualProgress (pre-existing, unrelated to this legal
+// package) — not duplicated here.
+model LegalConsent {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  termsVersion   String   @map("terms_version")
+  privacyVersion String   @map("privacy_version")
+  aupVersion     String   @map("aup_version")
+  acceptedAt     DateTime @default(now()) @map("accepted_at")
+  acceptedIp     String?  @map("accepted_ip")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("legal_consents")
 }

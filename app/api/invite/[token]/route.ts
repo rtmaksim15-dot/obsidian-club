@@ -6,6 +6,7 @@ import { generateReferralCode, generateUsernameFromEmail } from "@/lib/utils/cod
 import { awardRep, REP_TABLE } from "@/lib/rating/rep-engine";
 import { track } from "@/lib/analytics/track";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
+import { recordLegalConsent } from "@/lib/legal/record-consent";
 
 // Supabase's Admin API has intermittently returned a transient
 // "unrecognized JWT kid" / bad_jwt error on individual admin calls in
@@ -42,7 +43,13 @@ async function findAuthUserByEmail(admin: ReturnType<typeof createAdminClient>, 
   return null;
 }
 
-type Body = { name?: string; password?: string };
+type Body = {
+  name?: string;
+  password?: string;
+  ageConfirmed?: boolean;
+  termsAccepted?: boolean;
+  aupAccepted?: boolean;
+};
 
 // POST /api/invite/:token — redeems a one-time invite token (Closed
 // Registration & Invite System, 2026-07-17): creates the real account
@@ -93,6 +100,11 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
   }
   if (!password || password.length < 8) {
     return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 422 });
+  }
+  // Registration consent (Block 4, 2026-08-10) — same server-side
+  // re-check as app/api/join/[token]/route.ts.
+  if (!body.ageConfirmed || !body.termsAccepted || !body.aupAccepted) {
+    return NextResponse.json({ error: "You must accept all three agreements to continue." }, { status: 422 });
   }
 
   const supabaseAdmin = createAdminClient();
@@ -223,6 +235,8 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
       type: "auth.signup",
       meta: { provider: linkedExistingIdentity ? "invite-linked-existing" : "invite" },
     });
+
+    await recordLegalConsent(user.id, getClientIp(request));
 
     // CLAUDE.md (2026-07-05) REP bonuses — side effects, not the main
     // job, never allowed to fail the request.

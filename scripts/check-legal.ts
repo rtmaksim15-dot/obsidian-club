@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { parseFrontmatter } from "../lib/legal/frontmatter";
+import { parseLegalDocMeta } from "../lib/legal/parse-document";
 
 // Legal-package safety check (pre-launch cleanup 3, Block 3, 2026-08-09;
 // severity split 2026-08-10) — same "trip-wire" pattern as
@@ -38,23 +38,23 @@ type Problem = { file: string; issue: string };
 function checkPublicFile(filePath: string, relPath: string): Problem[] {
   const problems: Problem[] = [];
   const raw = fs.readFileSync(filePath, "utf8");
-  const { data, content } = parseFrontmatter(raw);
+  const meta = parseLegalDocMeta(raw);
 
   const placeholders = new Set<string>();
-  for (const m of Array.from(content.matchAll(PLACEHOLDER_PATTERN))) {
+  for (const m of Array.from(raw.matchAll(PLACEHOLDER_PATTERN))) {
     if (m[1] !== "LAWYER") placeholders.add(m[0]);
   }
   if (placeholders.size > 0) {
     problems.push({ file: relPath, issue: `Unfilled placeholder(s): ${Array.from(placeholders).join(", ")}` });
   }
 
-  if (content.includes("[LAWYER")) {
+  if (raw.includes("[LAWYER")) {
     problems.push({ file: relPath, issue: "Contains a [LAWYER ...] footnote — strip before publishing." });
   }
 
-  const effectiveDate = data.effective_date?.trim();
+  const effectiveDate = meta.effectiveDate;
   if (!effectiveDate || /^\[.*\]$/.test(effectiveDate)) {
-    problems.push({ file: relPath, issue: "Missing or placeholder `effective_date` in frontmatter." });
+    problems.push({ file: relPath, issue: "Missing or placeholder `**Effective date:**`." });
   }
 
   return problems;

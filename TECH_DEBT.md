@@ -638,25 +638,28 @@ whether a component references it). See `DECISIONS.md`, 2026-07-04.
   data-layer admin calls. Until this toggle is off, closed registration
   isn't airtight at the infrastructure level, even though every path
   inside the app itself is now closed. See DECISIONS.md, 2026-07-17.
-- **New (2026-08-09), legal package — none of this is app code:**
-  - The actual 9 legal document markdown files (public: Terms of
-    Service, Privacy Policy, Acceptable Use Policy, DMCA Policy,
-    Registration Consent Clickwrap; internal: plan/risk assessment,
-    decisions/parameters, 2257/2257A memo, Section 230 memo) —
-    `/legal/` currently holds `[DRAFT_PENDING]`/`[LAWYER ...]`
-    placeholder stubs only (see `scripts/check-legal.ts`, which reports
-    problems in these stubs as warnings — it only hard-fails the build
-    once a given public document is actually wired to a route; see
-    v0.35.1 in CHANGELOG.md for why the earlier unconditional hard-fail
-    had to be relaxed). Real content needs to come from Max/his lawyer —
-    not something to draft here.
+- **Updated (2026-08-11), legal package — the app-code side is now
+  built; what's left is genuinely external:**
+  - **`npm run build` / Vercel deploys are hard-blocked right now** by
+    `scripts/check-legal.ts` — `/terms`, `/privacy`, `/guidelines`, and
+    `/dmca` (v0.36.0) are wired to real routes rendering the real
+    attorney-drafted documents, and those documents still have real
+    unfilled `[BRACKET]` placeholders (`[LEGAL ENTITY NAME]`,
+    `[SUPPORT EMAIL]`, `[EFFECTIVE DATE]`, `[NOTICE ADDRESS]`,
+    `[AGE VERIFICATION PROVIDER]`, `[AAA / JAMS]`, `[COUNTY]`, several
+    more per-document — run `npm run check:legal` for the exact current
+    list) and `[LAWYER ...]` notes. This is the gate working exactly as
+    designed (see DECISIONS.md, v0.35.1 and v0.36.0 entries) — it stays
+    blocked until Max/his lawyer supply the real values and the
+    `[LAWYER ...]` notes are resolved/removed. Editing the *wording* of
+    these documents is a legal decision, not something to touch here.
   - Business entity registration — needed **before** the cohort opens,
     per Max's own stated blocker list.
   - An age-verification provider — integration + test needed before
     October 1.
   - DMCA agent registration with the U.S. Copyright Office ($6, renews
-    every 3 years) — the `/dmca` page (once real content exists) is
-    only actually enforceable once this is done.
+    every 3 years) — `/dmca` is live, but only actually enforceable
+    once this is done.
   - `support@`/`privacy@`/`dmca@`/`safety@` email aliases — DNS/mail-
     provider configuration (Resend, or wherever inbound mail for
     `obsidianclub.online` is routed), not something this codebase can
@@ -666,6 +669,10 @@ whether a component references it). See `DECISIONS.md`, 2026-07-04.
   - A review of Vercel's and Supabase's own acceptable-use terms
     against this platform's content — a compliance question for
     Max/his lawyer, not something to resolve in code.
+  - `/2257` (the voluntary 18 U.S.C. §2257 compliance statement,
+    sourced from the internal memo's §6) was in the original page list
+    but wasn't part of this pass's explicit "Blocks 2 and 4" scope —
+    not built yet.
 
 These aren't "debt" in the sense of a shortcut taken — they're
 external dependencies the implementer has no way to self-serve. Tracked

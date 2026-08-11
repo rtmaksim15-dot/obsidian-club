@@ -8,7 +8,104 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.35.1` is the current released version.
+Nothing yet — `v0.36.0` is the current released version.
+
+## [0.36.0] — 2026-08-11
+
+Legal package, Blocks 2 and 4: real attorney-drafted content, public legal pages,
+and registration consent-versioning.
+
+### Added
+
+- **Real legal document content** — the 9 real files (found at Max's iCloud
+  path) replace the `[DRAFT_PENDING]` placeholder stubs from `v0.35.0`:
+  `legal/02-terms-of-service.md`, `03-privacy-policy.md`,
+  `04-acceptable-use-policy.md`, `06-dmca-policy.md`,
+  `07-registration-consent-clickwrap.md` (public); `legal/internal/00-…`,
+  `01-…`, `05-…`, `08-…` (internal). Every document still has real,
+  unfilled `[BRACKET]` placeholders (`[LEGAL ENTITY NAME]`,
+  `[SUPPORT EMAIL]`, `[EFFECTIVE DATE]`, etc.) and `[LAWYER ...]` notes —
+  that's expected, not a bug; see the `check:legal` note below.
+- **`lib/legal/parse-document.ts`** replaces the old YAML-frontmatter
+  `lib/legal/frontmatter.ts` (deleted, no longer used) — the real files
+  use a plain bold-label convention (`# Title` / `**Effective date:**` /
+  `**Last updated:**`) instead of the invented frontmatter format the
+  stubs used. `extractPublicBody()` strips the draft-disclaimer
+  blockquote and the trailing "Attorney-review footnotes" section for
+  public rendering, and — specifically for the DMCA policy, whose
+  source file bundles a public Part A with an internal-only Part B
+  registration checklist in the same document — excludes everything
+  from `## Part B` onward.
+- **Public legal pages** — `/terms`, `/privacy`, `/guidelines`, `/dmca`
+  (new `(legal)` route group, no auth required — not in
+  `middleware.ts`'s `PROTECTED_PREFIXES`). `components/legal/LegalMarkdown.tsx`
+  is a small dependency-free markdown-to-JSX renderer scoped to what these
+  four documents actually use (headings, bold, blockquotes, lists), plus
+  two things generic markdown doesn't do: dropping `[^footnote]`
+  reference markers and turning known cross-document references like
+  `[Terms of Service]` into real links between the four pages (and one
+  to the existing `/codex` page for the Code of Conduct reference).
+  Quiet footer links added to the landing page and to every legal page.
+  `/2257` was in the original page-count discussion but wasn't part of
+  this pass's explicit scope (only 4 routes named) — not built.
+- **`check:legal` now correctly hard-fails again** for these four
+  documents, since wiring them to real routes is exactly the trigger
+  condition `v0.35.1`'s severity split was built around — publishing
+  placeholder legal text is still impossible. This **will block Vercel
+  deploys** until Max/his lawyer fill in the real placeholder values;
+  see DECISIONS.md for why this is the correct, by-design outcome, not
+  a repeat of the `v0.35.1` incident.
+- **Registration consent (clickwrap)** — the three real checkboxes from
+  `07-registration-consent-clickwrap.md` §2 (age/identity;
+  Terms+Privacy incl. arbitration/class-waiver; AUP+Code of
+  Conduct+Safety Guidelines+red lines), exact wording, unchecked by
+  default, submit disabled until all three are checked, document names
+  linked to the new legal pages. New shared
+  `components/shared/RegistrationConsentFields.tsx`, wired into both
+  real account-creation forms — `JoinRegistrationForm` and
+  `InviteRegistrationForm` (`/join/[token]` and `/invite/[token]`) — not
+  `/apply`, which turned out to have no registration form at all (it's
+  a Waitlist-application status page); Google OAuth was already
+  incapable of creating an account on its own (`app/auth/callback/route.ts`
+  only ever produces a Waitlist row), so it can't bypass these
+  checkboxes either. Server-side re-validated in both
+  `POST /api/join/:token` and `POST /api/invite/:token` (UI-only
+  enforcement is trivially bypassable via direct API call, same
+  reasoning as the existing `imageConsent` check in `app/api/posts`).
+- **`LegalConsent` model** (`legal_consents` table, RLS deny-all —
+  never exposed client-side) — one row per consent event: `userId`,
+  `termsVersion`/`privacyVersion`/`aupVersion` (from
+  `lib/legal/doc-versions.ts`, bumped by hand on material document
+  changes), `acceptedAt`, `acceptedIp`. Recorded on account creation via
+  `lib/legal/record-consent.ts`.
+- **One-time re-consent interstitial** for members whose latest
+  `LegalConsent` predates the current document versions — the 3 real
+  accounts, since this is the first version. Checked once in
+  `app/(platform)/layout.tsx` (covers every one of middleware's ~17
+  protected prefixes from a single place, rather than duplicating a
+  per-page check the way the smaller Doors/ritual gates do) and
+  redirects to `/legal-reconsent` (deliberately outside `(platform)`,
+  so the same layout check can't loop on it).
+- **`ContentComposer`'s per-upload image-consent checkbox** updated to
+  the real wording from `07`'s §4 ("Everyone shown is a consenting
+  adult (18+), and I have their specific, informed, revocable consent
+  to post this here."), replacing the earlier placeholder paraphrase
+  from `v0.35.0`.
+
+### Verified
+
+- Full round trip with a `test-`-prefixed account via `/join/[token]`:
+  checkboxes correctly block submit until all three are checked, real
+  consent row written with correct versions/timestamp/IP.
+  `legalConsent` deleted to simulate a pre-existing member → confirmed
+  redirect from `/hall` to `/legal-reconsent` → completed reconsent →
+  confirmed a new consent row and resumed normal access (fell through
+  to the pre-existing ritual gate, not blocked again). Cleaned up
+  (Prisma rows, Supabase Auth identity, test invite tokens) afterward.
+- `npx tsc --noEmit` clean.
+- `npm run check:legal` confirmed hard-fails on the four wired documents
+  (by design) and still only warns on the unwired internal-reference
+  file (`07`).
 
 ## [0.35.1] — 2026-08-10
 

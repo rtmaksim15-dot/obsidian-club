@@ -305,6 +305,20 @@ export default async function LandingPage() {
           </span>
           <span className="font-cinzel text-[0.7rem] tracking-[0.3em] text-ob-gold">POWER · DISCIPLINE · TRUST</span>
         </div>
+        <div className="mx-auto mt-4 flex max-w-[1180px] flex-wrap gap-x-5 gap-y-2">
+          <a href="/terms" className="font-inter text-[0.65rem] tracking-[0.1em] text-ob-subtle transition-colors hover:text-ob-muted">
+            Terms
+          </a>
+          <a href="/privacy" className="font-inter text-[0.65rem] tracking-[0.1em] text-ob-subtle transition-colors hover:text-ob-muted">
+            Privacy
+          </a>
+          <a href="/guidelines" className="font-inter text-[0.65rem] tracking-[0.1em] text-ob-subtle transition-colors hover:text-ob-muted">
+            Acceptable Use
+          </a>
+          <a href="/dmca" className="font-inter text-[0.65rem] tracking-[0.1em] text-ob-subtle transition-colors hover:text-ob-muted">
+            DMCA
+          </a>
+        </div>
       </footer>
     </div>
   );
