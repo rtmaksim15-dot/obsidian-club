@@ -8,7 +8,72 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.36.2` is the current released version.
+Nothing yet — `v0.36.3` is the current released version.
+
+## [0.36.3] — 2026-08-14
+
+Responsive pass on the public-facing pages (landing, /apply, /login, /join/[token],
+/terms, /privacy, /guidelines, /dmca) at phone/large-phone/tablet/laptop/large-desktop.
+
+### Fixed
+
+- **Landing hero, laptop and large-desktop widths (`lg`, 1024px+):** the
+  hero photo's own baked-in OC monogram + "OBSIDIAN CLUB" wordmark sit
+  at a fixed position within the source image (853×1844, very tall and
+  narrow). At viewports much wider than tall, `object-cover` had to
+  zoom into a thin horizontal band of that image to fill the width —
+  and that band landed on the wordmark, directly behind the HTML
+  headline and "Request Access" button. Confirmed live at 1280 and
+  1600px before fixing, and confirmed gone after.
+  - Below `lg` the hero is unchanged — still the original full-bleed
+    photo, which already looked correct on phone and tablet.
+  - From `lg` up, the image and its content now live inside a centered
+    `max-w-[1140px]` wrapper instead of spanning the full viewport
+    width — the same contained-column pattern the Ethos/Principles
+    sections on the same page already use — so the black page
+    background shows as gutters on the sides instead of the photo
+    being asked to cover more width than it was composed for.
+  - Added a dedicated scrim behind the headline/CTA zone specifically
+    (`lg:` only) as a second layer of insurance: even inside the
+    contained column, a short-and-wide viewport can still put a
+    zoomed-in slice of the tall source image behind the text, so the
+    text needs to stay legible regardless of exactly what's back
+    there, not just at the one crop position that was tested.
+- **Root cause of a debugging detour worth recording:** the first
+  attempt at the scrim used `from-black/92 via-black/55` — silently
+  produced no gradient at all. Tailwind's opacity-modifier utilities
+  (`/92`, `/55`) are only generated for the values in the default
+  opacity scale (5, 10, 20, 25, 30, 40, 50, 60, 70, 75, 80, 90, 95,
+  100); `92` and `55` aren't in it, so no CSS was ever emitted for
+  those classes — confirmed via computed-style inspection
+  (`--tw-gradient-from` was empty). Switched to `/90`/`/50` (both in
+  the default scale) and the gradient rendered immediately.
+
+### Verified
+
+- Landing page confirmed at 375, 430, 768, 1280, and 1600px — the
+  first two and the 1600px case needed DOM-measurement verification
+  (`getBoundingClientRect`) rather than trusting the screenshot tool
+  directly: this environment's screenshot capture had a reproducible
+  artifact at very large viewports (≥1600px) and at exactly 430px
+  width, where the captured image didn't reflect the actual rendered
+  page (confirmed a real tool limitation, not a site bug, by cross-
+  checking every case against live computed layout geometry).
+- `/apply`, `/login`, `/join/[token]` — already correct at every
+  breakpoint (small centered card on a black background, consistent
+  with the rest of the auth flow); no code changes needed.
+- `/terms`/`/privacy`/`/guidelines`/`/dmca` (shared `(legal)` layout) —
+  confirmed the reading column is genuinely centered via DOM
+  measurement (672px column, symmetric margins) at 1280px; kept
+  narrower than the ~1140px guideline deliberately, since forcing
+  long-form legal text that wide would hurt line-length readability.
+  No code changes needed.
+- Authenticated `(platform)` app — confirmed (not redesigned, per
+  scope) that the existing `mx-auto max-w-*` centering pattern is
+  already applied consistently across all ~24 platform pages
+  (`/feed`, `/hall`, `/ritual`, etc.), producing a centered mobile-
+  width column with dark gutters on desktop, Threads-style.
+- `npx tsc --noEmit` clean; full `rm -rf .next && npm run build` clean.
 
 ## [0.36.2] — 2026-08-11
 

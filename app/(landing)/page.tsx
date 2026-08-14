@@ -84,46 +84,72 @@ export default async function LandingPage() {
       {/* Fullscreen photo hero (redesigned 2026-07-23) — first use of
           next/image in this file (rest of the codebase uses plain <img>
           deliberately, see other components); `fill` needs it for a
-          true edge-to-edge background with responsive object-position. */}
-      <section
-        id="top"
-        className="relative flex min-h-screen items-end justify-center overflow-hidden bg-ob-black px-[clamp(20px,6vw,64px)] pb-[clamp(64px,14vh,140px)] pt-[132px]"
-      >
-        <Image
-          src="/images/hero-library.png"
-          alt="Obsidian Club — Private Community"
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover object-[center_40%] sm:object-[center_34%] md:object-[center_30%] lg:object-[center_32%]"
-        />
+          true edge-to-edge background with responsive object-position.
+          Responsive pass (2026-08-14): the photo's own baked-in OC
+          monogram + "OBSIDIAN CLUB" wordmark sit at a fixed position
+          within the source image (853×1844, very tall/narrow). At
+          viewports much wider than tall (laptop/desktop), object-cover
+          has to zoom into a thin horizontal band of that tall image to
+          fill the width, and that band lands right where the headline
+          sits — the two overlap. Below `lg` this section stays exactly
+          as before (full-bleed, already correct for phone/tablet).
+          From `lg` up, the image+content live inside a centered
+          max-w-[1140px] wrapper instead of spanning the full viewport
+          width — same contained-column pattern the Ethos/Principles
+          sections below already use — so the photo is never asked to
+          cover more width than it was actually composed for, and the
+          black page background shows as gutters on the sides instead
+          of a distorted crop. */}
+      <section id="top" className="relative min-h-screen overflow-hidden bg-ob-black">
+        <div className="relative mx-auto flex h-full min-h-screen max-w-[1140px] items-end justify-center px-[clamp(20px,6vw,64px)] pb-[clamp(64px,14vh,140px)] pt-[132px]">
+          <Image
+            src="/images/hero-library.png"
+            alt="Obsidian Club — Private Community"
+            fill
+            priority
+            sizes="(min-width: 1024px) 1140px, 100vw"
+            className="object-cover object-[center_40%] sm:object-[center_34%] md:object-[center_30%] lg:object-[center_26%]"
+          />
 
-        {/* Darker top/bottom, lighter center — keeps the photo's own
-            focal point (the OC monogram) legible while giving the
-            headline/CTA enough contrast against the busiest parts of
-            the image. */}
-        <div
-          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/80 via-black/40 to-black/70"
-          aria-hidden="true"
-        />
+          {/* Darker top/bottom, lighter center — keeps the photo's own
+              focal point (the OC monogram) legible while giving the
+              headline/CTA enough contrast against the busiest parts of
+              the image. */}
+          <div
+            className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/80 via-black/40 to-black/70"
+            aria-hidden="true"
+          />
 
-        <div className="relative z-10 mx-auto flex max-w-[720px] flex-col items-center text-center lg:max-w-[980px]">
-          <Reveal>
-            <h1 className="m-0 font-cinzel text-[clamp(2.1rem,4.6vw,3.9rem)] font-semibold uppercase leading-[1.12] tracking-[0.05em] text-ob-text">
-              A Private Community
-              <br />
-              For Those Who Lead
-            </h1>
-          </Reveal>
+          {/* Dedicated scrim behind the headline/CTA zone specifically
+              (2026-08-14) — at wide-short viewports, object-cover has
+              to zoom into a thin band of the tall source photo to fill
+              the width, and that band can land on the photo's own
+              baked-in wordmark regardless of object-position tuning.
+              This guarantees the text stays legible against whatever
+              ends up behind it, rather than chasing crop percentages. */}
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-[62%] bg-gradient-to-t from-black via-black/75 to-transparent lg:block"
+            aria-hidden="true"
+          />
 
-          <Reveal>
-            <a
-              href="#apply"
-              className="mt-[38px] inline-block rounded-ob bg-[#C6A75E] px-[2.4rem] py-[0.95rem] font-inter text-[0.78rem] font-semibold uppercase tracking-[0.3em] text-ob-text transition-transform hover:scale-[1.03]"
-            >
-              Request Access
-            </a>
-          </Reveal>
+          <div className="relative z-10 mx-auto flex max-w-[720px] flex-col items-center text-center lg:max-w-[980px]">
+            <Reveal>
+              <h1 className="m-0 font-cinzel text-[clamp(2.1rem,4.6vw,3.9rem)] font-semibold uppercase leading-[1.12] tracking-[0.05em] text-ob-text">
+                A Private Community
+                <br />
+                For Those Who Lead
+              </h1>
+            </Reveal>
+
+            <Reveal>
+              <a
+                href="#apply"
+                className="mt-[38px] inline-block rounded-ob bg-[#C6A75E] px-[2.4rem] py-[0.95rem] font-inter text-[0.78rem] font-semibold uppercase tracking-[0.3em] text-ob-text transition-transform hover:scale-[1.03]"
+              >
+                Request Access
+              </a>
+            </Reveal>
+          </div>
         </div>
       </section>
 
