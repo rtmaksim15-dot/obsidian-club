@@ -6,6 +6,7 @@ import { generateReferralCode, generateUsernameFromEmail } from "@/lib/utils/cod
 import { track } from "@/lib/analytics/track";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
 import { recordLegalConsent } from "@/lib/legal/record-consent";
+import { evaluateTokenLifecycle, lifecycleMessage } from "@/lib/invites/lifecycle";
 
 // Same transient-JWKS-staleness workaround as app/api/invite/[token]/route.ts.
 async function withRetry<R extends { error: unknown }>(fn: () => Promise<R>): Promise<R> {
@@ -63,8 +64,28 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
   if (!invite) {
     return NextResponse.json({ error: "Invalid invite link." }, { status: 404 });
   }
-  if (invite.redeemedAt) {
-    return NextResponse.json({ error: "This invite has already been used." }, { status: 410 });
+  const lifecycle = evaluateTokenLifecycle(invite);
+  if (!lifecycle.ok) {
+    return NextResponse.json({ error: lifecycleMessage(lifecycle.reason) }, { status: 410 });
+  }
+
+  // Atomic claim (2026-08-14) — the lifecycle check above reads then
+  // decides, which leaves a window for two concurrent POSTs to both
+  // pass it before either writes. This single conditional update is
+  // the actual concurrency guard: only the request that flips
+  // unused/opened → activated first gets a `count` of 1 and proceeds;
+  // the loser sees 0 and bails before ever touching Supabase Auth, so
+  // a race can never produce two accounts for one token. Placed before
+  // any side effect for exactly that reason. If account creation fails
+  // *after* this claim succeeds, the token is left claimed-but-
+  // unredeemed (no `redeemedAt`) — same "needs manual reconciliation"
+  // category as the other failure paths below, not silently recoverable.
+  const claim = await prisma.inviteToken.updateMany({
+    where: { id: invite.id, redeemedAt: null, revokedAt: null, status: { in: ["unused", "opened"] } },
+    data: { status: "activated" },
+  });
+  if (claim.count === 0) {
+    return NextResponse.json({ error: "This invite is no longer valid." }, { status: 410 });
   }
 
   let body: Body;

@@ -320,14 +320,18 @@ when this env var isn't set — meaning OpenGraph/canonical URLs will
 resolve incorrectly (to localhost) if deployed without setting it. **Must
 be set in Vercel's environment variables at deploy time.**
 
-Two more things depend on it as of Batch Channels + Email Infra
-(2026-08-07): the purchase-card CSV export's QR-code links (see
-"Invitation & Partner system v1" further down) and — new, higher
-stakes — `sendInvitationEmail` (`lib/utils/email.ts`), which now
+One more thing depends on it as of Batch Channels + Email Infra
+(2026-08-07): `sendInvitationEmail` (`lib/utils/email.ts`), which
 **refuses to send** rather than emailing a real inbox a broken link
 when this is unset. Must be set to `https://obsidianclub.online` before
-either the print batch's card links or any email-channel batch's
-invitations will actually work.
+any email-channel batch's invitations will actually work.
+
+The purchase-card CSV/QR export no longer depends on this var as of
+the batch generator v2 (reconciliation addendum, 2026-08-14) —
+`lib/invites/lifecycle.ts#JOIN_BASE_URL` hardcodes the literal
+production domain instead, since those links go on physical,
+unreprintable cards. See "Invitation & Partner system v1" further down
+for the note this superseded.
 
 ## Initiation Ritual: step 5 needed content that didn't exist — fixed 2026-08-03
 
@@ -992,8 +996,66 @@ recorded so they're a documented choice, not an oversight:
   paths, or whether they need their own, is a real open product
   question — not decided here, not guessed at either way.
 
-Also: purchase-card CSV links (`{NEXT_PUBLIC_APP_URL}/join/{token}`)
-depend on `NEXT_PUBLIC_APP_URL` actually being set for a printable,
-absolute URL — same pre-existing gap the old `/?ref=` referral link
-had (see "`NEXT_PUBLIC_APP_URL` unset" further up this file), not a
-new one.
+Also: purchase-card CSV links used to depend on `NEXT_PUBLIC_APP_URL`
+being set — **fixed by the batch generator v2** (reconciliation
+addendum, 2026-08-14), which hardcodes the literal
+`https://obsidianclub.online` domain instead (see "`NEXT_PUBLIC_APP_URL`
+unset" further up this file). Email-channel batches still depend on the
+env var, unchanged.
+
+## Batch generator v2 — invite lifecycle, short codes, QR/CSV export, admin board (2026-08-14)
+
+Reconciliation addendum to the Invitation & Partner system v1 above,
+implemented in 4 tasks. `InviteToken` gained `shortCode`
+(`OBS-XXXX-XXXX`, human-typeable fallback for scanning), `status`
+(`unused|opened|activated|expired|revoked`), `validUntil` (90-day hard
+cap from generation), `clientWindowDays`/`firstScannedAt`/
+`clientExpiresAt` (7-day window from first scan), `revokedAt`. The
+generator (`POST /api/admin/invite-batches`) mints all of these plus a
+QR PNG per token (new `GET .../qr-zip`, `qrcode` + `jszip`); the admin
+board (`/admin/invite-batches` and `[id]`) shows per-status counts and
+per-token Revoke/Arm/assign-source controls.
+
+**Two fields are deliberately nullable, diverging from the addendum's
+literal non-null spec** — 2 real, already-issued, unredeemed
+`InviteToken` rows (2026-08-08) predate this feature; making
+`shortCode`/`validUntil` required would have meant either fabricating
+values for them or retroactively imposing a 90-day expiry on a card a
+real person might be holding. `evaluateTokenLifecycle()` is null-safe:
+a grandfathered token with both null simply never trips either expiry
+branch, i.e. behaves exactly as it did before this migration. See
+`prisma/schema.prisma`'s `InviteToken` comment and DECISIONS.md
+(2026-08-14).
+
+**"Arm/assign-source" (the addendum's one line for this control) was
+built as two separate admin actions**, not one: a manual **Arm**
+button (mirrors first-scan arming — mainly for QA back-dating without
+visiting the real link) and an **assign-source** dropdown (reassigns
+only the `source` enum, not `inviterId`/`partnerOfId` — wiring a token
+to a specific member's identity wasn't asked for and isn't on this
+board). Flagged as an interpretation call, not a literal read.
+
+**The main `InviteBatchGenerator` UI still only creates `purchase_card`
+batches** — the extended API accepts an optional `source` override
+(used to mint the QA-TEST `partner` batch for Task 4), but it isn't
+exposed as a form field, so an admin can't accidentally create a
+`member`/`partner` batch through the print-card form by mistake.
+
+**Live browser verification of the admin board's buttons (Revoke/Arm/
+assign-source) wasn't done** — this sandbox couldn't establish an
+authenticated session against the local dev server (Supabase's
+redirect allow-list only covers the production domain, and a
+JS-based session-injection workaround was blocked by the sandbox's own
+policy classifier). Verified instead via `tsc`/`build`, an
+unauthenticated-request 403 sanity check, and a Prisma script
+exercising the exact DB writes each route performs (mint fields,
+revoke, arm, source reassignment) — but nobody has clicked the actual
+buttons yet. Worth a five-minute manual pass before relying on them for
+real batch management.
+
+The real `/join/[token]` flow itself (arming, all three terminal
+states, one-time burn, concurrent double-redeem, short-code resolve +
+its rate limit, RLS, consent+ritual side effects) **was** verified live
+end-to-end against a `test-`-prefixed `QA-TEST` batch (10 `partner`
+tokens), then fully deleted along with the accounts it created — see
+DECISIONS.md (2026-08-14) for the full scenario list and results.

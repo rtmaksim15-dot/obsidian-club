@@ -18,9 +18,22 @@ export default async function InviteBatchesPage() {
     include: { _count: { select: { tokens: true } } },
   });
 
-  const redeemedCounts = await Promise.all(
-    batches.map((b) => prisma.inviteToken.count({ where: { batchId: b.id, redeemedAt: { not: null } } })),
-  );
+  // Status counts per batch (reconciliation addendum Task 3, 2026-08-14)
+  // — groupBy over the whole invite_tokens table, then bucketed by
+  // batchId in memory, is one query regardless of batch count instead
+  // of N.
+  const statusRows = await prisma.inviteToken.groupBy({
+    by: ["batchId", "status"],
+    where: { batchId: { not: null } },
+    _count: { _all: true },
+  });
+  const statusCountsByBatch = new Map<string, Record<string, number>>();
+  for (const row of statusRows) {
+    if (!row.batchId) continue;
+    const bucket = statusCountsByBatch.get(row.batchId) ?? {};
+    bucket[row.status] = row._count._all;
+    statusCountsByBatch.set(row.batchId, bucket);
+  }
 
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
@@ -34,24 +47,29 @@ export default async function InviteBatchesPage() {
           {batches.length === 0 ? (
             <p className="text-body">No batches yet.</p>
           ) : (
-            batches.map((b, i) => (
-              <a key={b.id} href={`/admin/invite-batches/${b.id}`} className="card group block">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-data transition-colors group-hover:text-ob-accent">
-                      {new Date(b.createdAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}
-                    </p>
-                    <p className="text-caption mt-1" style={{ color: "var(--color-text-muted)" }}>
-                      {b.channel}
-                      {b.campaign ? ` — ${b.campaign}` : ""}
+            batches.map((b) => {
+              const counts = statusCountsByBatch.get(b.id) ?? {};
+              return (
+                <a key={b.id} href={`/admin/invite-batches/${b.id}`} className="card group block">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-data transition-colors group-hover:text-ob-accent">
+                        {new Date(b.createdAt).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" })}
+                      </p>
+                      <p className="text-caption mt-1" style={{ color: "var(--color-text-muted)" }}>
+                        {b.channel}
+                        {b.campaign ? ` — ${b.campaign}` : ""}
+                      </p>
+                    </div>
+                    <p className="text-caption text-right" style={{ color: "var(--color-text-muted)" }}>
+                      {b._count.tokens} total
+                      <br />
+                      {counts.activated ?? 0} activated · {counts.opened ?? 0} opened · {counts.revoked ?? 0} revoked
                     </p>
                   </div>
-                  <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
-                    {redeemedCounts[i]} / {b._count.tokens} redeemed
-                  </p>
-                </div>
-              </a>
-            ))
+                </a>
+              );
+            })
           )}
         </div>
       </div>

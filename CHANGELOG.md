@@ -8,7 +8,49 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.36.3` is the current released version.
+Nothing yet — `v0.37.0` is the current released version.
+
+## [0.37.0] — 2026-08-18
+
+Batch generator v2 — invite lifecycle, short codes, QR/CSV export, admin
+board (reconciliation addendum to Invitation & Partner system v1).
+
+### Added
+
+- `InviteToken` lifecycle fields: `shortCode` (`OBS-XXXX-XXXX`,
+  human-typeable), `status` (`unused|opened|activated|expired|revoked`),
+  `validUntil` (90-day hard cap from generation), `clientWindowDays`/
+  `firstScannedAt`/`clientExpiresAt` (7-day window from first scan),
+  `revokedAt`. Nullable by design for 2 real pre-existing tokens — see
+  DECISIONS.md and TECH_DEBT.md.
+- Arming (first `GET /join/[token]` scan) and expiry enforcement (both
+  `GET` and `POST /api/join/[token]`), sharing one evaluator
+  (`lib/invites/lifecycle.ts`) so the two call sites can't drift.
+- Atomic claim on redemption closing a pre-existing concurrency bug:
+  two simultaneous `POST`s to the same token can no longer both create
+  an account.
+- `/join` manual short-code entry (`POST /api/join/resolve-code`, 5/hr
+  rate limit) for a member who can't scan the card's QR.
+- Generator (`POST /api/admin/invite-batches`) now mints `shortCode`/
+  `validUntil`/`status` per token and accepts an optional `source`
+  override (API-only, not in the form).
+- QR PNG export (`GET .../qr-zip`, one PNG per token, zipped).
+- CSV export gained `Short Code` and a literal-domain join URL.
+- Admin batch board: per-status counts (list + detail pages), per-token
+  Revoke and Arm/assign-source controls.
+
+### Verified
+
+- `tsc --noEmit` and `npm run build` clean; `check:rls` — RLS enabled
+  on all 29 tables.
+- Full `/join` flow (arming, both terminal-window cases, revoke,
+  one-time burn, concurrent double-redeem, short-code rate limit, RLS,
+  consent+ritual) against a `test-`-prefixed QA-TEST batch, then fully
+  deleted (Prisma rows + Supabase Auth identities).
+- Real Batch 01 (500 `purchase_card` tokens, `cardNumber` 1–500)
+  generated, verified unique, exported as CSV + QR ZIP matching the DB.
+- Admin board buttons not click-tested live (sandbox couldn't
+  establish a dev-server auth session) — see TECH_DEBT.md.
 
 ## [0.36.3] — 2026-08-14
 

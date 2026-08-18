@@ -732,13 +732,44 @@ model InviteToken {
   emailSentAt    DateTime? @map("email_sent_at")
   emailSendError String?   @map("email_send_error")
 
+  // Lifecycle (batch generator v2, 2026-08-14): print-batch tokens now
+  // carry a hard cap and a client-side arming window on top of the
+  // plain redeemedAt burn marker above, which stays the single source
+  // of truth for "has this been used." `shortCode` and `validUntil`
+  // are nullable — deliberately, not per the original spec, which
+  // assumed a clean slate — because two real, already-issued
+  // member/partner InviteToken rows predate this feature (created
+  // 2026-08-08, still unredeemed). Backfilling a fabricated shortCode
+  // or retroactively imposing a 90-day cap on a link a real person may
+  // still be holding would be a live behavior change to something
+  // already in someone's hands — null on both means "grandfathered,
+  // no short code, no hard cap," exactly how they behaved before this
+  // migration. Every token minted through the extended generator from
+  // here on gets both set for real. See DECISIONS.md.
+  shortCode        String?           @unique @map("short_code")
+  status           InviteTokenStatus @default(unused)
+  validUntil       DateTime?         @map("valid_until")
+  clientWindowDays Int               @default(7) @map("client_window_days")
+  firstScannedAt   DateTime?         @map("first_scanned_at")
+  clientExpiresAt  DateTime?         @map("client_expires_at")
+  revokedAt        DateTime?         @map("revoked_at")
+
   batch      InviteBatch? @relation(fields: [batchId], references: [id])
   inviter    User?        @relation("MemberInviteTokens", fields: [inviterId], references: [id])
   partnerOf  User?        @relation("PartnerInviteTokens", fields: [partnerOfId], references: [id])
   redeemedBy User?        @relation("RedeemedInviteToken", fields: [redeemedById], references: [id])
 
   @@index([source])
+  @@index([status])
   @@map("invite_tokens")
+}
+
+enum InviteTokenStatus {
+  unused
+  opened
+  activated
+  expired
+  revoked
 }
 
 // ============================================================

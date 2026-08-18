@@ -1,16 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireAdmin } from "@/lib/auth/require-admin";
+import { joinUrl } from "@/lib/invites/lifecycle";
 
 function csvEscape(value: string): string {
   return `"${value.replace(/"/g, '""')}"`;
 }
 
 // GET /api/admin/invite-batches/:id/csv — CSV export for print (card
-// number, token, full URL). Same `NEXT_PUBLIC_APP_URL` fallback pattern
-// already used for the old referral link on /hall — see TECH_DEBT.md
-// for the standing note that this needs to be set in real production
-// for either link to print/share correctly.
+// number, token, short code, join URL). Reconciliation addendum
+// (2026-08-14): switched from the `NEXT_PUBLIC_APP_URL` fallback to the
+// literal production domain (see lib/invites/lifecycle.ts#JOIN_BASE_URL)
+// — this export feeds physical, unreprintable cards.
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   const admin = await requireAdmin();
   if (!admin) {
@@ -27,13 +28,13 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     orderBy: { cardNumber: "asc" },
   });
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "";
   const rows = [
-    ["Card Number", "Token", "URL"],
+    ["Card Number", "Token", "Short Code", "URL"],
     ...tokens.map((t) => [
-      String(t.cardNumber).padStart(4, "0"),
+      t.cardNumber !== null ? String(t.cardNumber).padStart(4, "0") : "",
       t.token,
-      `${baseUrl}/join/${t.token}`,
+      t.shortCode ?? "",
+      joinUrl(t.token),
     ]),
   ];
   const csv = rows.map((row) => row.map(csvEscape).join(",")).join("\r\n");
