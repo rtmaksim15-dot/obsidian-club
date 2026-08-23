@@ -134,10 +134,10 @@ export default async function LandingPage() {
 
           <div className="relative z-10 mx-auto flex max-w-[720px] flex-col items-center text-center lg:max-w-[980px]">
             <Reveal>
-              <h1 className="m-0 font-cinzel text-[clamp(2.1rem,4.6vw,3.9rem)] font-semibold uppercase leading-[1.12] tracking-[0.05em] text-ob-text">
-                A Private Community
+              <h1 className="m-0 font-cinzel text-[clamp(2.6rem,7vw,5.4rem)] font-semibold uppercase leading-[1.12] tracking-[0.05em] text-ob-text">
+                Your World.
                 <br />
-                For Those Who Lead
+                Your People.
               </h1>
             </Reveal>
 
