@@ -35,10 +35,38 @@ enum MemberRole {
 // PRODUCT.md §1 documents exactly these three application statuses, but
 // ARCHITECTURE.md §10's minimal waitlist table never included a status
 // column at all — see ADR-0012.
+// `held` added by the Invitation Panel flow (2026-08-2x, see DECISIONS.md)
+// — a fourth, non-terminal review outcome distinct from `pending` so the
+// queue can filter/sort held applications separately (an application an
+// admin has actually looked at once and parked, vs. one nobody's touched
+// yet). A held application can still move to `approved`/`declined` later.
 enum WaitlistStatus {
   pending
   approved
   declined
+  held
+}
+
+// Invitation Panel flow (2026-08-2x) — which public entry point an
+// application came in through: `card` (the QR panel a physical card
+// points at) or `site` (the existing landing-page form, if still
+// reachable). Deliberately a separate concept/column from the pre-
+// existing free-text `Waitlist.source` ("how you heard about us") below
+// — reusing that column would conflate two different meanings across
+// old and new rows. See DECISIONS.md.
+enum ApplicationOrigin {
+  card
+  site
+}
+
+// Invitation Panel flow (2026-08-2x) — preset reasons for the Hold
+// action in the admin review queue. Free-text detail goes in
+// `Waitlist.heldNote` alongside whichever preset applies.
+enum ApplicationHoldReason {
+  order_not_confirmed
+  age_check_needed
+  needs_follow_up
+  waiting
 }
 
 // Invitation & Partner system v1 (OBSIDIAN_ROADMAP_v3.1, 2026-08-01) —
@@ -48,6 +76,14 @@ enum InviteSource {
   purchase_card
   member
   partner
+  // Invitation Panel flow (2026-08-2x) — minted only on Accept in the
+  // applications queue (see Waitlist.applicationTokenId below), never by
+  // the print-batch generator (retired for new records, see
+  // DECISIONS.md). Deliberately gets no REP award and no `Referral` row
+  // on redemption, matching the existing purchase_card/member/partner
+  // precedent in app/api/join/[token]/route.ts — not the older
+  // /api/invite/[token]/route.ts flow's behavior.
+  application
 }
 
 enum RoomType {
@@ -636,6 +672,40 @@ model Waitlist {
   inviteTokenUsedAt DateTime?      @map("invite_token_used_at")
   createdAt         DateTime       @default(now()) @map("created_at")
 
+  // ---- Invitation Panel flow (2026-08-2x) — see DECISIONS.md ----
+  // `origin`: which public entry point this application came in
+  // through. Null for every row that predates this flow.
+  origin ApplicationOrigin?
+
+  // Hold: a non-terminal review outcome (see WaitlistStatus.held above).
+  // `heldReason` is one of four presets; `heldNote` is the accompanying
+  // free-text detail the reviewer types. Both are overwritten, not
+  // appended, on a repeat Hold — this is "the current hold reason," not
+  // a hold history log (the timeline in the person page reconstructs
+  // history from `reviewedAt`/`reviewedBy` transitions, not from this).
+  heldReason ApplicationHoldReason? @map("held_reason")
+  heldNote   String?                @map("held_note")
+  heldAt     DateTime?              @map("held_at")
+
+  // Token issuance on Accept — a real InviteToken via the lifecycle
+  // system (lib/invites/lifecycle.ts), redeemed at /join/[token].
+  // Deliberately a distinct field from the legacy `inviteToken`/
+  // `inviteTokenUsedAt` pair above: those stay reserved for the old
+  // /invite/[token] flow's one remaining live link and are never
+  // written for a new row again. `applicationTokenId` is null until
+  // Accept actually mints a token — a held or declined application
+  // never gets one.
+  applicationTokenId String?      @unique @map("application_token_id") @db.Uuid
+  applicationToken   InviteToken? @relation(fields: [applicationTokenId], references: [id])
+
+  // Send-status for whichever decision email this row triggered (the
+  // Accept invitation email, or the Decline email) — one pair of
+  // columns covers both, since a given row only ever sends one or the
+  // other. A7's admin re-send action re-populates these without
+  // touching `applicationTokenId` (re-sending never mints a new token).
+  decisionEmailSentAt    DateTime? @map("decision_email_sent_at")
+  decisionEmailSendError String?   @map("decision_email_send_error")
+
   @@map("waitlist")
 }
 
@@ -758,6 +828,8 @@ model InviteToken {
   inviter    User?        @relation("MemberInviteTokens", fields: [inviterId], references: [id])
   partnerOf  User?        @relation("PartnerInviteTokens", fields: [partnerOfId], references: [id])
   redeemedBy User?        @relation("RedeemedInviteToken", fields: [redeemedById], references: [id])
+  // application source only — the Waitlist row that minted this token.
+  waitlistApplication Waitlist?
 
   @@index([source])
   @@index([status])

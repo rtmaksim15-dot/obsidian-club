@@ -1,12 +1,17 @@
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { prisma } from "@/lib/db/prisma";
-import InviteBatchGenerator from "@/components/shared/InviteBatchGenerator";
 
 // Admin: purchase-card batches (Invitation & Partner system v1,
-// OBSIDIAN_ROADMAP_v3.1, 2026-08-01). Same not-discoverable pattern as
-// every other admin page here — notFound(), not a redirect/403 page,
-// for non-admins.
+// OBSIDIAN_ROADMAP_v3.1, 2026-08-01) — READ-ONLY HISTORICAL RECORD as of
+// the Invitation Panel flow (2026-08-2x, see DECISIONS.md). New batches
+// are never minted again; the generator form is gone and
+// `POST /api/admin/invite-batches` returns 410. This page stays so the
+// existing batches (including the now-revoked Batch 01) remain visible
+// and their CSV/QR exports downloadable for the historical record — see
+// A1's "do not drop, do not delete" instruction. Same not-discoverable
+// pattern as every other admin page here — notFound(), not a
+// redirect/403 page, for non-admins.
 export default async function InviteBatchesPage() {
   const admin = await requireAdmin();
   if (!admin) {
@@ -39,9 +44,14 @@ export default async function InviteBatchesPage() {
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
       <div className="mx-auto max-w-2xl">
         <p className="text-label mb-2">Admin</p>
-        <h1 className="text-h1 mb-10">Invite Batches</h1>
-
-        <InviteBatchGenerator />
+        <h1 className="text-h1 mb-2">Invite Batches</h1>
+        <p className="text-caption mb-10" style={{ color: "var(--color-text-muted)" }}>
+          Retired — historical record only. New invitations go through{" "}
+          <a href="/admin/applications" className="underline">
+            Applications
+          </a>
+          .
+        </p>
 
         <div className="mt-10 space-y-3">
           {batches.length === 0 ? (

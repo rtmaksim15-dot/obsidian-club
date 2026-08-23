@@ -1,3 +1,10 @@
+// LEGACY — frozen as of the Invitation Panel flow (A1, 2026-08-2x, see
+// DECISIONS.md). No new `Waitlist.inviteToken` is ever generated again
+// (the applications queue now mints an `InviteToken`, redeemed at
+// /join/[token] instead — see app/api/admin/applications/[id]/route.ts
+// and app/api/join/[token]/route.ts). This route stays alive, untouched,
+// permanently: at least one real, live, unredeemed old-style invite link
+// exists in production and must keep working. Do not delete this file.
 import { createServerClient, type CookieOptionsWithName } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/db/prisma";
