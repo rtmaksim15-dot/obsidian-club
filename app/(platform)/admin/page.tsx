@@ -21,19 +21,30 @@ export default async function AdminDashboardPage() {
     notFound();
   }
 
-  const [activeMembers, ritualComplete, pendingApplications, publishedPosts, ageVerifiedMembers, openReports, batches] =
-    await Promise.all([
-      prisma.user.count({ where: { status: "active" } }),
-      getRitualCompleteMemberCount(),
-      prisma.waitlist.count({ where: { status: "pending" } }),
-      prisma.post.count({ where: { isPublished: true } }),
-      prisma.user.count({ where: { status: "active", ageVerified: true } }),
-      prisma.report.count({ where: { status: "open" } }),
-      prisma.inviteBatch.findMany({
-        orderBy: { createdAt: "desc" },
-        include: { _count: { select: { tokens: true } } },
-      }),
-    ]);
+  const [
+    activeMembers,
+    ritualComplete,
+    pendingApplications,
+    publishedPosts,
+    ageVerifiedMembers,
+    openReports,
+    batches,
+    waitingListCount,
+  ] = await Promise.all([
+    prisma.user.count({ where: { status: "active" } }),
+    getRitualCompleteMemberCount(),
+    prisma.waitlist.count({ where: { status: "pending" } }),
+    prisma.post.count({ where: { isPublished: true } }),
+    prisma.user.count({ where: { status: "active", ageVerified: true } }),
+    prisma.report.count({ where: { status: "open" } }),
+    prisma.inviteBatch.findMany({
+      orderBy: { createdAt: "desc" },
+      include: { _count: { select: { tokens: true } } },
+    }),
+    // Landing-page pivot (2026-08-23) — the quiet secondary path's
+    // count. See app/(platform)/admin/waiting-list/page.tsx for the list.
+    prisma.waitingListEntry.count(),
+  ]);
 
   const redeemedCounts = await Promise.all(
     batches.map((b) => prisma.inviteToken.count({ where: { batchId: b.id, redeemedAt: { not: null } } })),
@@ -46,6 +57,7 @@ export default async function AdminDashboardPage() {
     { label: "Published posts", value: publishedPosts },
     { label: "Age verified", value: `${ageVerifiedMembers} / ${activeMembers}` },
     { label: "Open reports", value: openReports },
+    { label: "Waiting list", value: waitingListCount },
   ];
 
   return (
@@ -111,6 +123,9 @@ export default async function AdminDashboardPage() {
           </a>
           <a href="/admin/reports" className="text-caption" style={{ color: "var(--color-text-muted)" }}>
             Reports →
+          </a>
+          <a href="/admin/waiting-list" className="text-caption" style={{ color: "var(--color-text-muted)" }}>
+            Waiting List →
           </a>
         </div>
       </div>

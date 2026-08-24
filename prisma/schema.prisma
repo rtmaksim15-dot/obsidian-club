@@ -706,6 +706,16 @@ model Waitlist {
   decisionEmailSentAt    DateTime? @map("decision_email_sent_at")
   decisionEmailSendError String?   @map("decision_email_send_error")
 
+  // A3: the submission receipt — fired once, on the POST that creates
+  // this row (both /api/applications and /api/waitlist), tracked
+  // separately from the decision email above since a row can have both
+  // a receipt outcome and a later decision-email outcome independently.
+  // A bounced receipt is a real signal per instruction ("tells us the
+  // address is dead before we Accept") — logged the same way A7 logs
+  // decision-email failures, for the same reason.
+  receiptEmailSentAt    DateTime? @map("receipt_email_sent_at")
+  receiptEmailSendError String?   @map("receipt_email_send_error")
+
   @@map("waitlist")
 }
 
@@ -1000,4 +1010,25 @@ model LegalConsent {
 
   @@index([userId])
   @@map("legal_consents")
+}
+
+// ============================================================
+// WAITING LIST (landing-page pivot, 2026-08-2x — see DECISIONS.md)
+// ============================================================
+
+// Deliberately NOT the `Waitlist` model above — that table is the
+// applications queue now (Invitation Panel flow); mixing this in would
+// corrupt the person-page work in B1/B2. This is just an email a
+// visitor left on the landing page's quiet secondary path — no name,
+// no screening, not an application. Nothing here ever sends an email
+// or mints a token; Max acts on it manually. `invitedAt` is nullable
+// and unused by any code yet — reserved for whenever that manual
+// process needs a marker.
+model WaitingListEntry {
+  id        String    @id @default(uuid()) @db.Uuid
+  email     String    @unique
+  createdAt DateTime  @default(now()) @map("created_at")
+  invitedAt DateTime? @map("invited_at")
+
+  @@map("waiting_list_entries")
 }

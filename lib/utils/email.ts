@@ -41,12 +41,24 @@ function escapeHtml(input: string) {
 }
 
 /**
- * Sends the waitlist confirmation email. No-ops (with a server log) when
- * RESEND_API_KEY isn't configured yet, so the API route keeps working before
- * the Resend account is connected. Never throws — a failed email must not
- * fail the waitlist submission.
+ * Sends the application receipt email — its only real caller now is
+ * POST /api/applications (Invitation Panel flow, A3, 2026-08-2x); the
+ * old landing-page form this was originally written for is retired
+ * (see app/api/waitlist/route.ts). Copy is provisional — Max is
+ * supplying the real wording alongside the on-screen confirmation
+ * copy (also still a placeholder, see InvitationPanelForm.tsx).
+ *
+ * Unlike the original version of this function, this returns success/
+ * failure instead of swallowing it — A3 logs per-application send
+ * status (Waitlist.receiptEmailSentAt/receiptEmailSendError) the same
+ * way A7 will for the decision email: a bounced receipt means the
+ * address is dead, worth surfacing before an Accept decision is made
+ * on it, not a cosmetic failure to ignore.
  */
-export async function sendWaitlistConfirmation(email: string, name: string) {
+export async function sendWaitlistConfirmation(
+  email: string,
+  name: string,
+): Promise<{ ok: boolean; error?: string }> {
   const html = emailShell(`
       <p style="color:#EDEAE4;font-size:18px;line-height:1.6;margin:0 0 16px;">
         ${name ? escapeHtml(name) + ",<br/>" : ""}your application has been received.
@@ -56,7 +68,7 @@ export async function sendWaitlistConfirmation(email: string, name: string) {
         contacted directly. Not everyone is.
       </p>`);
 
-  await sendEmail(email, "Your application has been received", html);
+  return sendEmail(email, "Your application has been received", html);
 }
 
 /**

@@ -1,5 +1,10 @@
 "use client";
 
+// LEGACY — retired (landing-page pivot, 2026-08-23, see DECISIONS.md).
+// No longer rendered anywhere (was app/(landing)/page.tsx's "apply"
+// section, now the artifact/waiting-list pair). Posted to
+// POST /api/waitlist, itself retired to a 410. Kept, not deleted.
+
 import { useState } from "react";
 
 type Status = "idle" | "submitting" | "success" | "error";

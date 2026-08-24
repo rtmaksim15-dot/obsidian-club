@@ -1,86 +1,16 @@
 import { NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
-import { prisma } from "@/lib/db/prisma";
-import { sendWaitlistConfirmation } from "@/lib/utils/email";
-import { track } from "@/lib/analytics/track";
-import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
 
-// Waitlist intake (Landing Page, Section 5).
-
-type WaitlistPayload = {
-  name?: string;
-  email?: string;
-  age?: string;
-  city?: string;
-  source?: string;
-  reason?: string;
-  referralCode?: string;
-};
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-// Block 2 (August hardening pass, 2026-08-04): 5 applications per hour
-// per IP. Generous enough for a real applicant retrying past validation
-// errors, tight enough to blunt scripted spam of this public,
-// unauthenticated endpoint.
-const RATE_LIMIT = { max: 5, windowMs: 60 * 60 * 1000 };
-
-export async function POST(request: Request) {
-  const rateLimit = await checkRateLimit(`waitlist:${getClientIp(request)}`, RATE_LIMIT);
-  if (!rateLimit.allowed) {
-    return NextResponse.json(
-      { error: "Too many applications from this connection. Try again later." },
-      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } },
-    );
-  }
-
-  let body: WaitlistPayload;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid request." }, { status: 400 });
-  }
-
-  const name = body.name?.trim();
-  const email = body.email?.trim().toLowerCase();
-  const age = body.age ? Number(body.age) : NaN;
-  const city = body.city?.trim() || null;
-  const source = body.source?.trim() || null;
-  const reason = body.reason?.trim() || null;
-  const referralCode = body.referralCode?.trim() || null;
-
-  if (!name) {
-    return NextResponse.json({ error: "Name is required." }, { status: 422 });
-  }
-  if (!email || !EMAIL_RE.test(email)) {
-    return NextResponse.json({ error: "A valid email is required." }, { status: 422 });
-  }
-  if (!Number.isFinite(age) || age < 18) {
-    return NextResponse.json({ error: "You must be 18 or older." }, { status: 422 });
-  }
-
-  try {
-    await prisma.waitlist.create({
-      data: { email, name, age, city, source, reason, referralCode },
-    });
-    // Only on a genuine new application — not the duplicate/idempotent
-    // path below, which isn't a real new submission.
-    await track({ userId: null, type: "waitlist.submitted", meta: { source } });
-  } catch (err) {
-    // Duplicate application: treat as success (idempotent, no email
-    // enumeration) rather than telling the caller the email already exists.
-    const isDuplicate =
-      err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
-    if (!isDuplicate) {
-      console.error("[waitlist] Failed to store application:", err);
-      return NextResponse.json(
-        { error: "The club could not be reached. Try again shortly." },
-        { status: 503 }
-      );
-    }
-  }
-
-  await sendWaitlistConfirmation(email, name);
-
-  return NextResponse.json({ ok: true }, { status: 201 });
+// LEGACY — retired (landing-page pivot, 2026-08-23, see DECISIONS.md).
+// The landing page's inline application form (ApplicationForm.tsx, no
+// longer rendered anywhere) used to POST here. Superseded by the
+// Invitation Panel flow: applications now only come from /invitation
+// (POST /api/applications), and the landing page's own "apply" section
+// is now the artifact/waiting-list pair, not a form. Kept as a 410,
+// not deleted, per the same "retire in place" pattern as the invite-
+// batch generator — nothing currently depends on this route existing.
+export async function POST() {
+  return NextResponse.json(
+    { error: "This endpoint has been retired. Applications now go through the invitation panel." },
+    { status: 410 },
+  );
 }

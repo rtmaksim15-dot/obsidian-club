@@ -15,7 +15,13 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
-      disallow: "/legal/internal/",
+      // /invitation (landing-page pivot, 2026-08-23, see DECISIONS.md):
+      // the physical card's QR destination. Reachable by anyone who
+      // types the URL — this is obscurity, not access control (the
+      // real gate is the Accept decision) — but nothing should link to
+      // it or list it, so it shouldn't be crawled/indexed either. See
+      // that page's own `noindex` metadata for the second half of this.
+      disallow: ["/legal/internal/", "/invitation"],
     },
   };
 }

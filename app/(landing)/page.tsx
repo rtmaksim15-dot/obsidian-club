@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Image from "next/image";
 import LogoMark from "@/components/ui/LogoMark";
-import ApplicationForm from "@/components/shared/ApplicationForm";
+import WaitingListForm from "@/components/shared/WaitingListForm";
 import { Reveal, RevealGroup, RevealItem } from "@/components/shared/Reveal";
 import { getCurrentUser } from "@/lib/auth/session";
 
@@ -276,7 +276,17 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* ============ APPLICATION FORM ============ */}
+      {/* ============ HOW YOU GET IN ============ */}
+      {/* Landing-page pivot (2026-08-23, see DECISIONS.md): the old
+          inline application form (ApplicationForm.tsx) is retired —
+          this is now two paths, not a form. Path 1 (the artifact,
+          primary, visual weight) links out to Torros; path 2 (the
+          waiting list, secondary, quieter) is WaitingListForm below.
+          Both paths' descriptive copy are explicit, marked placeholders
+          per instruction — not written here. The old subhead ("Answer
+          plainly...") described filling out a form and no longer
+          applies to either path, so it's dropped rather than kept and
+          wrong. */}
       <section id="apply" className="scroll-mt-16 bg-ob-dark px-[clamp(20px,6vw,64px)] py-[clamp(80px,12vh,150px)]">
         <div className="mx-auto max-w-[600px]">
           <Reveal className="mb-12 text-center">
@@ -286,12 +296,43 @@ export default async function LandingPage() {
             <h2 className="m-0 font-cinzel text-[clamp(1.7rem,3.4vw,2.6rem)] font-semibold uppercase tracking-[0.06em] text-ob-text">
               Request Consideration
             </h2>
-            <p className="text-body mx-auto mt-4 max-w-[440px]">
-              Answer plainly. What you leave out tells us as much as what you write.
-            </p>
           </Reveal>
 
-          <ApplicationForm />
+          {/* Path 1 — primary, through the artifact */}
+          <Reveal>
+            <div className="card-premium text-center" style={{ padding: "clamp(40px, 6vw, 64px)" }}>
+              <p className="text-caption" style={{ color: "var(--color-warning)" }}>
+                PLACEHOLDER — copy pending
+              </p>
+              <p className="text-caption mt-2" style={{ color: "var(--color-text-muted)" }}>
+                Statement: an invitation arrives with an Obsidian piece — the card inside carries the way in.
+              </p>
+              <a
+                href="#"
+                className="mt-8 inline-block rounded-ob bg-[#C6A75E] px-[2.4rem] py-[0.95rem] font-inter text-[0.78rem] font-semibold uppercase tracking-[0.3em] text-ob-text transition-transform hover:scale-[1.03]"
+              >
+                Visit Torros
+              </a>
+              <p className="text-caption mt-3" style={{ color: "var(--color-warning)" }}>
+                PLACEHOLDER — Torros destination URL pending
+              </p>
+            </div>
+          </Reveal>
+
+          {/* Path 2 — secondary, quieter, the waiting list. Deliberately
+              plainer than the card above: no card-premium border/glow,
+              no name/age/question — just an email and a submit. */}
+          <Reveal>
+            <div className="mt-12 text-center">
+              <p className="text-caption" style={{ color: "var(--color-warning)" }}>
+                PLACEHOLDER — copy pending
+              </p>
+              <p className="text-caption mt-2" style={{ color: "var(--color-text-muted)" }}>
+                Statement: not ready yet — leave your email.
+              </p>
+              <WaitingListForm />
+            </div>
+          </Reveal>
         </div>
       </section>
 

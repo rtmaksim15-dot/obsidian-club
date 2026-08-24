@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Logo from "@/components/ui/Logo";
 import InvitationPanelForm from "@/components/shared/InvitationPanelForm";
 
@@ -8,6 +9,15 @@ import InvitationPanelForm from "@/components/shared/InvitationPanelForm";
 // the pre-existing OAuth-callback status page (no form of its own, see
 // its own file) and stays exactly as it was — this is new, additive
 // surface, not a repurposing of it.
+//
+// Landing-page pivot (2026-08-23): nothing on the site links here —
+// this is obscurity, not access control (the real gate is the Accept
+// decision), but it still shouldn't be crawled or indexed. Paired with
+// the `disallow` entry in app/robots.ts.
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
+
 export default function InvitationPage() {
   return (
     <main className="flex min-h-screen flex-col items-center bg-ob-black px-6 py-24 text-ob-text">
