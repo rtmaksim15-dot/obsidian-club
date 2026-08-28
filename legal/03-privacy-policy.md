@@ -56,7 +56,7 @@ collect the minimum necessary and to protect it carefully.
   age-verification method described in Section 3.
 
 We do **not** intentionally collect payment-card data on the Platform (the Platform
-is free); any Toros purchases occur through separate commerce channels with their
+is free); any Torross purchases occur through separate commerce channels with their
 own notices. [^payments]
 
 ## 3. Age verification and the `ageVerified` status
@@ -217,7 +217,7 @@ added]**.
 
 ### Attorney-review footnotes
 
-[^payments]: Confirm no card/PII from Toros commerce flows into the Platform's data stores; if any linkage exists, add disclosure and a processor for the payments provider.
+[^payments]: Confirm no card/PII from Torross commerce flows into the Platform's data stores; if any linkage exists, add disclosure and a processor for the payments provider.
 [^ageretention]: Decide the exact data the verification provider returns and what we store. Minimize: prefer storing only a pass/fail + timestamp + method. If any ID image is retained, define lawful basis, encryption, access, and deletion — and reconcile with state age-verification statutes that **prohibit retention** of identifying verification data.
 [^purposes]: Confirm the statement that intimate content is not used for ad profiling/model training matches actual engineering practice (including any analytics/ML on content for moderation) and describe moderation scanning accurately.
 [^2258a]: 18 U.S.C. §2258A imposes NCMEC reporting duties on providers who obtain actual knowledge of apparent CSAM, and restricts affirmative monitoring duties. Align this language with the incident-response/reporting SOP and preservation obligations.

@@ -26,7 +26,7 @@ do not agree, do not use the Platform.**
 The Platform is a private, invitation-only community for verified adults. It is
 **not** a pornography service, an escort or dating service, or a marketplace for
 sexual services. It is a members' space organized around a consent-centered
-lifestyle culture and the Toros brand.
+lifestyle culture and the Torross brand.
 
 ## 2. Eligibility and age (18+)
 
@@ -43,7 +43,7 @@ under 18.** [^age]
 ## 3. Invitations, tokens, and sponsorship
 
 3.1 **Invitation required.** Registration requires a valid, single-use invitation
-token obtained through one of: (a) a token included with a purchase of a Toros
+token obtained through one of: (a) a token included with a purchase of a Torross
 item; (b) a personal invitation from an existing member who acts as your
 **sponsor**, recorded in our systems; or (c) an approved application from the
 waitlist.
@@ -134,8 +134,8 @@ Policy], which is part of these Terms.
 
 ## 8. Fees; no purchase of status or access
 
-The Platform is currently **free**. Toros goods are sold separately, and buying a
-Toros item is not a purchase of Platform access, status, or any membership right —
+The Platform is currently **free**. Torross goods are sold separately, and buying a
+Torross item is not a purchase of Platform access, status, or any membership right —
 it may include an invitation token as described in Section 3. We may later offer
 **paid tools** (such as additional storage or the ability to create spaces); those
 are tools, not the sale of status or access, and any paid tool will have its own
@@ -143,7 +143,7 @@ terms and pricing presented before purchase. [^payments]
 
 ## 9. Intellectual property (ours)
 
-The Platform, including its name, the Toros marks, design, software, and content we
+The Platform, including its name, the Torross marks, design, software, and content we
 create, is owned by us or our licensors and protected by law. We grant you a
 limited, revocable, non-transferable, non-sublicensable license to use the Platform
 for your personal, non-commercial community participation, subject to these Terms.

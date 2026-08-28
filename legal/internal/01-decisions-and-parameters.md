@@ -17,7 +17,7 @@ Confirmed by founder 2026-08-08. Drives all drafts.
 - **Output format:** Markdown (.md).
 - **Processors named:** Vercel (hosting), Supabase (DB/auth, AWS us-east-2),
   Resend (transactional email). Age/ID provider = `[AGE VERIFICATION PROVIDER]`.
-- **Site:** obsidianclub.online. Brand goods: Toros (sold separately; platform free).
+- **Site:** obsidianclub.online. Brand goods: Torross (sold separately; platform free).
 - **Launch:** 1 October 2026.
 
 Placeholder convention: anything in `[BRACKETS]` = founder/counsel fills before

@@ -134,7 +134,7 @@ invite-token grant as revocable, non-transferable, and not a property right, and
 disclaim member-to-member liability.
 
 ### R8 — Payments / "not selling access" characterization (low, watch). Severity: low.
-Keeping the platform **free** and monetizing **Toros goods** separately is
+Keeping the platform **free** and monetizing **Torross goods** separately is
 cleaner than selling status/access. Preserve that separation explicitly so the
 invite-with-purchase mechanic isn't recharacterized as "paying for entry to adult
 content," which could pull in additional consumer-protection and (in some states)
