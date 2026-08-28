@@ -280,13 +280,15 @@ export default async function LandingPage() {
       {/* Landing-page pivot (2026-08-23, see DECISIONS.md): the old
           inline application form (ApplicationForm.tsx) is retired —
           this is now two paths, not a form. Path 1 (the artifact,
-          primary, visual weight) links out to Torros; path 2 (the
-          waiting list, secondary, quieter) is WaitingListForm below.
-          Both paths' descriptive copy are explicit, marked placeholders
-          per instruction — not written here. The old subhead ("Answer
-          plainly...") described filling out a form and no longer
-          applies to either path, so it's dropped rather than kept and
-          wrong. */}
+          primary, visual weight) is a statement only, no link and no
+          store named (2026-08-24 correction — it used to link out;
+          that's been removed for good, not a placeholder gap); path 2
+          (the waiting list, secondary, quieter) is WaitingListForm
+          below. Both paths' descriptive copy are explicit, marked
+          placeholders per instruction — not written here. The old
+          subhead ("Answer plainly...") described filling out a form and
+          no longer applies to either path, so it's dropped rather than
+          kept and wrong. */}
       <section id="apply" className="scroll-mt-16 bg-ob-dark px-[clamp(20px,6vw,64px)] py-[clamp(80px,12vh,150px)]">
         <div className="mx-auto max-w-[600px]">
           <Reveal className="mb-12 text-center">
@@ -298,7 +300,10 @@ export default async function LandingPage() {
             </h2>
           </Reveal>
 
-          {/* Path 1 — primary, through the artifact */}
+          {/* Path 1 — primary, through the artifact. Statement only —
+              no link, no store named (removed 2026-08-24 per
+              instruction). Still the visually prominent block, it just
+              doesn't lead anywhere. */}
           <Reveal>
             <div className="card-premium text-center" style={{ padding: "clamp(40px, 6vw, 64px)" }}>
               <p className="text-caption" style={{ color: "var(--color-warning)" }}>
@@ -306,15 +311,6 @@ export default async function LandingPage() {
               </p>
               <p className="text-caption mt-2" style={{ color: "var(--color-text-muted)" }}>
                 Statement: an invitation arrives with an Obsidian piece — the card inside carries the way in.
-              </p>
-              <a
-                href="#"
-                className="mt-8 inline-block rounded-ob bg-[#C6A75E] px-[2.4rem] py-[0.95rem] font-inter text-[0.78rem] font-semibold uppercase tracking-[0.3em] text-ob-text transition-transform hover:scale-[1.03]"
-              >
-                Visit Torros
-              </a>
-              <p className="text-caption mt-3" style={{ color: "var(--color-warning)" }}>
-                PLACEHOLDER — Torros destination URL pending
               </p>
             </div>
           </Reveal>
