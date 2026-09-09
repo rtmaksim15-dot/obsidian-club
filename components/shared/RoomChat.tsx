@@ -6,6 +6,9 @@ import { createClient } from "@/lib/auth/supabase-browser";
 type Message = {
   id: string;
   content: string;
+  // Moderation gap 1 (2026-09-08, see DECISIONS.md): same tombstone
+  // treatment as Comment — see CommentSection.tsx's identical comment.
+  isDeleted?: boolean;
   replyToId: string | null;
   createdAt: string;
   user: { id: string; displayName: string; avatarUrl: string | null; level: number };
@@ -151,7 +154,13 @@ export default function RoomChat({ room, currentUserId, initialMessages }: Props
                     </span>
                   ) : null}
                 </p>
-                <p className="text-body mt-0.5 !text-base">{m.content}</p>
+                {m.isDeleted ? (
+                  <p className="text-body mt-0.5 !text-base italic" style={{ color: "var(--color-text-muted)" }}>
+                    Message removed by moderator.
+                  </p>
+                ) : (
+                  <p className="text-body mt-0.5 !text-base">{m.content}</p>
+                )}
               </div>
             </div>
           ))

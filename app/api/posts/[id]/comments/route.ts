@@ -6,12 +6,22 @@ import { track } from "@/lib/analytics/track";
 const commentSelect = {
   id: true,
   content: true,
+  isDeleted: true,
   createdAt: true,
   author: { select: { id: true, displayName: true, avatarUrl: true, level: true } },
 };
 
 // GET /api/posts/:id/comments — flat, chronological (oldest first, like
 // a real conversation thread) list of a post's comments.
+//
+// Moderation gap 1 (2026-09-08, see DECISIONS.md): a removed comment
+// stays IN this list as a tombstone rather than being filtered out —
+// deleting a thread's replies alongside it would make the surviving
+// conversation read as a non-sequitur, and "the thread reading
+// coherently matters more than tidiness" per that decision. The real
+// content is redacted here, server-side, before it ever reaches a
+// non-admin response — `isDeleted: true` is the client's cue to render
+// a placeholder (see CommentSection.tsx), never the raw content.
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   const user = await getCurrentUser();
   if (!user) {
@@ -24,12 +34,14 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   }
 
   const comments = await prisma.comment.findMany({
-    where: { postId: post.id, isDeleted: false },
+    where: { postId: post.id },
     orderBy: { createdAt: "asc" },
     select: commentSelect,
   });
 
-  return NextResponse.json({ comments });
+  const redacted = comments.map((c) => (c.isDeleted ? { ...c, content: "" } : c));
+
+  return NextResponse.json({ comments: redacted });
 }
 
 type Body = { content?: string };

@@ -31,16 +31,21 @@ export default async function PostDetailPage({ params }: { params: { id: string 
   });
   if (!post || !post.isPublished || post.minLevel > user.level) notFound();
 
-  const comments = await prisma.comment.findMany({
-    where: { postId: post.id, isDeleted: false },
+  // Moderation gap 1 (2026-09-08, see DECISIONS.md): removed comments
+  // stay in the thread as tombstones, not filtered out — see the
+  // matching comment on GET /api/posts/:id/comments for why.
+  const rawComments = await prisma.comment.findMany({
+    where: { postId: post.id },
     orderBy: { createdAt: "asc" },
     select: {
       id: true,
       content: true,
+      isDeleted: true,
       createdAt: true,
       author: { select: { id: true, displayName: true, avatarUrl: true, level: true } },
     },
   });
+  const comments = rawComments.map((c) => (c.isDeleted ? { ...c, content: "" } : c));
 
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">

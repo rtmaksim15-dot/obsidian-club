@@ -251,6 +251,8 @@ model User {
   blocksReceived             Block[]           @relation("BlocksReceived")
   moderationActions          ModerationAction[]
   legalConsents              LegalConsent[]
+  deletedComments            Comment[]         @relation("CommentDeletedBy")
+  deletedMessages            Message[]         @relation("MessageDeletedBy")
 
   @@map("users")
 }
@@ -343,11 +345,18 @@ model Message {
   replyToId String?  @map("reply_to") @db.Uuid
   isDeleted Boolean  @default(false) @map("is_deleted")
   createdAt DateTime @default(now()) @map("created_at")
+  // Moderation gap 1 (2026-09-08, see DECISIONS.md): admin-only
+  // soft-delete attribution — who removed it and when. `isDeleted` alone
+  // (pre-existing) never actually got set by any code path; this pair
+  // is added alongside the first real writer of that flag.
+  deletedAt   DateTime? @map("deleted_at")
+  deletedById String?   @map("deleted_by_id") @db.Uuid
 
-  room    Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  user    User      @relation(fields: [userId], references: [id])
-  replyTo Message?  @relation("MessageReplies", fields: [replyToId], references: [id])
-  replies Message[] @relation("MessageReplies")
+  room     Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user     User      @relation(fields: [userId], references: [id])
+  replyTo  Message?  @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies  Message[] @relation("MessageReplies")
+  deletedBy User?    @relation("MessageDeletedBy", fields: [deletedById], references: [id])
 
   @@index([roomId])
   @@map("messages")
@@ -418,9 +427,14 @@ model Comment {
   content   String
   isDeleted Boolean  @default(false) @map("is_deleted")
   createdAt DateTime @default(now()) @map("created_at")
+  // Moderation gap 1 (2026-09-08, see DECISIONS.md) — see Message's
+  // identical pair for why this is added now, not when isDeleted was.
+  deletedAt   DateTime? @map("deleted_at")
+  deletedById String?   @map("deleted_by_id") @db.Uuid
 
-  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
-  author User @relation(fields: [authorId], references: [id])
+  post      Post  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author    User  @relation(fields: [authorId], references: [id])
+  deletedBy User? @relation("CommentDeletedBy", fields: [deletedById], references: [id])
 
   @@index([postId])
   @@map("comments")
@@ -899,6 +913,13 @@ model AnalyticsEvent {
 enum ReportTargetType {
   post
   profile
+  // Moderation gap 2 (2026-09-08, see DECISIONS.md) — live conversation
+  // (comments, room chat) previously had no reporting path at all.
+  // `Report.targetId` stays a bare uuid with no FK either way (same
+  // polymorphic shape post/profile already used), so this is additive
+  // only — no relation changes needed.
+  comment
+  message
 }
 
 // underage/non_consensual/threat are the "red line" categories (see

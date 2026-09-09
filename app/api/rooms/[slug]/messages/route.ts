@@ -12,6 +12,7 @@ async function loadRoomForAccess(slug: string) {
 const messageSelect = {
   id: true,
   content: true,
+  isDeleted: true,
   mediaUrl: true,
   replyToId: true,
   createdAt: true,
@@ -21,6 +22,11 @@ const messageSelect = {
 // GET /api/rooms/:slug/messages — latest PAGE_SIZE messages, oldest-first
 // ("История сообщений (снизу вверх)", DESIGN.md). No cursor pagination
 // yet — see TECH_DEBT.md.
+//
+// Moderation gap 1 (2026-09-08, see DECISIONS.md): a removed message
+// stays in this window as a tombstone rather than being filtered out —
+// same "thread reads coherently" reasoning as comments. Content is
+// redacted server-side before it reaches a non-admin response.
 export async function GET(_request: Request, { params }: { params: { slug: string } }) {
   const user = await getCurrentUser();
   if (!user) {
@@ -36,13 +42,15 @@ export async function GET(_request: Request, { params }: { params: { slug: strin
   }
 
   const messages = await prisma.message.findMany({
-    where: { roomId: room.id, isDeleted: false },
+    where: { roomId: room.id },
     orderBy: { createdAt: "desc" },
     take: PAGE_SIZE,
     select: messageSelect,
   });
 
-  return NextResponse.json({ messages: messages.reverse() });
+  const redacted = messages.map((m) => (m.isDeleted ? { ...m, content: "", mediaUrl: null } : m));
+
+  return NextResponse.json({ messages: redacted.reverse() });
 }
 
 type Body = { content?: string; replyToId?: string };

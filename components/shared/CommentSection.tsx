@@ -6,6 +6,11 @@ import { useState } from "react";
 type Comment = {
   id: string;
   content: string;
+  // Moderation gap 1 (2026-09-08, see DECISIONS.md): a removed comment
+  // arrives with isDeleted:true and content already redacted
+  // server-side — rendered as a tombstone below, not filtered out, so
+  // replies to it still read coherently.
+  isDeleted?: boolean;
   createdAt: string;
   author: { id: string; displayName: string; avatarUrl: string | null; level: number };
 };
@@ -78,7 +83,13 @@ export default function CommentSection({ postId, initial }: { postId: string; in
               </div>
               <div>
                 <p className="text-data !text-sm">{c.author.displayName}</p>
-                <p className="text-body !text-base">{c.content}</p>
+                {c.isDeleted ? (
+                  <p className="text-body !text-base italic" style={{ color: "var(--color-text-muted)" }}>
+                    Comment removed by moderator.
+                  </p>
+                ) : (
+                  <p className="text-body !text-base">{c.content}</p>
+                )}
                 <p className="text-caption mt-1" style={{ color: "var(--color-text-muted)" }}>
                   {formatTimestamp(c.createdAt)}
                 </p>

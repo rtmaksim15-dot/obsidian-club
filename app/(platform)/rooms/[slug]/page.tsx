@@ -25,18 +25,22 @@ export default async function RoomPage({ params }: { params: { slug: string } })
     );
   }
 
-  const messages = await prisma.message.findMany({
-    where: { roomId: room.id, isDeleted: false },
+  // Moderation gap 1 (2026-09-08, see DECISIONS.md): removed messages
+  // stay as tombstones — see GET /api/rooms/:slug/messages's comment.
+  const rawMessages = await prisma.message.findMany({
+    where: { roomId: room.id },
     orderBy: { createdAt: "desc" },
     take: 50,
     select: {
       id: true,
       content: true,
+      isDeleted: true,
       replyToId: true,
       createdAt: true,
       user: { select: { id: true, displayName: true, avatarUrl: true, level: true } },
     },
   });
+  const messages = rawMessages.map((m) => (m.isDeleted ? { ...m, content: "" } : m));
 
   return (
     <RoomChat
