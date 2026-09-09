@@ -4,15 +4,20 @@ import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import { REPORT_CATEGORIES, isRedLineCategory } from "@/lib/moderation/report";
 
-const VALID_TARGET_TYPES: ReportTargetType[] = ["post", "profile"];
+// Moderation gap 2 (2026-09-08, see DECISIONS.md): comment/message
+// added — live conversation previously had no reporting path at all.
+const VALID_TARGET_TYPES: ReportTargetType[] = ["post", "profile", "comment", "message"];
 const VALID_CATEGORIES = REPORT_CATEGORIES.map((c) => c.value);
 
 type Body = { targetType?: string; targetId?: string; category?: string; note?: string };
 
-// POST /api/reports — one-step report, reachable from every post and
-// every profile (member protection mechanics, pre-launch legal
-// package, 2026-08-09). No approval workflow to file one; review
-// happens afterward in /admin/reports.
+// POST /api/reports — one-step report, reachable from every post,
+// profile, comment, and chat message (member protection mechanics,
+// pre-launch legal package, 2026-08-09; comment/message added
+// 2026-09-08). No approval workflow to file one; review happens
+// afterward in /admin/reports. Category taxonomy and the isRedLine
+// freeze-at-filing behavior are unchanged by the target-type expansion
+// — both are purely category-driven, not target-type-driven.
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) {
@@ -49,13 +54,35 @@ export async function POST(request: Request) {
     if (post.authorId === user.id) {
       return NextResponse.json({ error: "You can't report your own post." }, { status: 422 });
     }
-  } else {
+  } else if (targetType === "profile") {
     const profile = await prisma.user.findUnique({ where: { id: targetId }, select: { id: true } });
     if (!profile) {
       return NextResponse.json({ error: "That member no longer exists." }, { status: 404 });
     }
     if (profile.id === user.id) {
       return NextResponse.json({ error: "You can't report your own profile." }, { status: 422 });
+    }
+  } else if (targetType === "comment") {
+    const comment = await prisma.comment.findUnique({
+      where: { id: targetId },
+      select: { id: true, authorId: true, isDeleted: true },
+    });
+    if (!comment || comment.isDeleted) {
+      return NextResponse.json({ error: "That comment no longer exists." }, { status: 404 });
+    }
+    if (comment.authorId === user.id) {
+      return NextResponse.json({ error: "You can't report your own comment." }, { status: 422 });
+    }
+  } else {
+    const message = await prisma.message.findUnique({
+      where: { id: targetId },
+      select: { id: true, userId: true, isDeleted: true },
+    });
+    if (!message || message.isDeleted) {
+      return NextResponse.json({ error: "That message no longer exists." }, { status: 404 });
+    }
+    if (message.userId === user.id) {
+      return NextResponse.json({ error: "You can't report your own message." }, { status: 422 });
     }
   }
 

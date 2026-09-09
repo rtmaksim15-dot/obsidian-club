@@ -61,6 +61,7 @@ export default async function PostDetailPage({ params }: { params: { id: string 
         <section className="mt-8">
           <CommentSection
             postId={post.id}
+            currentUserId={user.id}
             initial={comments.map((c) => ({ ...c, createdAt: c.createdAt.toISOString() }))}
           />
         </section>

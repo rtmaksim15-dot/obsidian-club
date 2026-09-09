@@ -4,7 +4,12 @@ import { useState } from "react";
 
 export type QueuedReport = {
   id: string;
-  targetType: "post" | "profile";
+  // Moderation gap 2 (2026-09-08, see DECISIONS.md): comment/message
+  // added. No new action wired here yet beyond display/resolve — the
+  // Remove button for these lives in the admin-views work that follows
+  // these gaps, not here; the underlying route already exists
+  // (DELETE /api/admin/comments/:id, /messages/:id).
+  targetType: "post" | "profile" | "comment" | "message";
   targetId: string;
   category: string;
   isRedLine: boolean;

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import ReportButton from "./ReportButton";
 
 type Comment = {
   id: string;
@@ -19,7 +20,15 @@ function formatTimestamp(iso: string) {
   return new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" });
 }
 
-export default function CommentSection({ postId, initial }: { postId: string; initial: Comment[] }) {
+export default function CommentSection({
+  postId,
+  currentUserId,
+  initial,
+}: {
+  postId: string;
+  currentUserId: string;
+  initial: Comment[];
+}) {
   const router = useRouter();
   const [comments, setComments] = useState(initial);
   const [draft, setDraft] = useState("");
@@ -90,8 +99,11 @@ export default function CommentSection({ postId, initial }: { postId: string; in
                 ) : (
                   <p className="text-body !text-base">{c.content}</p>
                 )}
-                <p className="text-caption mt-1" style={{ color: "var(--color-text-muted)" }}>
+                <p className="text-caption mt-1 flex items-center gap-3" style={{ color: "var(--color-text-muted)" }}>
                   {formatTimestamp(c.createdAt)}
+                  {!c.isDeleted && c.author.id !== currentUserId ? (
+                    <ReportButton targetType="comment" targetId={c.id} />
+                  ) : null}
                 </p>
               </div>
             </li>

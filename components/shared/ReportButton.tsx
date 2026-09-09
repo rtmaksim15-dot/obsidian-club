@@ -3,7 +3,10 @@
 import { useState } from "react";
 import { REPORT_CATEGORIES } from "@/lib/moderation/report";
 
-type Props = { targetType: "post" | "profile"; targetId: string };
+// Moderation gap 2 (2026-09-08, see DECISIONS.md): widened to cover
+// live conversation (comments, room chat) — the component itself
+// needed no other change, it was already generic over targetType.
+type Props = { targetType: "post" | "profile" | "comment" | "message"; targetId: string };
 type Status = "idle" | "picking" | "submitting" | "done" | "error";
 
 // One-step report, reachable directly from every post and every

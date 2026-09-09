@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/auth/supabase-browser";
+import ReportButton from "./ReportButton";
 
 type Message = {
   id: string;
   content: string;
-  // Moderation gap 1 (2026-09-08, see DECISIONS.md): same tombstone
+  // Moderation gap 1/2 (2026-09-08, see DECISIONS.md): same tombstone
   // treatment as Comment — see CommentSection.tsx's identical comment.
   isDeleted?: boolean;
   replyToId: string | null;
@@ -161,6 +162,9 @@ export default function RoomChat({ room, currentUserId, initialMessages }: Props
                 ) : (
                   <p className="text-body mt-0.5 !text-base">{m.content}</p>
                 )}
+                {!m.isDeleted && m.user.id !== currentUserId ? (
+                  <ReportButton targetType="message" targetId={m.id} />
+                ) : null}
               </div>
             </div>
           ))
