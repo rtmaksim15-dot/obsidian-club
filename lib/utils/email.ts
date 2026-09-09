@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { HARD_CAP_DAYS, joinUrl } from "@/lib/invites/lifecycle";
 
 // Transactional emails. Email clients don't reliably load custom fonts or
 // read CSS variables, so brand colors are inlined here as literal hex —
@@ -41,19 +42,11 @@ function escapeHtml(input: string) {
 }
 
 /**
- * Sends the application receipt email — its only real caller now is
- * POST /api/applications (Invitation Panel flow, A3, 2026-08-2x); the
- * old landing-page form this was originally written for is retired
- * (see app/api/waitlist/route.ts). Copy is provisional — Max is
- * supplying the real wording alongside the on-screen confirmation
- * copy (also still a placeholder, see InvitationPanelForm.tsx).
- *
- * Unlike the original version of this function, this returns success/
- * failure instead of swallowing it — A3 logs per-application send
- * status (Waitlist.receiptEmailSentAt/receiptEmailSendError) the same
- * way A7 will for the decision email: a bounced receipt means the
- * address is dead, worth surfacing before an Accept decision is made
- * on it, not a cosmetic failure to ignore.
+ * ORPHANED (2026-09-09, see DECISIONS.md) — the application receipt
+ * email was dropped entirely; the on-screen confirmation carries that
+ * job alone now (see InvitationPanelForm.tsx). Its only caller,
+ * POST /api/applications, no longer calls this. Kept, not deleted, in
+ * case a receipt email is reintroduced later.
  */
 export async function sendWaitlistConfirmation(
   email: string,
@@ -114,6 +107,62 @@ export async function sendInvitationEmail(
       </a>`);
 
   return sendEmail(to, "You have been invited to Obsidian Club", html);
+}
+
+/**
+ * NOT YET WIRED (2026-09-09, see DECISIONS.md) — the invitation email
+ * for the invitation-panel flow's Accept decision. No caller exists
+ * yet: the admin applications queue (app/api/admin/applications/[id]/
+ * route.ts) is still the old Waitlist.inviteToken system with no email
+ * sending at all — Accept minting a real InviteToken and sending this
+ * is A6/A5, not yet built. Written now so the exact copy isn't lost;
+ * do not call this from the old approval route, which must never touch
+ * Waitlist.inviteToken/InviteToken for the new flow (see DECISIONS.md).
+ * Distinct from `sendInvitationEmail` above, which is the existing,
+ * still-live email-channel-batch invitation — different flow, different
+ * copy, not to be conflated.
+ */
+export async function sendApplicationAcceptedEmail(email: string, token: string): Promise<{ ok: boolean; error?: string }> {
+  const html = emailShell(`
+      <p style="color:#EDEAE4;font-size:18px;line-height:1.6;margin:0 0 16px;">
+        Your request was accepted.
+      </p>
+      <p style="font-size:16px;line-height:1.7;margin:0 0 32px;">
+        The link below is yours alone. It works once.
+      </p>
+      <a href="${joinUrl(token)}" style="display:inline-block;padding:14px 36px;background:#8B1A1A;color:#EDEAE4;text-decoration:none;letter-spacing:2px;text-transform:uppercase;font-size:13px;">
+        Enter
+      </a>
+      <p style="font-size:14px;line-height:1.7;margin:32px 0 16px;color:#9E9A94;">
+        It expires in ${HARD_CAP_DAYS} days.
+      </p>
+      <p style="font-size:14px;color:#9E9A94;margin:0;">
+        — Obsidian Club
+      </p>`);
+
+  return sendEmail(email, "The door is open", html);
+}
+
+/**
+ * NOT YET WIRED (2026-09-09, see DECISIONS.md) — the decline email for
+ * the invitation-panel flow. Same status as
+ * `sendApplicationAcceptedEmail` above: no caller yet, written now so
+ * the copy isn't lost. Deliberately gives no reason — PRODUCT.md's
+ * "declines carry no explanation" applies here too.
+ */
+export async function sendApplicationDeclinedEmail(email: string): Promise<{ ok: boolean; error?: string }> {
+  const html = emailShell(`
+      <p style="color:#EDEAE4;font-size:18px;line-height:1.6;margin:0 0 16px;">
+        Our answer is no.
+      </p>
+      <p style="font-size:16px;line-height:1.7;margin:0 0 16px;">
+        We hope you find your circle elsewhere.
+      </p>
+      <p style="font-size:14px;color:#9E9A94;margin:0;">
+        — Obsidian Club
+      </p>`);
+
+  return sendEmail(email, "Your request", html);
 }
 
 /** Shared send + defensive-no-op wrapper for every transactional email. */

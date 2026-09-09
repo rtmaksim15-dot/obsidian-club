@@ -14,6 +14,8 @@ export default function InvitationPanelForm() {
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
   const [answer, setAnswer] = useState("");
+  const [ageAndTruthChecked, setAgeAndTruthChecked] = useState(false);
+  const [privacyChecked, setPrivacyChecked] = useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -58,14 +60,12 @@ export default function InvitationPanelForm() {
   }
 
   if (status === "success") {
-    // Bare placeholder — the real confirmation screen is A3, a separate
-    // step. Not final copy.
+    // Final copy (2026-09-09, see DECISIONS.md) — one line, nothing
+    // else. No timeline, no next steps, no "we'll be in touch." The
+    // club's impersonal voice: restraint is the point.
     return (
       <div className="card-premium mt-10 w-full max-w-sm text-center" style={{ padding: "clamp(32px, 6vw, 48px)" }}>
-        <p className="text-h2 !text-base m-0">Received.</p>
-        <p className="text-caption mt-3" style={{ color: "var(--color-warning)" }}>
-          PLACEHOLDER — A3 confirmation copy pending
-        </p>
+        <p className="text-h2 !text-base m-0">Your request has been received.</p>
       </div>
     );
   }
@@ -101,27 +101,32 @@ export default function InvitationPanelForm() {
         <span>I am at least 18 years old.</span>
       </label>
 
-      {/* Safety/publicity acknowledgement — copy pending, see A2. Two
-          slots reserved; neither wording is final. The existing "final
-          decision" line stays here per instruction until real copy
-          lands. */}
-      <div className="rounded-ob border border-dashed p-4" style={{ borderColor: "var(--color-warning)" }}>
-        <p className="text-caption mb-3" style={{ color: "var(--color-warning)" }}>
-          PLACEHOLDER — copy pending
-        </p>
-        <div className="space-y-3">
-          <label className="flex items-start gap-3 text-left text-[0.8rem] leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
-            <input type="checkbox" name="safetyAckPlaceholder1" required className="mt-1 shrink-0" />
-            <span>[ Safety acknowledgement — copy pending ]</span>
-          </label>
-          <label className="flex items-start gap-3 text-left text-[0.8rem] leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
-            <input type="checkbox" name="safetyAckPlaceholder2" required className="mt-1 shrink-0" />
-            <span>[ Publicity acknowledgement — copy pending ]</span>
-          </label>
-        </div>
-        <p className="text-ob-subtle m-0 mt-3 font-inter text-[0.7rem] tracking-[0.04em]">
-          By applying you accept that a decision, if any, is final.
-        </p>
+      {/* The two safety checkboxes (2026-09-09, see DECISIONS.md) —
+          real copy, replacing the placeholder block. Both required,
+          both gate Submit below. The first restates the age condition
+          the standalone 18+ checkbox above already covers (flagged,
+          not merged — implemented literally as specified). */}
+      <div className="space-y-3">
+        <label className="flex items-start gap-3 text-left text-[0.8rem] leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
+          <input
+            type="checkbox"
+            required
+            checked={ageAndTruthChecked}
+            onChange={(e) => setAgeAndTruthChecked(e.target.checked)}
+            className="mt-1 shrink-0"
+          />
+          <span>I am 18 or older, and everything I&apos;ve written here is true.</span>
+        </label>
+        <label className="flex items-start gap-3 text-left text-[0.8rem] leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
+          <input
+            type="checkbox"
+            required
+            checked={privacyChecked}
+            onChange={(e) => setPrivacyChecked(e.target.checked)}
+            className="mt-1 shrink-0"
+          />
+          <span>I understand this is a private community. What happens inside stays inside.</span>
+        </label>
       </div>
 
       <div>
@@ -148,7 +153,11 @@ export default function InvitationPanelForm() {
         </p>
       ) : null}
 
-      <button type="submit" className="btn-primary w-full" disabled={status === "submitting"}>
+      <button
+        type="submit"
+        className="btn-primary w-full"
+        disabled={status === "submitting" || !ageAndTruthChecked || !privacyChecked}
+      >
         {status === "submitting" ? "Submitting…" : "Submit"}
       </button>
     </form>

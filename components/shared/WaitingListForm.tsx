@@ -40,11 +40,11 @@ export default function WaitingListForm() {
   }
 
   if (status === "success") {
-    // Bare placeholder — Max supplies the real acknowledgement copy
-    // alongside the rest of this pivot's placeholder text.
+    // Final copy (2026-09-09, see DECISIONS.md) — the club's impersonal
+    // voice, no warmth added.
     return (
-      <p className="text-caption mt-4" style={{ color: "var(--color-warning)" }}>
-        Received. PLACEHOLDER — acknowledgement copy pending
+      <p className="text-caption mt-4" style={{ color: "var(--color-text-secondary)" }}>
+        Noted.
       </p>
     );
   }

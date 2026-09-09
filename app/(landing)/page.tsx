@@ -284,8 +284,10 @@ export default async function LandingPage() {
           store named (2026-08-24 correction — it used to link out;
           that's been removed for good, not a placeholder gap); path 2
           (the waiting list, secondary, quieter) is WaitingListForm
-          below. Both paths' descriptive copy are explicit, marked
-          placeholders per instruction — not written here. The old
+          below. Path 1's statement got final copy 2026-09-09 (see
+          DECISIONS.md); path 2's pre-submission line below is still a
+          placeholder — only its post-submission acknowledgement
+          ("Noted.", in WaitingListForm.tsx) has landed so far. The old
           subhead ("Answer plainly...") described filling out a form and
           no longer applies to either path, so it's dropped rather than
           kept and wrong. */}
@@ -303,14 +305,14 @@ export default async function LandingPage() {
           {/* Path 1 — primary, through the artifact. Statement only —
               no link, no store named (removed 2026-08-24 per
               instruction). Still the visually prominent block, it just
-              doesn't lead anywhere. */}
+              doesn't lead anywhere. Final copy (2026-09-09, see
+              DECISIONS.md) — the club's impersonal voice. */}
           <Reveal>
             <div className="card-premium text-center" style={{ padding: "clamp(40px, 6vw, 64px)" }}>
-              <p className="text-caption" style={{ color: "var(--color-warning)" }}>
-                PLACEHOLDER — copy pending
-              </p>
-              <p className="text-caption mt-2" style={{ color: "var(--color-text-muted)" }}>
-                Statement: an invitation arrives with an Obsidian piece — the card inside carries the way in.
+              <p className="text-body">Invitations arrive with the object.</p>
+              <p className="text-body mt-4">
+                They are not sold, and they cannot be requested. If you are meant to have one, you will find it in
+                your hands.
               </p>
             </div>
           </Reveal>
