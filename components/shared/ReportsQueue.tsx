@@ -5,10 +5,8 @@ import { useState } from "react";
 export type QueuedReport = {
   id: string;
   // Moderation gap 2 (2026-09-08, see DECISIONS.md): comment/message
-  // added. No new action wired here yet beyond display/resolve — the
-  // Remove button for these lives in the admin-views work that follows
-  // these gaps, not here; the underlying route already exists
-  // (DELETE /api/admin/comments/:id, /messages/:id).
+  // added, with a Remove action of their own (follow-up, same day) —
+  // see the "remove" branch in PATCH /api/admin/reports/:id.
   targetType: "post" | "profile" | "comment" | "message";
   targetId: string;
   category: string;
@@ -23,11 +21,13 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" });
 }
 
-const CONFIRM_MESSAGE: Record<"dismiss" | "review" | "preserve", string> = {
+const CONFIRM_MESSAGE: Record<"dismiss" | "review" | "preserve" | "remove", string> = {
   dismiss: "Dismiss this report? It will be marked reviewed with no action taken.",
   review: "Mark this report reviewed with no further action?",
   preserve:
     "Preserve and remove this post?\n\nIt will be unpublished and isolated (never deleted) — this is the red-line action for underage/non-consensual/threat reports.",
+  remove:
+    "Remove this content and mark the report reviewed?\n\nIt will be soft-deleted (never hard-deleted) and shown to other members as removed by a moderator.",
 };
 
 // Admin report review queue (member protection mechanics, pre-launch
@@ -38,7 +38,7 @@ export default function ReportsQueue({ initial }: { initial: QueuedReport[] }) {
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [errorId, setErrorId] = useState<string | null>(null);
 
-  async function act(id: string, action: "dismiss" | "review" | "preserve") {
+  async function act(id: string, action: "dismiss" | "review" | "preserve" | "remove") {
     if (!window.confirm(CONFIRM_MESSAGE[action])) return;
 
     setPendingId(id);
@@ -115,6 +115,17 @@ export default function ReportsQueue({ initial }: { initial: QueuedReport[] }) {
                 style={{ color: "var(--color-error)" }}
               >
                 Preserve &amp; remove
+              </button>
+            ) : null}
+            {r.targetType === "comment" || r.targetType === "message" ? (
+              <button
+                type="button"
+                onClick={() => act(r.id, "remove")}
+                disabled={pendingId === r.id}
+                className="text-caption"
+                style={{ color: "var(--color-error)" }}
+              >
+                Remove
               </button>
             ) : null}
           </div>
