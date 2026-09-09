@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { InviteSource } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { requireAdmin } from "@/lib/auth/require-admin";
+import { logModerationAction } from "@/lib/moderation/log";
 
 const VALID_SOURCES: InviteSource[] = ["purchase_card", "member", "partner"];
 
@@ -37,6 +38,17 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return NextResponse.json({ error: "This invite has already been redeemed and can't be reassigned." }, { status: 409 });
   }
 
+  const previousSource = token.source;
   const updated = await prisma.inviteToken.update({ where: { id: token.id }, data: { source } });
+
+  // Moderation gap 4 follow-up (2026-09-08, see DECISIONS.md).
+  await logModerationAction({
+    adminId: admin.id,
+    action: "invite_token.source_reassigned",
+    targetType: "invite_token",
+    targetId: token.id,
+    note: `source: ${previousSource} -> ${source}`,
+  });
+
   return NextResponse.json({ ok: true, source: updated.source });
 }

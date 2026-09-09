@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireAdmin } from "@/lib/auth/require-admin";
+import { logModerationAction } from "@/lib/moderation/log";
 
 // POST /api/admin/invite-tokens/:id/revoke — admin batch board, per-token
 // Revoke (reconciliation addendum Task 3, 2026-08-14). Only blocks a
@@ -9,6 +10,11 @@ import { requireAdmin } from "@/lib/auth/require-admin";
 // `redeemedAt` before `revokedAt` never runs for a used token anyway,
 // but rejecting here avoids a misleading "revoked" status sitting next
 // to a real member's redemption).
+//
+// Moderation gap 4 follow-up (2026-09-08, see DECISIONS.md): this and
+// its two sibling actions (arm, source reassignment) were found
+// unattributed while checking ageVerified — small enough to fix
+// alongside it.
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
   const admin = await requireAdmin();
   if (!admin) {
@@ -26,6 +32,14 @@ export async function POST(_request: Request, { params }: { params: { id: string
   const updated = await prisma.inviteToken.update({
     where: { id: token.id },
     data: { revokedAt: new Date(), status: "revoked" },
+  });
+
+  await logModerationAction({
+    adminId: admin.id,
+    action: "invite_token.revoked",
+    targetType: "invite_token",
+    targetId: token.id,
+    note: `status: ${token.status} -> revoked`,
   });
 
   return NextResponse.json({ ok: true, status: updated.status });

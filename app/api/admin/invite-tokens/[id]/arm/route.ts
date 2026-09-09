@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { computeClientExpiresAt, evaluateTokenLifecycle } from "@/lib/invites/lifecycle";
+import { logModerationAction } from "@/lib/moderation/log";
 
 // POST /api/admin/invite-tokens/:id/arm — admin batch board, manual Arm
 // (reconciliation addendum Task 3, 2026-08-14). Same effect as a
@@ -37,6 +38,15 @@ export async function POST(_request: Request, { params }: { params: { id: string
       clientExpiresAt: computeClientExpiresAt(now, token.clientWindowDays, token.validUntil),
       status: "opened",
     },
+  });
+
+  // Moderation gap 4 follow-up (2026-09-08, see DECISIONS.md).
+  await logModerationAction({
+    adminId: admin.id,
+    action: "invite_token.armed",
+    targetType: "invite_token",
+    targetId: token.id,
+    note: `status: ${token.status} -> opened (manual arm)`,
   });
 
   return NextResponse.json({ ok: true, status: updated.status });
