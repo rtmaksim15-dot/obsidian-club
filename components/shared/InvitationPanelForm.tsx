@@ -40,7 +40,7 @@ export default function InvitationPanelForm() {
           name: formData.get("name"),
           email: formData.get("email"),
           city: formData.get("city"),
-          ageConfirmed: formData.get("ageConfirmed") === "on",
+          ageConfirmed: ageAndTruthChecked,
           answer: trimmedAnswer,
         }),
       });
@@ -96,16 +96,14 @@ export default function InvitationPanelForm() {
         <input id="ip-city" name="city" className="input" placeholder="Where you are" />
       </div>
 
-      <label className="flex items-start gap-3 text-left text-[0.8rem] leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
-        <input type="checkbox" name="ageConfirmed" required className="mt-1 shrink-0" />
-        <span>I am at least 18 years old.</span>
-      </label>
-
-      {/* The two safety checkboxes (2026-09-09, see DECISIONS.md) —
-          real copy, replacing the placeholder block. Both required,
-          both gate Submit below. The first restates the age condition
-          the standalone 18+ checkbox above already covers (flagged,
-          not merged — implemented literally as specified). */}
+      {/* The two safety checkboxes (2026-09-09, see DECISIONS.md) — real
+          copy, replacing the placeholder block. Both required, both
+          gate Submit below. The first also carries the age
+          confirmation on its own (merged with the old standalone 18+
+          checkbox, 2026-09-09 follow-up) — one checkbox, one meaning,
+          no restated condition. `ageAndTruthChecked` is sent directly
+          as `ageConfirmed` to the API; there's no separate
+          `name="ageConfirmed"` input anymore. */}
       <div className="space-y-3">
         <label className="flex items-start gap-3 text-left text-[0.8rem] leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
           <input
