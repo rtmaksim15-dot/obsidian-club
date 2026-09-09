@@ -15,6 +15,8 @@ type Application = {
   status: string;
   heldReason: string | null;
   heldNote: string | null;
+  decisionEmailSentAt: string | null;
+  decisionEmailSendError: string | null;
 };
 
 const HOLD_REASONS: { value: string; label: string }[] = [
@@ -44,6 +46,13 @@ const CONFIRM_MESSAGE: Record<"approve" | "decline", (name: string) => string> =
     `Decline ${name}'s application?\n\nThis is final — no explanation is sent. We do not reconsider.`,
 };
 
+// Admin report review queue... — Applications queue (member protection
+// mechanics, pre-launch legal package, 2026-08-09; A5/A6/A7 additions,
+// 2026-09-09, see DECISIONS.md). `status`/`decisionEmailSentAt`/
+// `decisionEmailSendError` on each application are the single source of
+// truth for what's rendered — updated in place from each action's
+// response rather than tracked in separate boolean maps, so the UI
+// can't drift from what actually happened.
 export default function ApplicationsQueue({ initial }: { initial: Application[] }) {
   const [applications, setApplications] = useState(initial);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -53,12 +62,6 @@ export default function ApplicationsQueue({ initial }: { initial: Application[] 
   // `age` above. Keyed by application id since multiple cards render at
   // once. No enforcement gate yet; see DECISIONS.md.
   const [ageVerified, setAgeVerified] = useState<Record<string, boolean>>({});
-  // A6 (2026-09-09, see DECISIONS.md): approving mints a real token and
-  // the admin never sees or handles it — no link to copy anymore (that
-  // was the pre-A6 manual path). Kept in local state, keyed by
-  // application id, purely so the card shows a result instead of
-  // vanishing the moment it's approved, same UX shape as before.
-  const [approvedIds, setApprovedIds] = useState<Record<string, boolean>>({});
   // A5 (2026-09-09, see DECISIONS.md) — Hold needs a reason and an
   // optional note before it can submit, so it opens an inline picker
   // instead of firing on click like Approve/Decline do.
@@ -81,13 +84,55 @@ export default function ApplicationsQueue({ initial }: { initial: Application[] 
           action === "approve" ? { action, ageVerified: Boolean(ageVerified[id]) } : { action },
         ),
       });
+      const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error();
 
       if (action === "decline") {
         setApplications((prev) => prev.filter((a) => a.id !== id));
       } else {
-        setApprovedIds((prev) => ({ ...prev, [id]: true }));
+        setApplications((prev) =>
+          prev.map((a) =>
+            a.id === id
+              ? {
+                  ...a,
+                  status: "approved",
+                  decisionEmailSentAt: body.emailSent ? new Date().toISOString() : null,
+                  decisionEmailSendError: body.emailSent ? null : "Send failed.",
+                }
+              : a,
+          ),
+        );
       }
+    } catch {
+      setErrorId(id);
+    } finally {
+      setPendingId(null);
+    }
+  }
+
+  async function resend(id: string) {
+    setPendingId(id);
+    setErrorId(null);
+    try {
+      const res = await fetch(`/api/admin/applications/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "resend" }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error();
+
+      setApplications((prev) =>
+        prev.map((a) =>
+          a.id === id
+            ? {
+                ...a,
+                decisionEmailSentAt: body.emailSent ? new Date().toISOString() : null,
+                decisionEmailSendError: body.emailSent ? null : "Send failed.",
+              }
+            : a,
+        ),
+      );
     } catch {
       setErrorId(id);
     } finally {
@@ -124,16 +169,14 @@ export default function ApplicationsQueue({ initial }: { initial: Application[] 
     }
   }
 
-  const pendingApplications = applications.filter((a) => !approvedIds[a.id]);
-
-  if (pendingApplications.length === 0 && Object.keys(approvedIds).length === 0) {
+  if (applications.length === 0) {
     return <p className="text-body">No pending applications.</p>;
   }
 
   return (
     <ul className="space-y-4">
       {applications.map((a) => {
-        const isApproved = Boolean(approvedIds[a.id]);
+        const isApproved = a.status === "approved";
         return (
           <li key={a.id} className="card">
             <div className="flex flex-wrap items-start justify-between gap-4">
@@ -240,9 +283,26 @@ export default function ApplicationsQueue({ initial }: { initial: Application[] 
 
             {isApproved ? (
               <div className="mt-4 border-t border-ob-border pt-4">
-                <p className="text-caption" style={{ color: "var(--color-text-secondary)" }}>
-                  Approved.
-                </p>
+                {a.decisionEmailSendError ? (
+                  // A7 (2026-09-09, see DECISIONS.md): loud, not silent —
+                  // a person whose invitation email failed cannot enter
+                  // at all.
+                  <p className="text-body !text-base font-semibold" style={{ color: "var(--color-error)" }}>
+                    ⚠ Invitation email FAILED to send.
+                  </p>
+                ) : (
+                  <p className="text-caption" style={{ color: "var(--color-text-secondary)" }}>
+                    Approved — invitation email sent.
+                  </p>
+                )}
+                <button
+                  type="button"
+                  className="btn-secondary mt-2"
+                  disabled={pendingId === a.id}
+                  onClick={() => resend(a.id)}
+                >
+                  {pendingId === a.id ? "…" : "Resend"}
+                </button>
               </div>
             ) : null}
 

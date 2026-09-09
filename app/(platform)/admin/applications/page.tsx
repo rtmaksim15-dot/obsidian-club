@@ -19,8 +19,21 @@ export default async function AdminApplicationsPage() {
   // A5 (2026-09-09, see DECISIONS.md): held applications are
   // non-terminal — they stay actionable in the same queue as pending
   // ones, not a separate view.
+  //
+  // A7: also pulls in any already-approved application whose invitation
+  // email failed to send — persistently, across reloads, not just for
+  // the admin who happened to be watching the screen when it happened.
+  // A person whose email failed cannot enter at all, so this can't be a
+  // same-session-only signal. Declines aren't included here: a failed
+  // decline email isn't blocking anyone's access, so it doesn't carry
+  // the same urgency (see the route's own comment).
   const applications = await prisma.waitlist.findMany({
-    where: { status: { in: ["pending", "held"] } },
+    where: {
+      OR: [
+        { status: { in: ["pending", "held"] } },
+        { status: "approved", decisionEmailSendError: { not: null } },
+      ],
+    },
     orderBy: { createdAt: "asc" },
   });
 
@@ -43,6 +56,8 @@ export default async function AdminApplicationsPage() {
             status: a.status,
             heldReason: a.heldReason,
             heldNote: a.heldNote,
+            decisionEmailSentAt: a.decisionEmailSentAt?.toISOString() ?? null,
+            decisionEmailSendError: a.decisionEmailSendError,
           }))}
         />
       </div>

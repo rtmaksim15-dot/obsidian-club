@@ -5,8 +5,9 @@ import { requireAdmin } from "@/lib/auth/require-admin";
 import { track } from "@/lib/analytics/track";
 import { generateInviteToken } from "@/lib/utils/codes";
 import { computeValidUntil, HARD_CAP_DAYS } from "@/lib/invites/lifecycle";
+import { sendApplicationAcceptedEmail, sendApplicationDeclinedEmail } from "@/lib/utils/email";
 
-type Action = "approve" | "decline" | "hold";
+type Action = "approve" | "decline" | "hold" | "resend";
 const VALID_HOLD_REASONS: ApplicationHoldReason[] = ["order_not_confirmed", "age_check_needed", "needs_follow_up", "waiting"];
 
 type Body = { action?: Action; ageVerified?: boolean; heldReason?: string; heldNote?: string };
@@ -51,8 +52,19 @@ type Body = { action?: Action; ageVerified?: boolean; heldReason?: string; heldN
 // source uses.
 //
 // The admin no longer sees or handles the token at all — no inviteUrl
-// in the response, nothing to copy. Email sending is A7, next; this
-// step only retires the manual-copy path and issues the token.
+// in the response, nothing to copy. It's emailed directly (A7 below).
+//
+// A7 (2026-09-09, see DECISIONS.md): email is now the only door. Accept
+// sends sendApplicationAcceptedEmail with the token link; Decline sends
+// sendApplicationDeclinedEmail with no reason (PRODUCT.md §1). Both
+// record success/failure onto Waitlist.decisionEmailSentAt/
+// decisionEmailSendError (added back in A1 for exactly this) so a
+// failed send is a queryable, surfaced fact, not a silent one — see
+// ApplicationsQueue.tsx for how it's shown. "resend" reuses the
+// existing InviteToken via applicationTokenId and never mints a new
+// one; it's the only action with a different status precondition
+// (must already be "approved"), so it's checked before the general
+// pending/held guard below.
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const admin = await requireAdmin();
   if (!admin) {
@@ -66,14 +78,36 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
 
-  if (body.action !== "approve" && body.action !== "decline" && body.action !== "hold") {
-    return NextResponse.json({ error: 'action must be "approve", "decline", or "hold".' }, { status: 422 });
+  if (body.action !== "approve" && body.action !== "decline" && body.action !== "hold" && body.action !== "resend") {
+    return NextResponse.json({ error: 'action must be "approve", "decline", "hold", or "resend".' }, { status: 422 });
   }
 
   const application = await prisma.waitlist.findUnique({ where: { id: params.id } });
   if (!application) {
     return NextResponse.json({ error: "Application not found." }, { status: 404 });
   }
+
+  if (body.action === "resend") {
+    if (application.status !== "approved") {
+      return NextResponse.json({ error: "Only an approved application can be resent." }, { status: 422 });
+    }
+    if (!application.applicationTokenId) {
+      return NextResponse.json({ error: "No token to resend." }, { status: 422 });
+    }
+    const token = await prisma.inviteToken.findUnique({ where: { id: application.applicationTokenId } });
+    if (!token) {
+      return NextResponse.json({ error: "Token not found." }, { status: 404 });
+    }
+    const result = await sendApplicationAcceptedEmail(application.email, token.token);
+    await prisma.waitlist.update({
+      where: { id: application.id },
+      data: result.ok
+        ? { decisionEmailSentAt: new Date(), decisionEmailSendError: null }
+        : { decisionEmailSendError: result.error ?? "Unknown error" },
+    });
+    return NextResponse.json({ ok: true, emailSent: result.ok });
+  }
+
   if (application.status !== "pending" && application.status !== "held") {
     return NextResponse.json(
       { error: `Already ${application.status}.` },
@@ -102,7 +136,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
   if (body.action === "decline") {
     // PRODUCT.md §1: declines carry no explanation — that opacity is
-    // intentional, so no email is sent here.
+    // intentional; sendApplicationDeclinedEmail gives no reason either.
     await prisma.waitlist.update({
       where: { id: application.id },
       data: { status: "declined", reviewedAt: new Date(), reviewedBy: admin.id },
@@ -112,7 +146,16 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     // (PRODUCT.md §1: declines carry no explanation) — nothing real to
     // put there, so it's omitted rather than faked.
     await track({ userId: null, type: "waitlist.rejected", entity: "invite", entityId: application.id });
-    return NextResponse.json({ ok: true, status: "declined" });
+
+    const result = await sendApplicationDeclinedEmail(application.email);
+    await prisma.waitlist.update({
+      where: { id: application.id },
+      data: result.ok
+        ? { decisionEmailSentAt: new Date(), decisionEmailSendError: null }
+        : { decisionEmailSendError: result.error ?? "Unknown error" },
+    });
+
+    return NextResponse.json({ ok: true, status: "declined", emailSent: result.ok });
   }
 
   // --- approve: mint a real InviteToken, never the legacy hex field ---
@@ -150,5 +193,13 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     meta: { reviewedBy: admin.id, waitDays },
   });
 
-  return NextResponse.json({ ok: true, status: "approved" });
+  const result = await sendApplicationAcceptedEmail(application.email, token.token);
+  await prisma.waitlist.update({
+    where: { id: application.id },
+    data: result.ok
+      ? { decisionEmailSentAt: new Date(), decisionEmailSendError: null }
+      : { decisionEmailSendError: result.error ?? "Unknown error" },
+  });
+
+  return NextResponse.json({ ok: true, status: "approved", emailSent: result.ok });
 }
