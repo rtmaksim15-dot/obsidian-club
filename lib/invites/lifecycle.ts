@@ -2,10 +2,17 @@ import "server-only";
 import crypto from "crypto";
 
 // Batch generator v2 (2026-08-14) — the print-batch lifecycle: a hard
-// 90-day cap from generation, and a 7-day client window armed on first
-// scan of /join/[token] (see evaluateTokenLifecycle below). Values are
-// spec'd in the reconciliation addendum, not arbitrary.
-export const HARD_CAP_DAYS = 90;
+// cap from generation, and a 7-day client window armed on first scan of
+// /join/[token] (see evaluateTokenLifecycle below). Values are spec'd,
+// not arbitrary. HARD_CAP_DAYS changed 90 -> 20 (2026-09-09, see
+// DECISIONS.md) for the invitation-panel flow's Accept-issued tokens —
+// no currently-mintable token path is actually affected by this change
+// today: the print-batch generator that used to call computeValidUntil()
+// is retired for new batches (A1), and member/partner invites never set
+// validUntil at all. This sets the constant correctly for when the
+// application-accept flow (A6, not yet built) starts minting tokens
+// through it.
+export const HARD_CAP_DAYS = 20;
 export const DEFAULT_CLIENT_WINDOW_DAYS = 7;
 
 // Reconciliation addendum (2026-08-14): print-batch CSV/QR export must
