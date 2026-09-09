@@ -67,6 +67,25 @@ export default function RoomChat({ room, currentUserId, initialMessages }: Props
     //    comes from `GET /api/rooms/:slug/messages`, which already
     //    enforces the real per-room canAccessRoom() check server-side
     //    (see that route). See DECISIONS.md, 2026-08-04.
+    //
+    // UPDATE added (moderation gap 1 follow-up, 2026-09-08, see
+    // DECISIONS.md): a soft-delete is an UPDATE (isDeleted flips), not
+    // an INSERT — without this, a removed message stayed fully visible
+    // to everyone with the room open until their next fetch, which is
+    // exactly wrong for the content this exists to remove (doxxing, a
+    // contact solicitation). Same handler, same refetch-and-replace
+    // approach as INSERT already used; no new RLS policy needed, since
+    // Realtime's authorization check is "can this role SELECT this row,"
+    // not operation-specific — the existing SELECT policy already covers
+    // it.
+    async function refetchMessages() {
+      const res = await fetch(`/api/rooms/${room.slug}/messages`);
+      if (res.ok) {
+        const body = await res.json();
+        setMessages(body.messages);
+      }
+    }
+
     supabase.auth.getSession().then(() => {
       if (cancelled) return;
       channel = supabase
@@ -74,13 +93,12 @@ export default function RoomChat({ room, currentUserId, initialMessages }: Props
         .on(
           "postgres_changes",
           { event: "INSERT", schema: "public", table: "messages", filter: `room_id=eq.${room.id}` },
-          async () => {
-            const res = await fetch(`/api/rooms/${room.slug}/messages`);
-            if (res.ok) {
-              const body = await res.json();
-              setMessages(body.messages);
-            }
-          }
+          refetchMessages
+        )
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "messages", filter: `room_id=eq.${room.id}` },
+          refetchMessages
         )
         .subscribe();
     });
