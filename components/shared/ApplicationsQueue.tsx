@@ -12,7 +12,17 @@ type Application = {
   reason: string | null;
   referralCode: string | null;
   createdAt: string;
+  status: string;
+  heldReason: string | null;
+  heldNote: string | null;
 };
+
+const HOLD_REASONS: { value: string; label: string }[] = [
+  { value: "order_not_confirmed", label: "Order not confirmed" },
+  { value: "age_check_needed", label: "Age check needed" },
+  { value: "needs_follow_up", label: "Needs follow-up" },
+  { value: "waiting", label: "Waiting" },
+];
 
 // toLocaleDateString() with no fixed locale/timeZone renders differently
 // on the server (container locale) vs. the browser (visitor locale),
@@ -21,6 +31,10 @@ type Application = {
 // locale/UTC so server and client always agree.
 function formatAppliedDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { timeZone: "UTC" });
+}
+
+function holdReasonLabel(value: string | null) {
+  return HOLD_REASONS.find((r) => r.value === value)?.label ?? value;
 }
 
 const CONFIRM_MESSAGE: Record<"approve" | "decline", (name: string) => string> = {
@@ -46,6 +60,12 @@ export default function ApplicationsQueue({ initial }: { initial: Application[] 
   // vanishing the moment it's approved.
   const [inviteLinks, setInviteLinks] = useState<Record<string, string>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  // A5 (2026-09-09, see DECISIONS.md) — Hold needs a reason and an
+  // optional note before it can submit, so it opens an inline picker
+  // instead of firing on click like Approve/Decline do.
+  const [holdingId, setHoldingId] = useState<string | null>(null);
+  const [holdReason, setHoldReason] = useState<string>("");
+  const [holdNote, setHoldNote] = useState("");
 
   async function review(id: string, action: "approve" | "decline") {
     const app = applications.find((a) => a.id === id);
@@ -70,6 +90,35 @@ export default function ApplicationsQueue({ initial }: { initial: Application[] 
       } else {
         setInviteLinks((prev) => ({ ...prev, [id]: body.inviteUrl }));
       }
+    } catch {
+      setErrorId(id);
+    } finally {
+      setPendingId(null);
+    }
+  }
+
+  function startHold(id: string) {
+    setHoldingId(id);
+    setHoldReason("");
+    setHoldNote("");
+  }
+
+  async function submitHold(id: string) {
+    if (!holdReason) return;
+    setPendingId(id);
+    setErrorId(null);
+    try {
+      const res = await fetch(`/api/admin/applications/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "hold", heldReason: holdReason, heldNote: holdNote.trim() || undefined }),
+      });
+      if (!res.ok) throw new Error();
+
+      setApplications((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, status: "held", heldReason: holdReason, heldNote: holdNote.trim() || null } : a)),
+      );
+      setHoldingId(null);
     } catch {
       setErrorId(id);
     } finally {
@@ -110,6 +159,12 @@ export default function ApplicationsQueue({ initial }: { initial: Application[] 
                 <p className="text-caption mt-2">
                   Applied {formatAppliedDate(a.createdAt)}
                 </p>
+                {a.status === "held" ? (
+                  <p className="text-caption mt-2" style={{ color: "var(--color-warning)" }}>
+                    Held — {holdReasonLabel(a.heldReason)}
+                    {a.heldNote ? `: ${a.heldNote}` : ""}
+                  </p>
+                ) : null}
               </div>
               {!inviteUrl ? (
                 <div className="flex shrink-0 flex-col items-end gap-2">
@@ -122,6 +177,13 @@ export default function ApplicationsQueue({ initial }: { initial: Application[] 
                     Age verified
                   </label>
                   <div className="flex gap-2">
+                    <button
+                      className="btn-secondary"
+                      disabled={pendingId === a.id}
+                      onClick={() => startHold(a.id)}
+                    >
+                      Hold
+                    </button>
                     <button
                       className="btn-secondary"
                       disabled={pendingId === a.id}
@@ -140,6 +202,49 @@ export default function ApplicationsQueue({ initial }: { initial: Application[] 
                 </div>
               ) : null}
             </div>
+
+            {holdingId === a.id ? (
+              <div className="mt-4 border-t border-ob-border pt-4">
+                <label className="input-label" htmlFor={`hold-reason-${a.id}`}>
+                  Hold reason
+                </label>
+                <select
+                  id={`hold-reason-${a.id}`}
+                  className="input mt-1"
+                  value={holdReason}
+                  onChange={(e) => setHoldReason(e.target.value)}
+                >
+                  <option value="">Choose a reason…</option>
+                  {HOLD_REASONS.map((r) => (
+                    <option key={r.value} value={r.value}>
+                      {r.label}
+                    </option>
+                  ))}
+                </select>
+                <label className="input-label mt-3 block" htmlFor={`hold-note-${a.id}`}>
+                  Note <span className="normal-case">(optional)</span>
+                </label>
+                <input
+                  id={`hold-note-${a.id}`}
+                  className="input mt-1"
+                  value={holdNote}
+                  onChange={(e) => setHoldNote(e.target.value)}
+                />
+                <div className="mt-3 flex gap-2">
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={!holdReason || pendingId === a.id}
+                    onClick={() => submitHold(a.id)}
+                  >
+                    Confirm Hold
+                  </button>
+                  <button type="button" className="btn-secondary" onClick={() => setHoldingId(null)}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : null}
 
             {inviteUrl ? (
               <div className="mt-4 border-t border-ob-border pt-4">

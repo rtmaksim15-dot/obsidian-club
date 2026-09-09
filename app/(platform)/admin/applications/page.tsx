@@ -16,8 +16,11 @@ export default async function AdminApplicationsPage() {
     notFound();
   }
 
+  // A5 (2026-09-09, see DECISIONS.md): held applications are
+  // non-terminal — they stay actionable in the same queue as pending
+  // ones, not a separate view.
   const applications = await prisma.waitlist.findMany({
-    where: { status: "pending" },
+    where: { status: { in: ["pending", "held"] } },
     orderBy: { createdAt: "asc" },
   });
 
@@ -37,6 +40,9 @@ export default async function AdminApplicationsPage() {
             reason: a.reason,
             referralCode: a.referralCode,
             createdAt: a.createdAt.toISOString(),
+            status: a.status,
+            heldReason: a.heldReason,
+            heldNote: a.heldNote,
           }))}
         />
       </div>

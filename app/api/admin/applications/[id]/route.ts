@@ -1,24 +1,32 @@
 import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
+import type { ApplicationHoldReason } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { track } from "@/lib/analytics/track";
 
-type Body = { action?: "approve" | "decline"; ageVerified?: boolean };
+type Action = "approve" | "decline" | "hold";
+const VALID_HOLD_REASONS: ApplicationHoldReason[] = ["order_not_confirmed", "age_check_needed", "needs_follow_up", "waiting"];
 
-// PATCH /api/admin/applications/:id — approve or decline a waitlist entry.
+type Body = { action?: Action; ageVerified?: boolean; heldReason?: string; heldNote?: string };
+
+// PATCH /api/admin/applications/:id — approve, decline, or hold a
+// waitlist entry.
 //
-// Closed Registration & Invite System (2026-07-17): approving no longer
-// creates the account itself — it only generates a one-time invite token
-// and returns the resulting link for the admin to copy and send
-// manually. The account (Supabase Auth user, `public.users` row,
-// referral resolution, REP awards) is only created when that link is
-// actually redeemed — see app/api/invite/[token]/route.ts. This replaces
-// the old flow (create the account immediately + auto-email a Supabase-
-// generated invite link via Resend), which had a real gap: the emailed
-// link never actually prompted for a password anywhere, so a member who
-// clicked it ended up with an account they could never log back into
-// once that one-time link was spent. See DECISIONS.md.
+// A5 (2026-09-09, see DECISIONS.md): added Hold as a third, non-terminal
+// outcome alongside the existing approve/decline. A held application
+// isn't a final decision — it can still move to approved/declined
+// later, so the status guard below accepts both "pending" and "held" as
+// startable states. `heldReason`/`heldNote` hold the CURRENT hold
+// reason (overwritten on a repeat Hold, not appended — see
+// ApplicationHoldReason's schema comment); `reviewedAt`/`reviewedBy`
+// double as "who/when last touched this," same as they already did for
+// approve/decline, and `heldAt` marks specifically when this hold
+// happened.
+//
+// Approve/decline behavior themselves are unchanged in this step —
+// still the legacy Waitlist.inviteToken/manual-copy-link path. That
+// changes in A6.
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const admin = await requireAdmin();
   if (!admin) {
@@ -32,19 +40,38 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
 
-  if (body.action !== "approve" && body.action !== "decline") {
-    return NextResponse.json({ error: 'action must be "approve" or "decline".' }, { status: 422 });
+  if (body.action !== "approve" && body.action !== "decline" && body.action !== "hold") {
+    return NextResponse.json({ error: 'action must be "approve", "decline", or "hold".' }, { status: 422 });
   }
 
   const application = await prisma.waitlist.findUnique({ where: { id: params.id } });
   if (!application) {
     return NextResponse.json({ error: "Application not found." }, { status: 404 });
   }
-  if (application.status !== "pending") {
+  if (application.status !== "pending" && application.status !== "held") {
     return NextResponse.json(
       { error: `Already ${application.status}.` },
       { status: 409 }
     );
+  }
+
+  if (body.action === "hold") {
+    const heldReason = body.heldReason as ApplicationHoldReason;
+    if (!heldReason || !VALID_HOLD_REASONS.includes(heldReason)) {
+      return NextResponse.json({ error: "A hold reason is required." }, { status: 422 });
+    }
+    await prisma.waitlist.update({
+      where: { id: application.id },
+      data: {
+        status: "held",
+        heldReason,
+        heldNote: body.heldNote?.trim() || null,
+        heldAt: new Date(),
+        reviewedAt: new Date(),
+        reviewedBy: admin.id,
+      },
+    });
+    return NextResponse.json({ ok: true, status: "held" });
   }
 
   if (body.action === "decline") {
