@@ -1,9 +1,10 @@
-import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import type { ApplicationHoldReason } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { track } from "@/lib/analytics/track";
+import { generateInviteToken } from "@/lib/utils/codes";
+import { computeValidUntil, HARD_CAP_DAYS } from "@/lib/invites/lifecycle";
 
 type Action = "approve" | "decline" | "hold";
 const VALID_HOLD_REASONS: ApplicationHoldReason[] = ["order_not_confirmed", "age_check_needed", "needs_follow_up", "waiting"];
@@ -24,9 +25,34 @@ type Body = { action?: Action; ageVerified?: boolean; heldReason?: string; heldN
 // approve/decline, and `heldAt` marks specifically when this hold
 // happened.
 //
-// Approve/decline behavior themselves are unchanged in this step —
-// still the legacy Waitlist.inviteToken/manual-copy-link path. That
-// changes in A6.
+// A6 (2026-09-09, see DECISIONS.md): Accept now mints a real InviteToken
+// (source: "application") via Waitlist.applicationTokenId — NOT the
+// legacy `inviteToken` hex field / /invite/[token] path, which is
+// frozen for its one outstanding real link and never written for new
+// records again (see app/api/invite/[token]/route.ts's own comment).
+// A token is created only here, only on Accept, never before and never
+// by any other route. Redemption goes through /join/[token], same as
+// purchase_card/member/partner already do — evaluateTokenLifecycle and
+// that route's transaction are untouched, no new branch needed there
+// for this source (source only matters for attribution — see
+// app/api/join/[token]/route.ts's existing member/partner conditionals,
+// which "application" simply doesn't match, same as purchase_card
+// today). No REP award, no Referral row — matching that existing
+// precedent, not the old /invite/[token] flow's behavior.
+//
+// clientWindowDays is set equal to HARD_CAP_DAYS for this source: since
+// firstScannedAt (whenever set) is always >= createdAt, validUntil
+// (createdAt + HARD_CAP_DAYS) is always <= firstScannedAt +
+// HARD_CAP_DAYS, so computeClientExpiresAt() always resolves to
+// validUntil — the flat hard cap from issuance is what governs expiry,
+// the 7-day client-scan-window mechanic never actually binds. This is
+// "no scan/arming window for this source" achieved without
+// special-casing the shared arming logic in /join/[token] that every
+// source uses.
+//
+// The admin no longer sees or handles the token at all — no inviteUrl
+// in the response, nothing to copy. Email sending is A7, next; this
+// step only retires the manual-copy path and issues the token.
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const admin = await requireAdmin();
   if (!admin) {
@@ -89,23 +115,33 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return NextResponse.json({ ok: true, status: "declined" });
   }
 
-  // --- approve: generate the one-time invite token, nothing else yet ---
-  const inviteToken = randomBytes(24).toString("hex");
+  // --- approve: mint a real InviteToken, never the legacy hex field ---
   const ageVerified = Boolean(body.ageVerified);
+  const now = new Date();
+
+  const token = await prisma.inviteToken.create({
+    data: {
+      token: generateInviteToken(),
+      source: "application",
+      validUntil: computeValidUntil(now),
+      clientWindowDays: HARD_CAP_DAYS,
+      status: "unused",
+    },
+  });
 
   await prisma.waitlist.update({
     where: { id: application.id },
     data: {
       status: "approved",
-      reviewedAt: new Date(),
+      reviewedAt: now,
       reviewedBy: admin.id,
-      inviteToken,
       ageVerified,
-      ageVerifiedAt: ageVerified ? new Date() : null,
+      ageVerifiedAt: ageVerified ? now : null,
+      applicationTokenId: token.id,
     },
   });
 
-  const waitDays = Math.floor((Date.now() - application.createdAt.getTime()) / 86_400_000);
+  const waitDays = Math.floor((now.getTime() - application.createdAt.getTime()) / 86_400_000);
   await track({
     userId: null,
     type: "waitlist.approved",
@@ -114,10 +150,5 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     meta: { reviewedBy: admin.id, waitDays },
   });
 
-  const { origin } = new URL(request.url);
-  return NextResponse.json({
-    ok: true,
-    status: "approved",
-    inviteUrl: `${origin}/invite/${inviteToken}`,
-  });
+  return NextResponse.json({ ok: true, status: "approved" });
 }

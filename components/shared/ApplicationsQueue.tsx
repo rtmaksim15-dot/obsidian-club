@@ -53,13 +53,12 @@ export default function ApplicationsQueue({ initial }: { initial: Application[] 
   // `age` above. Keyed by application id since multiple cards render at
   // once. No enforcement gate yet; see DECISIONS.md.
   const [ageVerified, setAgeVerified] = useState<Record<string, boolean>>({});
-  // Approving no longer creates the account — it returns a one-time
-  // invite link the admin has to copy and send themselves (Closed
-  // Registration & Invite System, 2026-07-17). Kept in local state,
-  // keyed by application id, so the card can show it instead of
-  // vanishing the moment it's approved.
-  const [inviteLinks, setInviteLinks] = useState<Record<string, string>>({});
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  // A6 (2026-09-09, see DECISIONS.md): approving mints a real token and
+  // the admin never sees or handles it — no link to copy anymore (that
+  // was the pre-A6 manual path). Kept in local state, keyed by
+  // application id, purely so the card shows a result instead of
+  // vanishing the moment it's approved, same UX shape as before.
+  const [approvedIds, setApprovedIds] = useState<Record<string, boolean>>({});
   // A5 (2026-09-09, see DECISIONS.md) — Hold needs a reason and an
   // optional note before it can submit, so it opens an inline picker
   // instead of firing on click like Approve/Decline do.
@@ -82,13 +81,12 @@ export default function ApplicationsQueue({ initial }: { initial: Application[] 
           action === "approve" ? { action, ageVerified: Boolean(ageVerified[id]) } : { action },
         ),
       });
-      const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error();
 
       if (action === "decline") {
         setApplications((prev) => prev.filter((a) => a.id !== id));
       } else {
-        setInviteLinks((prev) => ({ ...prev, [id]: body.inviteUrl }));
+        setApprovedIds((prev) => ({ ...prev, [id]: true }));
       }
     } catch {
       setErrorId(id);
@@ -126,22 +124,16 @@ export default function ApplicationsQueue({ initial }: { initial: Application[] 
     }
   }
 
-  async function copyLink(id: string, url: string) {
-    await navigator.clipboard.writeText(url);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId((current) => (current === id ? null : current)), 2000);
-  }
+  const pendingApplications = applications.filter((a) => !approvedIds[a.id]);
 
-  const pendingApplications = applications.filter((a) => !inviteLinks[a.id]);
-
-  if (pendingApplications.length === 0 && Object.keys(inviteLinks).length === 0) {
+  if (pendingApplications.length === 0 && Object.keys(approvedIds).length === 0) {
     return <p className="text-body">No pending applications.</p>;
   }
 
   return (
     <ul className="space-y-4">
       {applications.map((a) => {
-        const inviteUrl = inviteLinks[a.id];
+        const isApproved = Boolean(approvedIds[a.id]);
         return (
           <li key={a.id} className="card">
             <div className="flex flex-wrap items-start justify-between gap-4">
@@ -166,7 +158,7 @@ export default function ApplicationsQueue({ initial }: { initial: Application[] 
                   </p>
                 ) : null}
               </div>
-              {!inviteUrl ? (
+              {!isApproved ? (
                 <div className="flex shrink-0 flex-col items-end gap-2">
                   <label className="text-caption flex items-center gap-2">
                     <input
@@ -246,22 +238,11 @@ export default function ApplicationsQueue({ initial }: { initial: Application[] 
               </div>
             ) : null}
 
-            {inviteUrl ? (
+            {isApproved ? (
               <div className="mt-4 border-t border-ob-border pt-4">
                 <p className="text-caption" style={{ color: "var(--color-text-secondary)" }}>
-                  Approved — copy this link and send it to them yourself. It works once.
+                  Approved.
                 </p>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <code
-                    className="text-caption flex-1 break-all rounded-ob border px-3 py-2"
-                    style={{ borderColor: "var(--color-border)", color: "var(--color-text-primary)" }}
-                  >
-                    {inviteUrl}
-                  </code>
-                  <button type="button" className="btn-secondary shrink-0" onClick={() => copyLink(a.id, inviteUrl)}>
-                    {copiedId === a.id ? "Copied" : "Copy"}
-                  </button>
-                </div>
               </div>
             ) : null}
 
