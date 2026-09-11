@@ -56,9 +56,38 @@ import AdminConsole from "@/components/admin/AdminConsole";
 // none were asked for; not invented here. "Notes" stays out entirely,
 // per the original build order's own separate later step for it.
 //
-// Full per-zone depth for Arbitration/Invitations is still built out
-// in the steps that follow, per the specified order. Same
-// notFound()-not-redirect pattern as every other admin page.
+// Step 5 (2026-09-11): Zone 3 (Arbitration) full depth. Reuses the
+// existing PATCH /api/admin/reports/[id] action route unchanged
+// (dismiss/review/preserve/remove) -- components/shared/ReportsQueue.tsx
+// had this logic already, same orphaned-since-the-fold shape as the
+// other zones' predecessors. Report.targetId is a bare polymorphic uuid
+// with no Prisma relation (confirmed against the schema, same shape
+// Waitlist.reviewedBy already had) -- resolving it to actual reported
+// content requires the manual per-targetType batched lookup the
+// pre-fold admin/reports/page.tsx already did (recovered from git
+// history), extended here with the target's author and enough context
+// (parent post for a comment, room for a message) to build a one-click
+// link where the target's own visibility rules make that reliable.
+// Notably, Post has no admin bypass on its own detail route and no
+// soft-delete field (only isPreserved) -- once a red-line report is
+// preserved, /posts/[id] 404s for the admin same as anyone, so the
+// panel carries its own copy of the content rather than depending on
+// the link. "Full history" turned out to have three independent, real
+// meanings, none pre-built: other open/resolved reports against the
+// same exact target (self-joins on the existing
+// @@index([targetType, targetId])), every ModerationAction ever logged
+// against that target (the action route already writes these with
+// targetType/targetId = the report's own target, not "report" --
+// same read Zone 2 already does for targetType "user"), and the
+// reporter's own filing history (a fresh groupBy, no existing query
+// did this). All three are shown, clearly labeled, rather than
+// guessing at one. The confirm-dialog-before-PATCH pattern from every
+// other zone's actions is kept -- "one-click" reads as direct context
+// links, not skipping confirmation, matching every existing precedent.
+//
+// Full per-zone depth for Invitations is still built out in the step
+// that follows, per the specified order. Same notFound()-not-redirect
+// pattern as every other admin page.
 export default async function AdminConsolePage() {
   const admin = await requireAdmin();
   if (!admin) {
@@ -118,8 +147,17 @@ export default async function AdminConsolePage() {
     }),
     prisma.report.findMany({
       where: { status: "open" },
-      orderBy: { createdAt: "asc" },
+      // Red-line categories (underage/non_consensual/threat) first,
+      // oldest-first within each group — matches the pre-fold
+      // admin/reports/page.tsx's own ordering (git history), lost when
+      // Step 1 first stood up this zone as a bare minimal list.
+      orderBy: [{ isRedLine: "desc" }, { createdAt: "asc" }],
       take: 50,
+      include: {
+        reporter: {
+          select: { id: true, displayName: true, username: true, level: true, trustScore: true, ageVerified: true, joinedAt: true },
+        },
+      },
     }),
     prisma.inviteToken.findMany({
       orderBy: { createdAt: "desc" },
@@ -205,11 +243,128 @@ export default async function AdminConsolePage() {
     adminActionsByTarget.set(m.targetId, list);
   }
 
+  // Zone 3's batch: targetId has no Prisma relation (bare polymorphic
+  // uuid, same shape Waitlist.reviewedBy already had), so the reported
+  // content is resolved per targetType, batched across every open
+  // report rather than one query per report.
+  const postTargetIds = reports.filter((r) => r.targetType === "post").map((r) => r.targetId);
+  const commentTargetIds = reports.filter((r) => r.targetType === "comment").map((r) => r.targetId);
+  const messageTargetIds = reports.filter((r) => r.targetType === "message").map((r) => r.targetId);
+  const profileTargetIds = reports.filter((r) => r.targetType === "profile").map((r) => r.targetId);
+  const reportTargetPairs = reports.map((r) => ({ targetType: r.targetType, targetId: r.targetId }));
+
+  const [targetPosts, targetComments, targetMessages, targetProfiles, siblingReports, targetModerationActions] =
+    await Promise.all([
+      postTargetIds.length
+        ? prisma.post.findMany({
+            where: { id: { in: postTargetIds } },
+            select: {
+              id: true,
+              title: true,
+              content: true,
+              isPublished: true,
+              isPreserved: true,
+              createdAt: true,
+              author: { select: { id: true, displayName: true, username: true, level: true, trustScore: true, ageVerified: true } },
+            },
+          })
+        : Promise.resolve([]),
+      commentTargetIds.length
+        ? prisma.comment.findMany({
+            where: { id: { in: commentTargetIds } },
+            select: {
+              id: true,
+              content: true,
+              isDeleted: true,
+              createdAt: true,
+              postId: true,
+              post: { select: { id: true, title: true, isPublished: true } },
+              author: { select: { id: true, displayName: true, username: true, level: true, trustScore: true, ageVerified: true } },
+            },
+          })
+        : Promise.resolve([]),
+      messageTargetIds.length
+        ? prisma.message.findMany({
+            where: { id: { in: messageTargetIds } },
+            select: {
+              id: true,
+              content: true,
+              isDeleted: true,
+              createdAt: true,
+              room: { select: { id: true, slug: true, name: true } },
+              user: { select: { id: true, displayName: true, username: true, level: true, trustScore: true, ageVerified: true } },
+            },
+          })
+        : Promise.resolve([]),
+      profileTargetIds.length
+        ? prisma.user.findMany({
+            where: { id: { in: profileTargetIds } },
+            select: { id: true, displayName: true, username: true, level: true, trustScore: true, ageVerified: true, joinedAt: true },
+          })
+        : Promise.resolve([]),
+      // (a) other reports (any status) against the exact same target —
+      // uses the existing @@index([targetType, targetId]); excluded per
+      // report by id below, not in the query itself (an OR of every
+      // listed report's target, one query total).
+      reportTargetPairs.length
+        ? prisma.report.findMany({
+            where: { OR: reportTargetPairs },
+            select: { id: true, targetType: true, targetId: true, status: true, category: true, createdAt: true },
+          })
+        : Promise.resolve([]),
+      // (b) every ModerationAction ever logged against these exact
+      // targets — the action route always logs targetType/targetId as
+      // the report's own target, never "report" itself, so this is real
+      // admin-activity history, not just this report's own resolution.
+      reportTargetPairs.length
+        ? prisma.moderationAction.findMany({
+            where: { OR: reportTargetPairs.map((t) => ({ targetType: t.targetType, targetId: t.targetId })) },
+            orderBy: { createdAt: "desc" },
+          })
+        : Promise.resolve([]),
+    ]);
+
+  const postById = new Map(targetPosts.map((p) => [p.id, p]));
+  const commentById = new Map(targetComments.map((c) => [c.id, c]));
+  const messageById = new Map(targetMessages.map((m) => [m.id, m]));
+  const profileById = new Map(targetProfiles.map((u) => [u.id, u]));
+
+  const targetKey = (t: string, id: string) => `${t}:${id}`;
+  const siblingReportsByTarget = new Map<string, typeof siblingReports>();
+  for (const s of siblingReports) {
+    const key = targetKey(s.targetType, s.targetId);
+    const list = siblingReportsByTarget.get(key) ?? [];
+    list.push(s);
+    siblingReportsByTarget.set(key, list);
+  }
+  const targetActionsByTarget = new Map<string, typeof targetModerationActions>();
+  for (const m of targetModerationActions) {
+    if (!m.targetType || !m.targetId) continue;
+    const key = targetKey(m.targetType, m.targetId);
+    const list = targetActionsByTarget.get(key) ?? [];
+    list.push(m);
+    targetActionsByTarget.set(key, list);
+  }
+
+  // (c) the reporter's own filing history — how many reports they've
+  // filed, broken down by outcome. No existing query did this.
+  const reporterIds = Array.from(new Set(reports.map((r) => r.reporterId)));
+  const reporterFilingRows = reporterIds.length
+    ? await prisma.report.groupBy({ by: ["reporterId", "status"], where: { reporterId: { in: reporterIds } }, _count: { _all: true } })
+    : [];
+  const filingStatsByReporter = new Map<string, { open: number; reviewed: number; dismissed: number }>();
+  for (const row of reporterFilingRows) {
+    const stats = filingStatsByReporter.get(row.reporterId) ?? { open: 0, reviewed: 0, dismissed: 0 };
+    stats[row.status as "open" | "reviewed" | "dismissed"] = row._count._all;
+    filingStatsByReporter.set(row.reporterId, stats);
+  }
+
   // reviewedBy (Waitlist), invitedById/partnerId (User), and adminId
-  // (ModerationAction) are all raw User.id fields, not Prisma relations
-  // (see schema comments) — resolved together in one shared name-lookup
-  // query rather than one per concern, since in practice it's usually
-  // the same handful of accounts either way.
+  // (ModerationAction, both Zone 2's and Zone 3's) are all raw User.id
+  // fields, not Prisma relations (see schema comments) — resolved
+  // together in one shared name-lookup query rather than one per
+  // concern, since in practice it's usually the same handful of
+  // accounts either way.
   const nameLookupIds = Array.from(
     new Set(
       [
@@ -217,6 +372,8 @@ export default async function AdminConsolePage() {
         ...peopleBase.map((p) => p.invitedById),
         ...peopleBase.map((p) => p.partnerId),
         ...adminActionRows.map((m) => m.adminId),
+        ...reports.map((r) => r.reviewedById),
+        ...targetModerationActions.map((m) => m.adminId),
       ].filter((id): id is string => Boolean(id)),
     ),
   );
@@ -291,12 +448,119 @@ export default async function AdminConsolePage() {
           adminName: nameById.get(m.adminId) ?? null,
         })),
       }))}
-      reports={reports.map((r) => ({
-        id: r.id,
-        targetType: r.targetType,
-        category: r.category,
-        createdAt: r.createdAt.toISOString(),
-      }))}
+      reports={reports.map((r) => {
+        let label: string;
+        let authorId: string | null = null;
+        let authorName: string | null = null;
+        let authorUsername: string | null = null;
+        let isDeleted = false;
+        let isPreserved = false;
+        let contextHref: string | null = null;
+
+        if (r.targetType === "post") {
+          const post = postById.get(r.targetId);
+          if (!post) {
+            label = "[post no longer exists]";
+          } else {
+            label = post.title || post.content || "(no content)";
+            authorId = post.author.id;
+            authorName = post.author.displayName;
+            authorUsername = post.author.username;
+            isPreserved = post.isPreserved;
+            // Post has no admin bypass and no soft-delete field — once
+            // unpublished (preserve does this) the link 404s for the
+            // admin same as anyone, so it's only offered while still
+            // publicly reachable.
+            contextHref = post.isPublished ? `/posts/${post.id}` : null;
+          }
+        } else if (r.targetType === "comment") {
+          const comment = commentById.get(r.targetId);
+          if (!comment) {
+            label = "[comment no longer exists]";
+          } else {
+            label = comment.isDeleted ? "[comment already removed]" : comment.content;
+            authorId = comment.author.id;
+            authorName = comment.author.displayName;
+            authorUsername = comment.author.username;
+            isDeleted = comment.isDeleted;
+            contextHref = comment.post?.isPublished ? `/posts/${comment.post.id}` : null;
+          }
+        } else if (r.targetType === "message") {
+          const message = messageById.get(r.targetId);
+          if (!message) {
+            label = "[message no longer exists]";
+          } else {
+            label = message.isDeleted ? "[message already removed]" : message.content;
+            authorId = message.user.id;
+            authorName = message.user.displayName;
+            authorUsername = message.user.username;
+            isDeleted = message.isDeleted;
+            // Admins bypass canAccessRoom entirely, so the room itself
+            // is always reachable — but RoomPage only ever loads the
+            // most recent 50 messages with no scroll-to/anchor, so an
+            // older message in an active room may not actually be
+            // visible there. Linked anyway; it's still often useful.
+            contextHref = `/rooms/${message.room.slug}`;
+          }
+        } else {
+          const profile = profileById.get(r.targetId);
+          if (!profile) {
+            label = "[member no longer exists]";
+          } else {
+            label = profile.displayName;
+            authorId = profile.id;
+            authorName = profile.displayName;
+            authorUsername = profile.username;
+            contextHref = `/profile/${profile.username}`;
+          }
+        }
+
+        const key = targetKey(r.targetType, r.targetId);
+        const filingStats = filingStatsByReporter.get(r.reporterId) ?? { open: 0, reviewed: 0, dismissed: 0 };
+
+        return {
+          id: r.id,
+          targetType: r.targetType,
+          targetId: r.targetId,
+          category: r.category,
+          isRedLine: r.isRedLine,
+          note: r.note,
+          status: r.status,
+          createdAt: r.createdAt.toISOString(),
+          reviewedAt: r.reviewedAt ? r.reviewedAt.toISOString() : null,
+          reviewerName: r.reviewedById ? (nameById.get(r.reviewedById) ?? null) : null,
+          reporter: {
+            id: r.reporter.id,
+            displayName: r.reporter.displayName,
+            username: r.reporter.username,
+            level: r.reporter.level,
+            trustScore: r.reporter.trustScore,
+            ageVerified: r.reporter.ageVerified,
+            joinedAt: r.reporter.joinedAt ? r.reporter.joinedAt.toISOString() : null,
+            reportsFiled: filingStats.open + filingStats.reviewed + filingStats.dismissed,
+            reportsDismissed: filingStats.dismissed,
+          },
+          target: {
+            label,
+            authorId,
+            authorName,
+            authorUsername,
+            isDeleted,
+            isPreserved,
+            contextHref,
+          },
+          siblingReports: (siblingReportsByTarget.get(key) ?? [])
+            .filter((s) => s.id !== r.id)
+            .map((s) => ({ id: s.id, status: s.status, category: s.category, createdAt: s.createdAt.toISOString() })),
+          targetModerationActions: (targetActionsByTarget.get(key) ?? []).map((m) => ({
+            id: m.id,
+            action: m.action,
+            note: m.note,
+            createdAt: m.createdAt.toISOString(),
+            adminName: nameById.get(m.adminId) ?? null,
+          })),
+        };
+      })}
       tokens={tokens.map((t) => ({
         id: t.id,
         source: t.source,

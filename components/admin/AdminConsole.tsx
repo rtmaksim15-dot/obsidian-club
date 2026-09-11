@@ -5,6 +5,7 @@ import DetailPanel from "./DetailPanel";
 import StatusBar, { type Counts } from "./StatusBar";
 import ApplicationDetail from "./ApplicationDetail";
 import PersonDetail from "./PersonDetail";
+import ReportDetail from "./ReportDetail";
 import { levelName } from "@/lib/rating/levels";
 
 export type Zone = "applications" | "people" | "arbitration" | "invitations";
@@ -81,7 +82,47 @@ export type Person = {
   consents: { id: string; termsVersion: string; privacyVersion: string; aupVersion: string; acceptedAt: string; acceptedIp: string | null }[];
   adminActions: { id: string; action: string; note: string | null; createdAt: string; adminName: string | null }[];
 };
-type ReportRow = { id: string; targetType: string; category: string; createdAt: string };
+// Zone 3 full depth (2026-09-11) — side-by-side reporter/reported,
+// resolved server-side per targetType since Report.targetId has no
+// Prisma relation (see admin/page.tsx). "Full history" is three
+// independent things, all shown: siblingReports (other reports, any
+// status, against this exact target), targetModerationActions (every
+// admin action ever logged against this target, not just this report's
+// own resolution), and the reporter's own filing stats.
+export type ReportRow = {
+  id: string;
+  targetType: string;
+  targetId: string;
+  category: string;
+  isRedLine: boolean;
+  note: string | null;
+  status: string;
+  createdAt: string;
+  reviewedAt: string | null;
+  reviewerName: string | null;
+  reporter: {
+    id: string;
+    displayName: string;
+    username: string;
+    level: number;
+    trustScore: number;
+    ageVerified: boolean;
+    joinedAt: string | null;
+    reportsFiled: number;
+    reportsDismissed: number;
+  };
+  target: {
+    label: string;
+    authorId: string | null;
+    authorName: string | null;
+    authorUsername: string | null;
+    isDeleted: boolean;
+    isPreserved: boolean;
+    contextHref: string | null;
+  };
+  siblingReports: { id: string; status: string; category: string; createdAt: string }[];
+  targetModerationActions: { id: string; action: string; note: string | null; createdAt: string; adminName: string | null }[];
+};
 type TokenRow = { id: string; source: string; status: string; createdAt: string };
 
 type Props = {
@@ -117,9 +158,10 @@ type Props = {
 // default view once its status moves past pending/held, while still
 // surfacing it under "Failed Sends" if it has a send error, decided or
 // not (see Step 2 commit for why that has to be true).
-export default function AdminConsole({ counts, applications: initialApplications, people: initialPeople, reports, tokens }: Props) {
+export default function AdminConsole({ counts, applications: initialApplications, people: initialPeople, reports: initialReports, tokens }: Props) {
   const [applications, setApplications] = useState(initialApplications);
   const [people, setPeople] = useState(initialPeople);
+  const [reports, setReports] = useState(initialReports);
   const [zone, setZone] = useState<Zone>("applications");
   const [openId, setOpenId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>(null);
@@ -152,6 +194,10 @@ export default function AdminConsole({ counts, applications: initialApplications
     setPeople((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   }
 
+  function updateReport(id: string, patch: Partial<ReportRow>) {
+    setReports((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  }
+
   const visibleApplications = applications.filter((a) => {
     if (filter === "pending") return a.status === "pending";
     if (filter === "held") return a.status === "held";
@@ -159,9 +205,20 @@ export default function AdminConsole({ counts, applications: initialApplications
     return a.status === "pending" || a.status === "held";
   });
   const visiblePeople = filter === "notAgeVerified" ? people.filter((p) => !p.ageVerified) : people;
+  // Every action on a report is terminal (the route 422s on a
+  // non-"open" report — it can never be re-acted on), so a resolved row
+  // simply drops out of view, same "filter hides it once decided"
+  // pattern Zone 1 uses for its own pending/held default.
+  const visibleReports = reports.filter((r) => r.status === "open");
 
   const currentList =
-    zone === "applications" ? visibleApplications : zone === "people" ? visiblePeople : zone === "arbitration" ? reports : tokens;
+    zone === "applications"
+      ? visibleApplications
+      : zone === "people"
+        ? visiblePeople
+        : zone === "arbitration"
+          ? visibleReports
+          : tokens;
 
   const openApplication = zone === "applications" ? applications.find((a) => a.id === openId) : undefined;
   const openPerson = zone === "people" ? people.find((p) => p.id === openId) : undefined;
@@ -237,11 +294,17 @@ export default function AdminConsole({ counts, applications: initialApplications
                 </li>
               ))}
             {zone === "arbitration" &&
-              reports.map((r) => (
+              visibleReports.map((r) => (
                 <li key={r.id} className="card cursor-pointer" onClick={() => setOpenId(r.id)}>
-                  <p className="text-data">
-                    {r.targetType} — {r.category}
+                  <p className="text-data">{r.target.label}</p>
+                  <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
+                    {r.targetType} · {r.category} · reported by {r.reporter.displayName}
                   </p>
+                  {r.isRedLine ? (
+                    <p className="text-caption mt-1 font-semibold" style={{ color: "var(--color-error)" }}>
+                      Red line
+                    </p>
+                  ) : null}
                 </li>
               ))}
             {zone === "invitations" &&
@@ -263,11 +326,7 @@ export default function AdminConsole({ counts, applications: initialApplications
           ) : null}
           {openPerson ? <PersonDetail person={openPerson} onUpdate={updatePerson} /> : null}
           {openReport ? (
-            <div>
-              <p className="text-h2 !text-base">
-                {openReport.targetType} report — {openReport.category}
-              </p>
-            </div>
+            <ReportDetail report={openReport} onUpdate={updateReport} onClose={() => setOpenId(null)} />
           ) : null}
           {openToken ? (
             <div>
