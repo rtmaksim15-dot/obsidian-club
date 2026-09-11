@@ -117,6 +117,20 @@ import AdminConsole from "@/components/admin/AdminConsole";
 // (plain links, no email flow -- "display-only" per the original spec)
 // and application-sourced tokens (resent via their own existing route)
 // with no extra guard needed.
+//
+// Step 7 (2026-09-11): Notes model + RLS -- the one new model the
+// original Part B task pre-approved, scoped to Zone 2 (People), where
+// "notes" was actually named. AdminNote is append-only, same shape as
+// RepHistory/LegalConsent/ModerationAction -- a running log, not an
+// editable field. New table needed RLS enabling by hand after
+// `prisma db push` (same two-step dance check-rls.ts/CLAUDE.md rule 8
+// describes for every table this project has ever added): pushed,
+// check:rls caught it disabled, `alter table admin_notes enable row
+// level security` run directly, check:rls re-run clean, then the SQL
+// saved to supabase/migrations/ as a record, matching every other
+// admin-only table's deny-all pattern (only ever read/written via
+// Prisma from POST /api/admin/members/[id]/notes, never a browser-side
+// Supabase client).
 export default async function AdminConsolePage() {
   const admin = await requireAdmin();
   if (!admin) {
@@ -233,7 +247,7 @@ export default async function AdminConsolePage() {
   // Zone 2's batch: one query per concern across every listed member,
   // not one query per member — the same shape as the counts block
   // above, just at row-detail scale instead of dashboard-stat scale.
-  const [postCounts, commentCounts, invitees, repHistoryRows, consentRows, adminActionRows] = await Promise.all([
+  const [postCounts, commentCounts, invitees, repHistoryRows, consentRows, adminActionRows, adminNoteRows] = await Promise.all([
     prisma.post.groupBy({
       by: ["authorId"],
       where: { authorId: { in: peopleIds }, isPublished: true },
@@ -258,6 +272,10 @@ export default async function AdminConsolePage() {
     }),
     prisma.moderationAction.findMany({
       where: { targetType: "user", targetId: { in: peopleIds } },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.adminNote.findMany({
+      where: { memberId: { in: peopleIds } },
       orderBy: { createdAt: "desc" },
     }),
   ]);
@@ -289,6 +307,12 @@ export default async function AdminConsolePage() {
     const list = adminActionsByTarget.get(m.targetId) ?? [];
     list.push(m);
     adminActionsByTarget.set(m.targetId, list);
+  }
+  const adminNotesByMember = new Map<string, typeof adminNoteRows>();
+  for (const n of adminNoteRows) {
+    const list = adminNotesByMember.get(n.memberId) ?? [];
+    list.push(n);
+    adminNotesByMember.set(n.memberId, list);
   }
 
   // Zone 3's batch: targetId has no Prisma relation (bare polymorphic
@@ -432,6 +456,7 @@ export default async function AdminConsolePage() {
         ...peopleBase.map((p) => p.invitedById),
         ...peopleBase.map((p) => p.partnerId),
         ...adminActionRows.map((m) => m.adminId),
+        ...adminNoteRows.map((n) => n.authorId),
         ...reports.map((r) => r.reviewedById),
         ...targetModerationActions.map((m) => m.adminId),
         ...tokens.map((t) => t.redeemedById),
@@ -509,6 +534,12 @@ export default async function AdminConsolePage() {
           note: m.note,
           createdAt: m.createdAt.toISOString(),
           adminName: nameById.get(m.adminId) ?? null,
+        })),
+        notes: (adminNotesByMember.get(p.id) ?? []).map((n) => ({
+          id: n.id,
+          body: n.body,
+          createdAt: n.createdAt.toISOString(),
+          authorName: nameById.get(n.authorId) ?? null,
         })),
       }))}
       reports={reports.map((r) => {

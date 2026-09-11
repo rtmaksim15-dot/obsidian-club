@@ -35,6 +35,31 @@ export default function PersonDetail({
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [noteDraft, setNoteDraft] = useState("");
+  const [notePending, setNotePending] = useState(false);
+  const [noteError, setNoteError] = useState<string | null>(null);
+
+  async function addNote() {
+    const text = noteDraft.trim();
+    if (!text) return;
+    setNotePending(true);
+    setNoteError(null);
+    try {
+      const res = await fetch(`/api/admin/members/${person.id}/notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body: text }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || "Something went wrong.");
+      onUpdate(person.id, { notes: [json.note, ...person.notes] });
+      setNoteDraft("");
+    } catch (e) {
+      setNoteError(e instanceof Error ? e.message : "Something went wrong.");
+    } finally {
+      setNotePending(false);
+    }
+  }
 
   async function toggleAgeVerified() {
     const next = !person.ageVerified;
@@ -167,6 +192,43 @@ export default function PersonDetail({
             ))}
           </ul>
         )}
+      </div>
+      <div className="mt-6 border-t border-ob-border pt-4">
+        <p className="text-label mb-2">Notes</p>
+        {person.notes.length === 0 ? (
+          <p className="text-caption" style={{ color: "var(--color-text-secondary)" }}>
+            No notes yet.
+          </p>
+        ) : (
+          <ul className="space-y-3">
+            {person.notes.map((n) => (
+              <li key={n.id} className="text-caption" style={{ color: "var(--color-text-secondary)" }}>
+                <span style={{ color: "var(--color-text-muted)" }}>
+                  {formatDate(n.createdAt)}
+                  {n.authorName ? ` — ${n.authorName}` : ""}
+                </span>
+                <p className="text-body !text-sm mt-1" style={{ color: "var(--color-text-primary)" }}>
+                  {n.body}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+        <textarea
+          className="input mt-4 w-full"
+          rows={3}
+          value={noteDraft}
+          onChange={(e) => setNoteDraft(e.target.value)}
+          placeholder="Add a note about this member…"
+        />
+        <button type="button" className="btn-secondary mt-2" disabled={!noteDraft.trim() || notePending} onClick={addNote}>
+          {notePending ? "…" : "Add Note"}
+        </button>
+        {noteError ? (
+          <p className="text-caption mt-2" style={{ color: "var(--color-error)" }}>
+            {noteError}
+          </p>
+        ) : null}
       </div>
     </div>
   );
