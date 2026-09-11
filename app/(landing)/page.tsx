@@ -3,7 +3,9 @@ import Image from "next/image";
 import LogoMark from "@/components/ui/LogoMark";
 import WaitingListForm from "@/components/shared/WaitingListForm";
 import { Reveal, RevealGroup, RevealItem } from "@/components/shared/Reveal";
+import LaunchCountdown from "@/components/shared/LaunchCountdown";
 import { getCurrentUser } from "@/lib/auth/session";
+import { getDoorsState } from "@/lib/config/doors";
 
 // Landing Page — recreated pixel-for-pixel from the approved design handoff
 // (design_handoff_obsidian_club_landing/, 2026-07). Copy, spacing and color
@@ -47,6 +49,8 @@ export default async function LandingPage() {
   // /ritual first if the Initiation Ritual isn't complete yet.
   const user = await getCurrentUser();
   if (user) redirect("/feed");
+
+  const doors = getDoorsState();
 
   return (
     <div className="relative overflow-hidden bg-ob-black">
@@ -149,6 +153,14 @@ export default async function LandingPage() {
                 Request Access
               </a>
             </Reveal>
+
+            {doors.date ? (
+              <Reveal>
+                <div className="mt-[42px]">
+                  <LaunchCountdown targetIso={doors.date.toISOString()} />
+                </div>
+              </Reveal>
+            ) : null}
           </div>
         </div>
       </section>

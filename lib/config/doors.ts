@@ -1,5 +1,6 @@
-// The Doors mechanic (pre-launch cleanup, 2026-08-08) — the October 1
-// cohort launch gate. Unlike feature-flags.ts's compile-time booleans,
+// The Doors mechanic (pre-launch cleanup, 2026-08-08) — the November 1
+// cohort launch gate (moved from October 1, 2026-09-10). Unlike
+// feature-flags.ts's compile-time booleans,
 // this reads a runtime env var (`DOORS_OPEN_DATE`) and compares it to
 // the current time on every call, so flipping the launch date or
 // unsetting the var takes effect immediately with no redeploy of code,
@@ -33,7 +34,7 @@ function ordinal(n: number): string {
   return `${n}${ORDINAL_SUFFIXES[(v - 20) % 10] || ORDINAL_SUFFIXES[v] || ORDINAL_SUFFIXES[0]}`;
 }
 
-/** "October 1st" — no year, matching the ceremonial tone of the rest of the ritual/antechamber copy. */
+/** "November 1st" — no year, matching the ceremonial tone of the rest of the ritual/antechamber copy. */
 export function formatDoorsDate(date: Date): string {
   const month = date.toLocaleDateString("en-US", { month: "long", timeZone: "UTC" });
   return `${month} ${ordinal(date.getUTCDate())}`;
