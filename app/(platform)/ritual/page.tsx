@@ -17,6 +17,12 @@ export default async function RitualPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/ritual");
 
+  // Founder exception (2026-09-10, production decision): Lord Obsidian
+  // doesn't pass through initiation — he's already inside. isAdmin
+  // accounts never see this screen, even if they navigate here
+  // directly — same exception every ritual-gated page now has.
+  if (user.isAdmin) redirect("/feed");
+
   const profile = await prisma.userProfile.findUnique({ where: { userId: user.id } });
   const status = await getRitualStatus(user, profile);
 

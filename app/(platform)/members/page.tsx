@@ -15,9 +15,13 @@ export default async function MembersPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/members");
 
-  const profile = await prisma.userProfile.findUnique({ where: { userId: user.id } });
-  const ritual = await getRitualStatus(user, profile);
-  if (!ritual.complete) redirect("/ritual");
+  // Founder exception (2026-09-10, production decision): isAdmin
+  // accounts skip the Initiation Ritual gate entirely — see feed/page.tsx.
+  if (!user.isAdmin) {
+    const profile = await prisma.userProfile.findUnique({ where: { userId: user.id } });
+    const ritual = await getRitualStatus(user, profile);
+    if (!ritual.complete) redirect("/ritual");
+  }
 
   // Doors mechanic (2026-08-08) — admins always bypass; everyone else
   // sees the antechamber instead of real content while doors.active.

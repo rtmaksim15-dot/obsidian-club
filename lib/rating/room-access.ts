@@ -13,8 +13,13 @@ const NEWCOMER_WINDOW_DAYS = 30;
  * Access reverts to the plain 30-day rule as soon as the ritual
  * completes. The ritual check only runs once the window has actually
  * closed, so the common case stays a single date comparison.
+ *
+ * Founder exception (2026-09-10, production decision): isAdmin accounts
+ * bypass every check here, including `minLevel` — Lord Obsidian doesn't
+ * pass through initiation or leveling, he's already inside every room.
  */
 export async function canAccessRoom(user: User, room: Room): Promise<boolean> {
+  if (user.isAdmin) return true;
   if (user.level < room.minLevel) return false;
 
   if (room.type === "newcomers") {

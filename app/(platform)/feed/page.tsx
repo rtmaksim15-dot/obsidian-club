@@ -30,9 +30,16 @@ export default async function FeedPage() {
   // already enforces — otherwise a member who hasn't accepted the Code
   // of Conduct/read the introduction/posted in Newcomers could land
   // straight on the real feed and skip the ritual entirely.
-  const profile = await prisma.userProfile.findUnique({ where: { userId: user.id } });
-  const ritual = await getRitualStatus(user, profile);
-  if (!ritual.complete) redirect("/ritual");
+  //
+  // The founder account is the one deliberate exception (2026-09-10,
+  // production decision): Lord Obsidian doesn't pass through
+  // initiation — he's already inside. Every isAdmin account skips this
+  // gate entirely, same as it already skips the Doors gate below.
+  if (!user.isAdmin) {
+    const profile = await prisma.userProfile.findUnique({ where: { userId: user.id } });
+    const ritual = await getRitualStatus(user, profile);
+    if (!ritual.complete) redirect("/ritual");
+  }
 
   // Doors mechanic (2026-08-08) — admins always bypass; everyone else
   // sees the antechamber instead of real content while doors.active.
