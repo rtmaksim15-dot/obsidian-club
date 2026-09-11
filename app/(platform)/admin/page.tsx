@@ -12,9 +12,15 @@ import AdminConsole from "@/components/admin/AdminConsole";
 // instruction, and invite-batches' function is superseded by Zone 4
 // but not yet redirected until that zone actually lands.
 //
-// Step 1 (this commit): shell, zone switching, and panel open/close
-// mechanics only. Each zone below is a minimal, real (not fake) list —
-// full per-zone depth (consent history, RepHistory, side-by-side
+// Step 1 (2026-09-09 commit): shell, zone switching, and panel
+// open/close mechanics. Step 2 (2026-09-10, see DECISIONS.md): the
+// status bar's six counts, each clickable to filter the zone below.
+// "Failed sends" (decisionEmailSendError) can land on an
+// already-decided application (the accept/decline call succeeded, only
+// the email didn't), so the applications fetch below is a superset of
+// the pending/held queue -- an OR, not an AND -- specifically so a
+// failed send is never invisible just because its status has moved on.
+// Full per-zone depth (consent history, RepHistory, side-by-side
 // arbitration, token actions) is built out in the steps that follow,
 // per the specified order. Same notFound()-not-redirect pattern as
 // every other admin page.
@@ -24,9 +30,11 @@ export default async function AdminConsolePage() {
     notFound();
   }
 
-  const [applications, people, reports, tokens] = await Promise.all([
+  const [applications, people, reports, tokens, counts] = await Promise.all([
     prisma.waitlist.findMany({
-      where: { status: { in: ["pending", "held"] } },
+      where: {
+        OR: [{ status: { in: ["pending", "held"] } }, { decisionEmailSendError: { not: null } }],
+      },
       orderBy: { createdAt: "asc" },
       take: 50,
     }),
@@ -44,15 +52,32 @@ export default async function AdminConsolePage() {
       orderBy: { createdAt: "desc" },
       take: 50,
     }),
+    Promise.all([
+      prisma.waitlist.count({ where: { status: "pending" } }),
+      prisma.waitlist.count({ where: { status: "held" } }),
+      prisma.waitlist.count({ where: { decisionEmailSendError: { not: null } } }),
+      prisma.report.count({ where: { status: "open" } }),
+      prisma.user.count({ where: { status: "active" } }),
+      prisma.user.count({ where: { status: "active", ageVerified: false } }),
+    ]).then(([pending, held, failedSend, openReports, membersTotal, notAgeVerified]) => ({
+      pending,
+      held,
+      failedSend,
+      openReports,
+      membersTotal,
+      notAgeVerified,
+    })),
   ]);
 
   return (
     <AdminConsole
+      counts={counts}
       applications={applications.map((a) => ({
         id: a.id,
         name: a.name,
         email: a.email,
         status: a.status,
+        decisionEmailSendError: a.decisionEmailSendError,
         createdAt: a.createdAt.toISOString(),
       }))}
       people={people.map((p) => ({
@@ -61,6 +86,7 @@ export default async function AdminConsolePage() {
         email: p.email,
         rep: p.rep,
         level: p.level,
+        ageVerified: p.ageVerified,
       }))}
       reports={reports.map((r) => ({
         id: r.id,

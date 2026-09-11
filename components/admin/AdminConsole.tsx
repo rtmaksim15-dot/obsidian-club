@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import DetailPanel from "./DetailPanel";
+import StatusBar, { type Counts } from "./StatusBar";
 
-type Zone = "applications" | "people" | "arbitration" | "invitations";
+export type Zone = "applications" | "people" | "arbitration" | "invitations";
+export type Filter = "pending" | "held" | "failedSend" | "notAgeVerified" | null;
 
 const ZONES: { id: Zone; label: string }[] = [
   { id: "applications", label: "Applications" },
@@ -12,12 +14,27 @@ const ZONES: { id: Zone; label: string }[] = [
   { id: "invitations", label: "Invitations" },
 ];
 
-type Application = { id: string; name: string | null; email: string; status: string; createdAt: string };
-type Person = { id: string; displayName: string; email: string; rep: number; level: number };
+const FILTER_LABELS: Record<Exclude<Filter, null>, string> = {
+  pending: "New Applications",
+  held: "On Hold",
+  failedSend: "Failed Sends",
+  notAgeVerified: "Not Age-Verified",
+};
+
+type Application = {
+  id: string;
+  name: string | null;
+  email: string;
+  status: string;
+  decisionEmailSendError: string | null;
+  createdAt: string;
+};
+type Person = { id: string; displayName: string; email: string; rep: number; level: number; ageVerified: boolean };
 type ReportRow = { id: string; targetType: string; category: string; createdAt: string };
 type TokenRow = { id: string; source: string; status: string; createdAt: string };
 
 type Props = {
+  counts: Counts;
   applications: Application[];
   people: Person[];
   reports: ReportRow[];
@@ -32,9 +49,16 @@ type Props = {
 // panel open just closes it (there's no cross-zone panel identity to
 // preserve). A single Escape listener lives here, not per-zone, so it
 // always works regardless of which zone's content is on screen.
-export default function AdminConsole({ applications, people, reports, tokens }: Props) {
+//
+// Status bar (2026-09-10): `filter` narrows whichever zone's list is
+// showing to one of the status bar's six counts. Switching zones via
+// the tabs clears it (a plain tab click means "show me everything in
+// this zone"); clicking a status bar number sets zone + filter
+// together and always wins over whatever tab was previously active.
+export default function AdminConsole({ counts, applications, people, reports, tokens }: Props) {
   const [zone, setZone] = useState<Zone>("applications");
   const [openId, setOpenId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<Filter>(null);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -46,11 +70,26 @@ export default function AdminConsole({ applications, people, reports, tokens }: 
 
   function switchZone(next: Zone) {
     setZone(next);
+    setFilter(null);
     setOpenId(null);
   }
 
+  function selectStat(nextZone: Zone, nextFilter: Filter) {
+    setZone(nextZone);
+    setFilter(nextFilter);
+    setOpenId(null);
+  }
+
+  const visibleApplications = applications.filter((a) => {
+    if (filter === "pending") return a.status === "pending";
+    if (filter === "held") return a.status === "held";
+    if (filter === "failedSend") return a.decisionEmailSendError !== null;
+    return a.status === "pending" || a.status === "held";
+  });
+  const visiblePeople = filter === "notAgeVerified" ? people.filter((p) => !p.ageVerified) : people;
+
   const currentList =
-    zone === "applications" ? applications : zone === "people" ? people : zone === "arbitration" ? reports : tokens;
+    zone === "applications" ? visibleApplications : zone === "people" ? visiblePeople : zone === "arbitration" ? reports : tokens;
 
   const openApplication = zone === "applications" ? applications.find((a) => a.id === openId) : undefined;
   const openPerson = zone === "people" ? people.find((p) => p.id === openId) : undefined;
@@ -62,11 +101,7 @@ export default function AdminConsole({ applications, people, reports, tokens }: 
       <div className="mx-auto max-w-4xl">
         <p className="text-label mb-6">Admin Console</p>
 
-        {/* Status bar lands in the next step — placeholder row for now
-            so the shell's vertical rhythm is already correct. */}
-        <div className="card mb-6 flex flex-wrap gap-6" style={{ opacity: 0.5 }}>
-          <p className="text-caption">Status bar — next step</p>
-        </div>
+        <StatusBar counts={counts} onSelect={selectStat} />
 
         <div className="mb-6 flex gap-2 border-b border-ob-border">
           {ZONES.map((z) => (
@@ -85,6 +120,17 @@ export default function AdminConsole({ applications, people, reports, tokens }: 
           ))}
         </div>
 
+        {filter ? (
+          <button
+            type="button"
+            onClick={() => setFilter(null)}
+            className="text-caption mb-4 inline-flex items-center gap-2 rounded-ob border px-3 py-1.5"
+            style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
+          >
+            Showing: {FILTER_LABELS[filter]} <span aria-hidden="true">×</span>
+          </button>
+        ) : null}
+
         {currentList.length === 0 ? (
           <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
             Nothing here.
@@ -92,7 +138,7 @@ export default function AdminConsole({ applications, people, reports, tokens }: 
         ) : (
           <ul className="space-y-2">
             {zone === "applications" &&
-              applications.map((a) => (
+              visibleApplications.map((a) => (
                 <li
                   key={a.id}
                   className="card cursor-pointer"
@@ -102,14 +148,19 @@ export default function AdminConsole({ applications, people, reports, tokens }: 
                   <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
                     {a.status}
                   </p>
+                  {a.decisionEmailSendError ? (
+                    <p className="text-caption mt-1 font-semibold" style={{ color: "var(--color-error)" }}>
+                      Send failed — {a.decisionEmailSendError}
+                    </p>
+                  ) : null}
                 </li>
               ))}
             {zone === "people" &&
-              people.map((p) => (
+              visiblePeople.map((p) => (
                 <li key={p.id} className="card cursor-pointer" onClick={() => setOpenId(p.id)}>
                   <p className="text-data">{p.displayName}</p>
                   <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
-                    REP {p.rep} · Level {p.level}
+                    REP {p.rep} · Level {p.level} · {p.ageVerified ? "Age-verified" : "Not age-verified"}
                   </p>
                 </li>
               ))}
@@ -140,6 +191,11 @@ export default function AdminConsole({ applications, people, reports, tokens }: 
               <p className="text-h2 !text-base">{openApplication.name || "(no name given)"}</p>
               <p className="text-data mt-1">{openApplication.email}</p>
               <p className="text-caption mt-2">Status: {openApplication.status}</p>
+              {openApplication.decisionEmailSendError ? (
+                <p className="text-caption mt-2 font-semibold" style={{ color: "var(--color-error)" }}>
+                  Send failed — {openApplication.decisionEmailSendError}
+                </p>
+              ) : null}
             </div>
           ) : null}
           {openPerson ? (
@@ -147,7 +203,8 @@ export default function AdminConsole({ applications, people, reports, tokens }: 
               <p className="text-h2 !text-base">{openPerson.displayName}</p>
               <p className="text-data mt-1">{openPerson.email}</p>
               <p className="text-caption mt-2">
-                REP {openPerson.rep} · Level {openPerson.level}
+                REP {openPerson.rep} · Level {openPerson.level} ·{" "}
+                {openPerson.ageVerified ? "Age-verified" : "Not age-verified"}
               </p>
             </div>
           ) : null}
