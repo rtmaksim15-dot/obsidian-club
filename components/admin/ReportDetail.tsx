@@ -78,7 +78,7 @@ export default function ReportDetail({
       </p>
       {r.note ? <p className="text-body mt-3 !text-base italic">&ldquo;{r.note}&rdquo;</p> : null}
 
-      <div className="mt-6 grid grid-cols-2 gap-4 border-t border-ob-border pt-4">
+      <div className="mt-6 grid grid-cols-1 gap-4 border-t border-ob-border pt-4 sm:grid-cols-2">
         <div>
           <p className="text-label mb-2">Reporter</p>
           <p className="text-data">{r.reporter.displayName}</p>

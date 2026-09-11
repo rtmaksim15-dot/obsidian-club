@@ -90,7 +90,7 @@ export default function PersonDetail({
         {person.joinedAt ? ` · Joined ${formatDay(person.joinedAt)}` : ""}
       </p>
 
-      <div className="mt-6 grid grid-cols-3 gap-4 border-t border-ob-border pt-4">
+      <div className="mt-6 grid grid-cols-1 gap-4 border-t border-ob-border pt-4 sm:grid-cols-3">
         <div>
           <p className="text-label">REP</p>
           <p className="text-data mt-1">{person.rep}</p>
