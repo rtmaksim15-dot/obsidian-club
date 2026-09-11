@@ -6,6 +6,8 @@ import StatusBar, { type Counts } from "./StatusBar";
 import ApplicationDetail from "./ApplicationDetail";
 import PersonDetail from "./PersonDetail";
 import ReportDetail from "./ReportDetail";
+import TokenDetail from "./TokenDetail";
+import CreatePersonalInvite from "./CreatePersonalInvite";
 import { levelName } from "@/lib/rating/levels";
 
 export type Zone = "applications" | "people" | "arbitration" | "invitations";
@@ -123,7 +125,30 @@ export type ReportRow = {
   siblingReports: { id: string; status: string; category: string; createdAt: string }[];
   targetModerationActions: { id: string; action: string; note: string | null; createdAt: string; adminName: string | null }[];
 };
-type TokenRow = { id: string; source: string; status: string; createdAt: string };
+// Zone 4 full depth (2026-09-11) — "issued/redeemed/expired" is bucketed
+// server-side from evaluateTokenLifecycle(), never the possibly-stale
+// `status` column (nothing in this codebase ever writes
+// InviteTokenStatus.expired). Failed sends are sorted first, per
+// instruction. redeemedByName/inviterName/partnerOfName are resolved
+// server-side (all three are raw User.id fields, no Prisma relation on
+// the client's shape).
+export type TokenRow = {
+  id: string;
+  source: string;
+  status: string;
+  bucket: "issued" | "redeemed" | "expired" | "revoked";
+  createdAt: string;
+  validUntil: string | null;
+  revokedAt: string | null;
+  redeemedAt: string | null;
+  redeemedByName: string | null;
+  inviterName: string | null;
+  partnerOfName: string | null;
+  sentToEmail: string | null;
+  sentToName: string | null;
+  emailSentAt: string | null;
+  emailSendError: string | null;
+};
 
 type Props = {
   counts: Counts;
@@ -158,10 +183,11 @@ type Props = {
 // default view once its status moves past pending/held, while still
 // surfacing it under "Failed Sends" if it has a send error, decided or
 // not (see Step 2 commit for why that has to be true).
-export default function AdminConsole({ counts, applications: initialApplications, people: initialPeople, reports: initialReports, tokens }: Props) {
+export default function AdminConsole({ counts, applications: initialApplications, people: initialPeople, reports: initialReports, tokens: initialTokens }: Props) {
   const [applications, setApplications] = useState(initialApplications);
   const [people, setPeople] = useState(initialPeople);
   const [reports, setReports] = useState(initialReports);
+  const [tokens, setTokens] = useState(initialTokens);
   const [zone, setZone] = useState<Zone>("applications");
   const [openId, setOpenId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>(null);
@@ -196,6 +222,14 @@ export default function AdminConsole({ counts, applications: initialApplications
 
   function updateReport(id: string, patch: Partial<ReportRow>) {
     setReports((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  }
+
+  function updateToken(id: string, patch: Partial<TokenRow>) {
+    setTokens((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+  }
+
+  function addToken(token: TokenRow) {
+    setTokens((prev) => [token, ...prev]);
   }
 
   const visibleApplications = applications.filter((a) => {
@@ -260,6 +294,8 @@ export default function AdminConsole({ counts, applications: initialApplications
           </button>
         ) : null}
 
+        {zone === "invitations" ? <CreatePersonalInvite onCreated={addToken} /> : null}
+
         {currentList.length === 0 ? (
           <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
             Nothing here.
@@ -310,9 +346,15 @@ export default function AdminConsole({ counts, applications: initialApplications
             {zone === "invitations" &&
               tokens.map((t) => (
                 <li key={t.id} className="card cursor-pointer" onClick={() => setOpenId(t.id)}>
-                  <p className="text-data">
-                    {t.source} — {t.status}
+                  <p className="text-data">{t.sentToEmail ?? t.source}</p>
+                  <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
+                    {t.source} · {t.bucket}
                   </p>
+                  {t.sentToEmail && !t.emailSentAt ? (
+                    <p className="text-caption mt-1 font-semibold" style={{ color: "var(--color-error)" }}>
+                      Send failed{t.emailSendError ? ` — ${t.emailSendError}` : ""}
+                    </p>
+                  ) : null}
                 </li>
               ))}
           </ul>
@@ -328,13 +370,7 @@ export default function AdminConsole({ counts, applications: initialApplications
           {openReport ? (
             <ReportDetail report={openReport} onUpdate={updateReport} onClose={() => setOpenId(null)} />
           ) : null}
-          {openToken ? (
-            <div>
-              <p className="text-h2 !text-base">
-                {openToken.source} — {openToken.status}
-              </p>
-            </div>
-          ) : null}
+          {openToken ? <TokenDetail token={openToken} onUpdate={updateToken} /> : null}
         </DetailPanel>
       ) : null}
     </main>

@@ -144,6 +144,46 @@ export async function sendApplicationAcceptedEmail(email: string, token: string)
 }
 
 /**
+ * Personal invitation email (Admin Console Zone 4, 2026-09-11) — sent
+ * when an admin issues an invitation directly by email from the
+ * console, bypassing the application queue and the Waitlist model
+ * entirely (InviteToken.source: "personal_invitation" — no Waitlist row
+ * ever exists for this path). Copy deliberately doesn't presuppose a
+ * prior request/review, unlike sendApplicationAcceptedEmail's "your
+ * request was accepted" — there was no request here. Reuses
+ * sendInvitationEmail's non-acceptance framing ("you have been invited
+ * to enter") but, like sendApplicationAcceptedEmail, uses joinUrl()'s
+ * literal domain and states the real expiry, since this token carries
+ * the same HARD_CAP_DAYS lifecycle an application-issued one does
+ * (unlike the plain member/partner links, which never set validUntil).
+ */
+export async function sendPersonalInvitationEmail(
+  email: string,
+  name: string | null,
+  token: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const html = emailShell(`
+      <p style="color:#EDEAE4;font-size:18px;line-height:1.6;margin:0 0 16px;">
+        ${name ? escapeHtml(name) + ",<br/>" : ""}you have been invited to enter.
+      </p>
+      <p style="font-size:16px;line-height:1.7;margin:0 0 32px;">
+        Obsidian Club is a private circle, open by invitation only. The
+        link below is yours alone, and it works once.
+      </p>
+      <a href="${joinUrl(token)}" style="display:inline-block;padding:14px 36px;background:#8B1A1A;color:#EDEAE4;text-decoration:none;letter-spacing:2px;text-transform:uppercase;font-size:13px;">
+        Enter the Circle
+      </a>
+      <p style="font-size:14px;line-height:1.7;margin:32px 0 16px;color:#9E9A94;">
+        It expires in ${HARD_CAP_DAYS} days.
+      </p>
+      <p style="font-size:14px;color:#9E9A94;margin:0;">
+        — Obsidian Club
+      </p>`);
+
+  return sendEmail(email, "You have been invited to Obsidian Club", html);
+}
+
+/**
  * NOT YET WIRED (2026-09-09, see DECISIONS.md) — the decline email for
  * the invitation-panel flow. Same status as
  * `sendApplicationAcceptedEmail` above: no caller yet, written now so

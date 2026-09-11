@@ -84,6 +84,15 @@ enum InviteSource {
   // precedent in app/api/join/[token]/route.ts — not the older
   // /api/invite/[token]/route.ts flow's behavior.
   application
+  // Admin Console Zone 4 (2026-09-11, see DECISIONS.md) — an admin
+  // issuing an invitation directly by email from the console, no
+  // application/Waitlist row involved at all. Falls through every
+  // `=== "member"` / `=== "partner"` check in app/api/join/[token]/
+  // route.ts exactly like purchase_card/application already do (those
+  // checks are positive matches, not a negative "everything else"
+  // branch) — no code change needed there for this value to behave
+  // correctly: no attribution, default inviteAllowance, no Referral row.
+  personal_invitation
 }
 
 enum RoomType {

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { prisma } from "@/lib/db/prisma";
+import { evaluateTokenLifecycle } from "@/lib/invites/lifecycle";
 import AdminConsole from "@/components/admin/AdminConsole";
 
 // Admin Console (2026-09-09, see DECISIONS.md) — Part B of the
@@ -85,16 +86,44 @@ import AdminConsole from "@/components/admin/AdminConsole";
 // other zone's actions is kept -- "one-click" reads as direct context
 // links, not skipping confirmation, matching every existing precedent.
 //
-// Full per-zone depth for Invitations is still built out in the step
-// that follows, per the specified order. Same notFound()-not-redirect
-// pattern as every other admin page.
+// Step 6 (2026-09-11): Zone 4 (Invitations) full depth, plus a direct
+// requirement given mid-build: an admin can issue an invitation
+// straight to an email address, bypassing the applications queue
+// entirely (POST /api/admin/invites/personal) -- no public form, no
+// separate Accept step. That needed one real schema change: a new
+// InviteSource value, "personal_invitation" (prisma db push'd against
+// production, npm run check:rls re-run clean after -- see CLAUDE.md
+// rule 8). /api/join/[token]/route.ts needed no change: every source
+// branch there is a positive `=== "member"` / `=== "partner"` check,
+// so the new value already falls through exactly like purchase_card/
+// application do today. Send-failure for this path (and for resending
+// any token that has an email on file) is tracked on InviteToken's own
+// sentToEmail/sentToName/emailSentAt/emailSendError columns -- not
+// Waitlist's decisionEmailSendError, since a personally-issued invite
+// has no Waitlist row to hold that; these columns already existed
+// (labeled "email-channel batches only" but not actually restricted to
+// them) and are exactly the right place regardless.
+//
+// InviteTokenStatus's "expired" value is never actually written by
+// anything in this codebase (confirmed: no cron/sweep exists) -- real
+// expiry is computed live via evaluateTokenLifecycle() (already shared
+// by /join/[token] and the arm route), so "issued/redeemed/expired" is
+// bucketed here at read time, not read off the stale `status` column.
+// "Failed-sends-first" sorts the fetched list before mapping. Reuses
+// the existing arm/revoke routes unchanged; a new resend route
+// (POST /api/admin/invite-tokens/[id]/resend) mirrors the applications
+// flow's "resend never re-mints" rule and is only legal when
+// `sentToEmail` is set -- which already excludes member/partner tokens
+// (plain links, no email flow -- "display-only" per the original spec)
+// and application-sourced tokens (resent via their own existing route)
+// with no extra guard needed.
 export default async function AdminConsolePage() {
   const admin = await requireAdmin();
   if (!admin) {
     notFound();
   }
 
-  const [applications, peopleBase, reports, tokens, counts] = await Promise.all([
+  const [applications, peopleBase, reports, tokensRaw, counts] = await Promise.all([
     prisma.waitlist.findMany({
       where: {
         OR: [{ status: { in: ["pending", "held"] } }, { decisionEmailSendError: { not: null } }],
@@ -162,6 +191,25 @@ export default async function AdminConsolePage() {
     prisma.inviteToken.findMany({
       orderBy: { createdAt: "desc" },
       take: 50,
+      select: {
+        id: true,
+        source: true,
+        status: true,
+        createdAt: true,
+        validUntil: true,
+        clientWindowDays: true,
+        firstScannedAt: true,
+        clientExpiresAt: true,
+        revokedAt: true,
+        redeemedAt: true,
+        redeemedById: true,
+        inviterId: true,
+        partnerOfId: true,
+        sentToEmail: true,
+        sentToName: true,
+        emailSentAt: true,
+        emailSendError: true,
+      },
     }),
     Promise.all([
       prisma.waitlist.count({ where: { status: "pending" } }),
@@ -359,12 +407,24 @@ export default async function AdminConsolePage() {
     filingStatsByReporter.set(row.reporterId, stats);
   }
 
-  // reviewedBy (Waitlist), invitedById/partnerId (User), and adminId
-  // (ModerationAction, both Zone 2's and Zone 3's) are all raw User.id
-  // fields, not Prisma relations (see schema comments) — resolved
-  // together in one shared name-lookup query rather than one per
-  // concern, since in practice it's usually the same handful of
-  // accounts either way.
+  // Zone 4: bucket each token's real, live lifecycle state (never the
+  // possibly-stale `status` column — nothing in this codebase ever
+  // writes InviteTokenStatus.expired) and sort failed sends to the
+  // front, per instruction.
+  const now = new Date();
+  const tokens = [...tokensRaw].sort((a, b) => {
+    const aFailed = Boolean(a.sentToEmail) && !a.emailSentAt;
+    const bFailed = Boolean(b.sentToEmail) && !b.emailSentAt;
+    if (aFailed !== bFailed) return aFailed ? -1 : 1;
+    return b.createdAt.getTime() - a.createdAt.getTime();
+  });
+
+  // reviewedBy (Waitlist), invitedById/partnerId (User), adminId
+  // (ModerationAction, Zones 2/3), and redeemedById/inviterId/
+  // partnerOfId (InviteToken, Zone 4) are all raw User.id fields, not
+  // Prisma relations (see schema comments) — resolved together in one
+  // shared name-lookup query rather than one per concern, since in
+  // practice it's usually the same handful of accounts either way.
   const nameLookupIds = Array.from(
     new Set(
       [
@@ -374,6 +434,9 @@ export default async function AdminConsolePage() {
         ...adminActionRows.map((m) => m.adminId),
         ...reports.map((r) => r.reviewedById),
         ...targetModerationActions.map((m) => m.adminId),
+        ...tokens.map((t) => t.redeemedById),
+        ...tokens.map((t) => t.inviterId),
+        ...tokens.map((t) => t.partnerOfId),
       ].filter((id): id is string => Boolean(id)),
     ),
   );
@@ -561,12 +624,33 @@ export default async function AdminConsolePage() {
           })),
         };
       })}
-      tokens={tokens.map((t) => ({
-        id: t.id,
-        source: t.source,
-        status: t.status,
-        createdAt: t.createdAt.toISOString(),
-      }))}
+      tokens={tokens.map((t) => {
+        const lifecycle = evaluateTokenLifecycle(t, now);
+        const bucket: "redeemed" | "revoked" | "expired" | "issued" = t.redeemedAt
+          ? "redeemed"
+          : t.revokedAt
+            ? "revoked"
+            : !lifecycle.ok
+              ? "expired"
+              : "issued";
+        return {
+          id: t.id,
+          source: t.source,
+          status: t.status,
+          bucket,
+          createdAt: t.createdAt.toISOString(),
+          validUntil: t.validUntil ? t.validUntil.toISOString() : null,
+          revokedAt: t.revokedAt ? t.revokedAt.toISOString() : null,
+          redeemedAt: t.redeemedAt ? t.redeemedAt.toISOString() : null,
+          redeemedByName: t.redeemedById ? (nameById.get(t.redeemedById) ?? null) : null,
+          inviterName: t.inviterId ? (nameById.get(t.inviterId) ?? null) : null,
+          partnerOfName: t.partnerOfId ? (nameById.get(t.partnerOfId) ?? null) : null,
+          sentToEmail: t.sentToEmail,
+          sentToName: t.sentToName,
+          emailSentAt: t.emailSentAt ? t.emailSentAt.toISOString() : null,
+          emailSendError: t.emailSendError,
+        };
+      })}
     />
   );
 }
