@@ -17,8 +17,8 @@ export async function GET() {
     orderBy: [{ type: "asc" }, { name: "asc" }],
   });
 
-  return NextResponse.json({
-    rooms: rooms.map((room) => ({
+  const annotated = await Promise.all(
+    rooms.map(async (room) => ({
       id: room.id,
       slug: room.slug,
       name: room.name,
@@ -26,7 +26,9 @@ export async function GET() {
       type: room.type,
       minLevel: room.minLevel,
       city: room.city,
-      locked: !canAccessRoom(user, room),
+      locked: !(await canAccessRoom(user, room)),
     })),
-  });
+  );
+
+  return NextResponse.json({ rooms: annotated });
 }

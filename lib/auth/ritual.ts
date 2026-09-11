@@ -118,6 +118,29 @@ export async function getRitualStatus(user: User, profile: UserProfile | null): 
 }
 
 /**
+ * Side-effect-free ritual completeness check for one user — same
+ * completion definition as `getRitualStatus`'s `complete`, minus the
+ * REP-award side effect, so it's safe to call from access-control code
+ * (`lib/rating/room-access.ts`) rather than only from the ritual pages
+ * themselves.
+ */
+export async function isRitualComplete(user: User): Promise<boolean> {
+  const profile = await prisma.userProfile.findUnique({ where: { userId: user.id } });
+  const progress = (profile?.ritualProgress ?? {}) as Record<string, unknown>;
+  const usernameChosen = progress.usernameChosen === true;
+  const profileComplete = Boolean(user.bio && user.avatarUrl && usernameChosen);
+  if (!profileComplete) return false;
+  if (progress.codeOfConduct !== true) return false;
+  if (progress.introMaterial !== true) return false;
+  if (progress.safetyRules !== true) return false;
+
+  const introduced = await prisma.message.count({
+    where: { userId: user.id, room: { slug: "newcomers" } },
+  });
+  return introduced > 0;
+}
+
+/**
  * Live count of ritual-complete members — powers the antechamber's "N
  * members stand at the doors" (Doors mechanic, 2026-08-08). Mirrors
  * `getRitualStatus`'s completion definition exactly, but as a set

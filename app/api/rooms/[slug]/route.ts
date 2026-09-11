@@ -17,7 +17,7 @@ export async function GET(_request: Request, { params }: { params: { slug: strin
     return NextResponse.json({ error: "Room not found." }, { status: 404 });
   }
 
-  const locked = !canAccessRoom(user, room);
+  const locked = !(await canAccessRoom(user, room));
 
   return NextResponse.json({
     room: {

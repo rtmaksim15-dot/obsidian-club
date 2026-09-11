@@ -37,7 +37,7 @@ export async function GET(_request: Request, { params }: { params: { slug: strin
   if (!room || !room.isActive) {
     return NextResponse.json({ error: "Room not found." }, { status: 404 });
   }
-  if (!canAccessRoom(user, room)) {
+  if (!(await canAccessRoom(user, room))) {
     return NextResponse.json({ error: "This room isn't open to you yet." }, { status: 403 });
   }
 
@@ -66,7 +66,7 @@ export async function POST(request: Request, { params }: { params: { slug: strin
   if (!room || !room.isActive) {
     return NextResponse.json({ error: "Room not found." }, { status: 404 });
   }
-  if (!canAccessRoom(user, room)) {
+  if (!(await canAccessRoom(user, room))) {
     return NextResponse.json({ error: "This room isn't open to you yet." }, { status: 403 });
   }
 

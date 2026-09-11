@@ -58,7 +58,7 @@ export default async function HouseDetailPage({ params }: { params: { slug: stri
     prisma.houseMembership.count({ where: { houseId: house.id } }),
   ]);
 
-  const roomLocked = room ? !canAccessRoom(user, room) : false;
+  const roomLocked = room ? !(await canAccessRoom(user, room)) : false;
 
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">

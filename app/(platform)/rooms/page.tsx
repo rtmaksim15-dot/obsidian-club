@@ -42,6 +42,10 @@ export default async function RoomsPage() {
     redirect(`/rooms/${rooms[0].slug}`);
   }
 
+  const lockedById = new Map(
+    await Promise.all(rooms.map(async (room) => [room.id, !(await canAccessRoom(user, room))] as const)),
+  );
+
   const grouped = GROUP_ORDER.map((type) => ({
     type,
     label: GROUP_LABELS[type] ?? type,
@@ -77,7 +81,7 @@ export default async function RoomsPage() {
                 <p className="text-label mb-3">{group.label}</p>
                 <ul className="space-y-3">
                   {group.rooms.map((room) => {
-                    const locked = !canAccessRoom(user, room);
+                    const locked = lockedById.get(room.id) ?? true;
                     return (
                       <li key={room.id}>
                         {locked ? (

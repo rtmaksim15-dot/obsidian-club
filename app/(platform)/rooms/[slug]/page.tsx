@@ -11,7 +11,7 @@ export default async function RoomPage({ params }: { params: { slug: string } })
   const room = await prisma.room.findUnique({ where: { slug: params.slug } });
   if (!room || !room.isActive) notFound();
 
-  if (!canAccessRoom(user, room)) {
+  if (!(await canAccessRoom(user, room))) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center bg-ob-black px-6 text-center text-ob-text">
         <p className="text-label mb-3">Locked</p>
