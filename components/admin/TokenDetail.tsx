@@ -23,9 +23,9 @@ const BUCKET_LABELS: Record<TokenRow["bucket"], string> = {
   revoked: "Revoked",
 };
 
-// Zone 4 full depth (2026-09-11, see DECISIONS.md — reconstruction
-// pending). member/partner tokens are display-only per instruction --
-// no action buttons render for them, even though the underlying arm/
+// Zone 4 full depth (2026-09-11, see DECISIONS.md). member/partner
+// tokens are display-only per instruction -- no action buttons render
+// for them, even though the underlying arm/
 // revoke routes have no source restriction server-side (this is a
 // client-side-only enforcement of "display-only", matching what the
 // instruction actually asked for). Resend reuses the new

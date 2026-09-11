@@ -30,8 +30,7 @@ const CONFIRM_MESSAGE: Record<"approve" | "decline", (name: string) => string> =
   decline: (name) => `Decline ${name}'s application?\n\nThis is final — no explanation is sent. We do not reconsider.`,
 };
 
-// Zone 1 full depth (2026-09-10, see DECISIONS.md — reconstruction
-// pending, see the note in admin/page.tsx). Ports ApplicationsQueue.tsx's
+// Zone 1 full depth (2026-09-10, see DECISIONS.md). Ports ApplicationsQueue.tsx's
 // interaction logic (same API contract, same PATCH /api/admin/
 // applications/[id], untouched) into a single-application detail-panel
 // shape. Reviewer/hold state shown here is CURRENT state, not a

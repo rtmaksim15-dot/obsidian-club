@@ -20,9 +20,9 @@ const CONFIRM_MESSAGE: Record<Action, string> = {
     "Remove this content and mark the report reviewed?\n\nIt will be soft-deleted (never hard-deleted) and shown to other members as removed by a moderator.",
 };
 
-// Zone 3 full depth (2026-09-11, see DECISIONS.md — reconstruction
-// pending). Reuses the existing PATCH /api/admin/reports/[id] action
-// route unchanged (dismiss/review/preserve/remove) -- components/shared/
+// Zone 3 full depth (2026-09-11, see DECISIONS.md). Reuses the existing
+// PATCH /api/admin/reports/[id] action route unchanged
+// (dismiss/review/preserve/remove) -- components/shared/
 // ReportsQueue.tsx had this exact confirm-dialog-per-action pattern
 // already; ported here into the shared detail-panel shape. Every action
 // is terminal (the route 422s on a non-"open" report), so any

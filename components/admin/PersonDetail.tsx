@@ -14,9 +14,9 @@ function formatDay(iso: string | null) {
   return new Date(iso).toLocaleDateString("en-US", { dateStyle: "medium", timeZone: "UTC" });
 }
 
-// Zone 2 full depth (2026-09-11, see DECISIONS.md — reconstruction
-// pending). Reuses the existing PATCH /api/admin/members/[id] action
-// route unchanged for the ageVerified toggle -- components/shared/
+// Zone 2 full depth (2026-09-11, see DECISIONS.md). Reuses the existing
+// PATCH /api/admin/members/[id] action route unchanged for the
+// ageVerified toggle -- components/shared/
 // MembersAgeVerification.tsx had this logic already, same
 // orphaned-since-the-fold shape ApplicationsQueue.tsx was for Zone 1.
 // RepHistory/LegalConsent/ModerationAction sections show real history
