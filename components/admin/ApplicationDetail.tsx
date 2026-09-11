@@ -1,7 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { forwardRef, useImperativeHandle, useState } from "react";
 import type { Application } from "./AdminConsole";
+
+export type ApplicationDetailHandle = {
+  approve: () => void;
+  hold: () => void;
+  decline: () => void;
+};
 
 const HOLD_REASONS: { value: string; label: string }[] = [
   { value: "order_not_confirmed", label: "Order not confirmed" },
@@ -32,15 +38,20 @@ const CONFIRM_MESSAGE: Record<"approve" | "decline", (name: string) => string> =
 // timeline — the schema only ever keeps the last value (see the
 // research note in AdminConsole.tsx) — so this deliberately doesn't
 // present itself as a history.
-export default function ApplicationDetail({
-  application,
-  onUpdate,
-  onClose,
-}: {
+// Keyboard shortcuts (2026-09-11, see DECISIONS.md): A/H/D only apply
+// in the Applications zone, only while a still-decidable (pending/held)
+// application's panel is open -- AdminConsole's global keydown handler
+// calls these through a ref rather than duplicating the action logic,
+// so there's exactly one implementation of approve/hold/decline
+// (including their confirm dialogs, unchanged) whether triggered by
+// click or by key. "Hold" opens the reason picker, same as clicking the
+// button -- a keyboard shortcut skipping the required reason selection
+// would be a real behavior change, not an accelerator.
+const ApplicationDetail = forwardRef<ApplicationDetailHandle, {
   application: Application;
   onUpdate: (id: string, patch: Partial<Application>) => void;
   onClose: () => void;
-}) {
+}>(function ApplicationDetail({ application, onUpdate, onClose }, ref) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ageVerifiedChecked, setAgeVerifiedChecked] = useState(false);
@@ -51,6 +62,18 @@ export default function ApplicationDetail({
   const a = application;
   const name = a.name || a.email;
   const canDecide = a.status === "pending" || a.status === "held";
+
+  useImperativeHandle(ref, () => ({
+    approve: () => {
+      if (canDecide && !pending) review("approve");
+    },
+    hold: () => {
+      if (canDecide && !pending) setHolding(true);
+    },
+    decline: () => {
+      if (canDecide && !pending) review("decline");
+    },
+  }));
 
   async function patch(body: Record<string, unknown>) {
     setPending(true);
@@ -233,4 +256,6 @@ export default function ApplicationDetail({
       ) : null}
     </div>
   );
-}
+});
+
+export default ApplicationDetail;

@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import DetailPanel from "./DetailPanel";
 import StatusBar, { type Counts } from "./StatusBar";
-import ApplicationDetail from "./ApplicationDetail";
+import ApplicationDetail, { type ApplicationDetailHandle } from "./ApplicationDetail";
 import PersonDetail from "./PersonDetail";
 import ReportDetail from "./ReportDetail";
 import TokenDetail from "./TokenDetail";
 import CreatePersonalInvite from "./CreatePersonalInvite";
+import CommandPalette from "./CommandPalette";
 import { levelName } from "@/lib/rating/levels";
 
 export type Zone = "applications" | "people" | "arbitration" | "invitations";
@@ -192,14 +193,8 @@ export default function AdminConsole({ counts, applications: initialApplications
   const [zone, setZone] = useState<Zone>("applications");
   const [openId, setOpenId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>(null);
-
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpenId(null);
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const applicationDetailRef = useRef<ApplicationDetailHandle>(null);
 
   function switchZone(next: Zone) {
     setZone(next);
@@ -259,6 +254,70 @@ export default function AdminConsole({ counts, applications: initialApplications
   const openPerson = zone === "people" ? people.find((p) => p.id === openId) : undefined;
   const openReport = zone === "arbitration" ? reports.find((r) => r.id === openId) : undefined;
   const openToken = zone === "invitations" ? tokens.find((t) => t.id === openId) : undefined;
+
+  function moveSelection(direction: 1 | -1) {
+    if (currentList.length === 0) return;
+    const idx = currentList.findIndex((item) => item.id === openId);
+    if (idx === -1) {
+      setOpenId(currentList[0].id);
+      return;
+    }
+    const nextIdx = (idx + direction + currentList.length) % currentList.length;
+    setOpenId(currentList[nextIdx].id);
+  }
+
+  // Keyboard shortcuts (2026-09-11, see DECISIONS.md): J/K move a
+  // cursor through whichever zone's list is currently visible and open
+  // that row's detail panel directly (Superhuman-style "advance through
+  // the queue," not a separate highlight-then-open step). A/H/D only
+  // fire in the Applications zone, only while a still-decidable
+  // (pending/held) application's panel is open -- routed through
+  // ApplicationDetail's own approve/hold/decline via a ref rather than
+  // duplicating that logic (including its confirm dialogs) here.
+  // Cmd/Ctrl+K opens a small "jump to zone" palette; Escape closes the
+  // palette first if it's open, otherwise the detail panel -- never
+  // both at once. Every shortcut is ignored while focus is inside a
+  // text input/textarea/select/contenteditable, so typing an email,
+  // a note, or a hold reason never triggers navigation or an action.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        if (paletteOpen) setPaletteOpen(false);
+        else setOpenId(null);
+        return;
+      }
+
+      const target = e.target as HTMLElement | null;
+      const isTyping =
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable);
+      if (isTyping) return;
+
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen(true);
+        return;
+      }
+      if (paletteOpen) return;
+
+      const key = e.key.toLowerCase();
+      if (key === "j" || key === "k") {
+        e.preventDefault();
+        moveSelection(key === "j" ? 1 : -1);
+        return;
+      }
+      if (zone === "applications" && openApplication) {
+        if (key === "a") applicationDetailRef.current?.approve();
+        else if (key === "h") applicationDetailRef.current?.hold();
+        else if (key === "d") applicationDetailRef.current?.decline();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [zone, currentList, openId, openApplication, paletteOpen]);
 
   return (
     <main className="min-h-screen bg-ob-black px-6 py-10 text-ob-text">
@@ -365,7 +424,12 @@ export default function AdminConsole({ counts, applications: initialApplications
       {openId ? (
         <DetailPanel onClose={() => setOpenId(null)}>
           {openApplication ? (
-            <ApplicationDetail application={openApplication} onUpdate={updateApplication} onClose={() => setOpenId(null)} />
+            <ApplicationDetail
+              ref={applicationDetailRef}
+              application={openApplication}
+              onUpdate={updateApplication}
+              onClose={() => setOpenId(null)}
+            />
           ) : null}
           {openPerson ? <PersonDetail person={openPerson} onUpdate={updatePerson} /> : null}
           {openReport ? (
@@ -373,6 +437,10 @@ export default function AdminConsole({ counts, applications: initialApplications
           ) : null}
           {openToken ? <TokenDetail token={openToken} onUpdate={updateToken} /> : null}
         </DetailPanel>
+      ) : null}
+
+      {paletteOpen ? (
+        <CommandPalette zones={ZONES} onSelect={switchZone} onClose={() => setPaletteOpen(false)} />
       ) : null}
     </main>
   );
