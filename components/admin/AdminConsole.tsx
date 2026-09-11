@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import DetailPanel from "./DetailPanel";
 import StatusBar, { type Counts } from "./StatusBar";
+import ApplicationDetail from "./ApplicationDetail";
 
 export type Zone = "applications" | "people" | "arbitration" | "invitations";
 export type Filter = "pending" | "held" | "failedSend" | "notAgeVerified" | null;
@@ -21,13 +22,35 @@ const FILTER_LABELS: Record<Exclude<Filter, null>, string> = {
   notAgeVerified: "Not Age-Verified",
 };
 
-type Application = {
+// Zone 1 full depth (2026-09-10) — everything the review action route
+// (PATCH /api/admin/applications/[id]) reads or writes, plus what the
+// old ApplicationsQueue.tsx card showed. reviewerName is resolved
+// server-side (reviewedBy is a raw User.id, no Prisma relation).
+// hasToken stands in for applicationTokenId's mere existence — the
+// token/URL itself is never sent to the client, by the same rule A7
+// already established for the old queue.
+export type Application = {
   id: string;
   name: string | null;
   email: string;
+  age: number | null;
+  city: string | null;
+  source: string | null;
+  reason: string | null;
+  referralCode: string | null;
+  origin: string | null;
   status: string;
-  decisionEmailSendError: string | null;
   createdAt: string;
+  heldReason: string | null;
+  heldNote: string | null;
+  heldAt: string | null;
+  reviewedAt: string | null;
+  reviewerName: string | null;
+  ageVerified: boolean;
+  ageVerifiedAt: string | null;
+  hasToken: boolean;
+  decisionEmailSentAt: string | null;
+  decisionEmailSendError: string | null;
 };
 type Person = { id: string; displayName: string; email: string; rep: number; level: number; ageVerified: boolean };
 type ReportRow = { id: string; targetType: string; category: string; createdAt: string };
@@ -55,7 +78,19 @@ type Props = {
 // the tabs clears it (a plain tab click means "show me everything in
 // this zone"); clicking a status bar number sets zone + filter
 // together and always wins over whatever tab was previously active.
-export default function AdminConsole({ counts, applications, people, reports, tokens }: Props) {
+//
+// Zone 1 (2026-09-10): `applications` is now local state, not a bare
+// prop — Accept/Hold/Decline/Resend mutate a row in place via
+// `updateApplication` so the list and the open panel both reflect the
+// result immediately, without a full page reload. Declining closes the
+// panel (nothing further to do); approving/holding leaves it open to
+// show the updated state. Rows are never removed from state on
+// decision — the existing `filter` logic already hides a row from the
+// default view once its status moves past pending/held, while still
+// surfacing it under "Failed Sends" if it has a send error, decided or
+// not (see Step 2 commit for why that has to be true).
+export default function AdminConsole({ counts, applications: initialApplications, people, reports, tokens }: Props) {
+  const [applications, setApplications] = useState(initialApplications);
   const [zone, setZone] = useState<Zone>("applications");
   const [openId, setOpenId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>(null);
@@ -78,6 +113,10 @@ export default function AdminConsole({ counts, applications, people, reports, to
     setZone(nextZone);
     setFilter(nextFilter);
     setOpenId(null);
+  }
+
+  function updateApplication(id: string, patch: Partial<Application>) {
+    setApplications((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)));
   }
 
   const visibleApplications = applications.filter((a) => {
@@ -187,16 +226,7 @@ export default function AdminConsole({ counts, applications, people, reports, to
       {openId ? (
         <DetailPanel onClose={() => setOpenId(null)}>
           {openApplication ? (
-            <div>
-              <p className="text-h2 !text-base">{openApplication.name || "(no name given)"}</p>
-              <p className="text-data mt-1">{openApplication.email}</p>
-              <p className="text-caption mt-2">Status: {openApplication.status}</p>
-              {openApplication.decisionEmailSendError ? (
-                <p className="text-caption mt-2 font-semibold" style={{ color: "var(--color-error)" }}>
-                  Send failed — {openApplication.decisionEmailSendError}
-                </p>
-              ) : null}
-            </div>
+            <ApplicationDetail application={openApplication} onUpdate={updateApplication} onClose={() => setOpenId(null)} />
           ) : null}
           {openPerson ? (
             <div>

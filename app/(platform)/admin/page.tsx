@@ -20,10 +20,26 @@ import AdminConsole from "@/components/admin/AdminConsole";
 // the email didn't), so the applications fetch below is a superset of
 // the pending/held queue -- an OR, not an AND -- specifically so a
 // failed send is never invisible just because its status has moved on.
-// Full per-zone depth (consent history, RepHistory, side-by-side
-// arbitration, token actions) is built out in the steps that follow,
-// per the specified order. Same notFound()-not-redirect pattern as
-// every other admin page.
+//
+// Step 3 (2026-09-10): Zone 1 (Applications) full depth. Reuses the
+// existing PATCH /api/admin/applications/[id] action route unchanged
+// (approve/decline/hold/resend) -- components/shared/ApplicationsQueue.tsx
+// had this logic already; ApplicationDetail.tsx below ports its
+// interaction pattern into a single-row detail-panel shape instead of a
+// list of cards. "Consent history" and "decision history" turned out to
+// be aspirational per-zone language, not real schema, per the research
+// pass ahead of this step -- there is no consent record for anyone who
+// hasn't redeemed an invite yet (LegalConsent requires a User row), and
+// reviewedAt/reviewedBy/heldReason/heldNote are last-value-wins columns,
+// not an append-only log. By instruction: show what's actually real
+// (current reviewer, current hold state, decision-email status, the
+// admin's own age-verified attestation), add no new model. A proper
+// audit-log model is a separate task after Part B, alongside
+// reconstructing the missing DECISIONS.md entries.
+//
+// Full per-zone depth for People/Arbitration/Invitations is still built
+// out in the steps that follow, per the specified order. Same
+// notFound()-not-redirect pattern as every other admin page.
 export default async function AdminConsolePage() {
   const admin = await requireAdmin();
   if (!admin) {
@@ -37,6 +53,29 @@ export default async function AdminConsolePage() {
       },
       orderBy: { createdAt: "asc" },
       take: 50,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        age: true,
+        city: true,
+        source: true,
+        reason: true,
+        referralCode: true,
+        origin: true,
+        status: true,
+        createdAt: true,
+        heldReason: true,
+        heldNote: true,
+        heldAt: true,
+        reviewedAt: true,
+        reviewedBy: true,
+        ageVerified: true,
+        ageVerifiedAt: true,
+        applicationTokenId: true,
+        decisionEmailSentAt: true,
+        decisionEmailSendError: true,
+      },
     }),
     prisma.user.findMany({
       where: { status: "active" },
@@ -69,6 +108,15 @@ export default async function AdminConsolePage() {
     })),
   ]);
 
+  // reviewedBy is a raw User.id, not a Prisma relation (see schema
+  // comment on Waitlist) — resolved here in one extra query rather than
+  // per-row, since in practice there's only ever been one admin.
+  const reviewerIds = Array.from(new Set(applications.map((a) => a.reviewedBy).filter((id): id is string => Boolean(id))));
+  const reviewers = reviewerIds.length
+    ? await prisma.user.findMany({ where: { id: { in: reviewerIds } }, select: { id: true, displayName: true } })
+    : [];
+  const reviewerNameById = new Map(reviewers.map((r) => [r.id, r.displayName]));
+
   return (
     <AdminConsole
       counts={counts}
@@ -76,9 +124,24 @@ export default async function AdminConsolePage() {
         id: a.id,
         name: a.name,
         email: a.email,
+        age: a.age,
+        city: a.city,
+        source: a.source,
+        reason: a.reason,
+        referralCode: a.referralCode,
+        origin: a.origin,
         status: a.status,
-        decisionEmailSendError: a.decisionEmailSendError,
         createdAt: a.createdAt.toISOString(),
+        heldReason: a.heldReason,
+        heldNote: a.heldNote,
+        heldAt: a.heldAt ? a.heldAt.toISOString() : null,
+        reviewedAt: a.reviewedAt ? a.reviewedAt.toISOString() : null,
+        reviewerName: a.reviewedBy ? (reviewerNameById.get(a.reviewedBy) ?? null) : null,
+        ageVerified: a.ageVerified,
+        ageVerifiedAt: a.ageVerifiedAt ? a.ageVerifiedAt.toISOString() : null,
+        hasToken: Boolean(a.applicationTokenId),
+        decisionEmailSentAt: a.decisionEmailSentAt ? a.decisionEmailSentAt.toISOString() : null,
+        decisionEmailSendError: a.decisionEmailSendError,
       }))}
       people={people.map((p) => ({
         id: p.id,
