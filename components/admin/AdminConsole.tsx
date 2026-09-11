@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import DetailPanel from "./DetailPanel";
 import StatusBar, { type Counts } from "./StatusBar";
 import ApplicationDetail from "./ApplicationDetail";
+import PersonDetail from "./PersonDetail";
+import { levelName } from "@/lib/rating/levels";
 
 export type Zone = "applications" | "people" | "arbitration" | "invitations";
 export type Filter = "pending" | "held" | "failedSend" | "notAgeVerified" | null;
@@ -52,7 +54,33 @@ export type Application = {
   decisionEmailSentAt: string | null;
   decisionEmailSendError: string | null;
 };
-type Person = { id: string; displayName: string; email: string; rep: number; level: number; ageVerified: boolean };
+// Zone 2 full depth (2026-09-11) — REP/level (+RepHistory), post/
+// comment counts, invited-by/invited-whom/partner, LegalConsent history
+// (real history here, unlike Zone 1's Waitlist rows — see admin/page.tsx),
+// and every ModerationAction ever logged against this specific member
+// (targetType "user"). No ban/promote/role/inviteAllowance fields —
+// those admin actions don't exist as endpoints yet.
+export type Person = {
+  id: string;
+  displayName: string;
+  username: string;
+  email: string;
+  rep: number;
+  level: number;
+  trustScore: number;
+  reputation: number;
+  ageVerified: boolean;
+  ageVerifiedAt: string | null;
+  joinedAt: string | null;
+  postCount: number;
+  commentCount: number;
+  invitedByName: string | null;
+  inviteeNames: string[];
+  partnerName: string | null;
+  repHistory: { id: string; delta: number; reason: string | null; source: string | null; createdAt: string }[];
+  consents: { id: string; termsVersion: string; privacyVersion: string; aupVersion: string; acceptedAt: string; acceptedIp: string | null }[];
+  adminActions: { id: string; action: string; note: string | null; createdAt: string; adminName: string | null }[];
+};
 type ReportRow = { id: string; targetType: string; category: string; createdAt: string };
 type TokenRow = { id: string; source: string; status: string; createdAt: string };
 
@@ -89,8 +117,9 @@ type Props = {
 // default view once its status moves past pending/held, while still
 // surfacing it under "Failed Sends" if it has a send error, decided or
 // not (see Step 2 commit for why that has to be true).
-export default function AdminConsole({ counts, applications: initialApplications, people, reports, tokens }: Props) {
+export default function AdminConsole({ counts, applications: initialApplications, people: initialPeople, reports, tokens }: Props) {
   const [applications, setApplications] = useState(initialApplications);
+  const [people, setPeople] = useState(initialPeople);
   const [zone, setZone] = useState<Zone>("applications");
   const [openId, setOpenId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>(null);
@@ -117,6 +146,10 @@ export default function AdminConsole({ counts, applications: initialApplications
 
   function updateApplication(id: string, patch: Partial<Application>) {
     setApplications((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)));
+  }
+
+  function updatePerson(id: string, patch: Partial<Person>) {
+    setPeople((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   }
 
   const visibleApplications = applications.filter((a) => {
@@ -199,7 +232,7 @@ export default function AdminConsole({ counts, applications: initialApplications
                 <li key={p.id} className="card cursor-pointer" onClick={() => setOpenId(p.id)}>
                   <p className="text-data">{p.displayName}</p>
                   <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
-                    REP {p.rep} · Level {p.level} · {p.ageVerified ? "Age-verified" : "Not age-verified"}
+                    REP {p.rep} · {levelName(p.level)} · {p.ageVerified ? "Age-verified" : "Not age-verified"}
                   </p>
                 </li>
               ))}
@@ -228,16 +261,7 @@ export default function AdminConsole({ counts, applications: initialApplications
           {openApplication ? (
             <ApplicationDetail application={openApplication} onUpdate={updateApplication} onClose={() => setOpenId(null)} />
           ) : null}
-          {openPerson ? (
-            <div>
-              <p className="text-h2 !text-base">{openPerson.displayName}</p>
-              <p className="text-data mt-1">{openPerson.email}</p>
-              <p className="text-caption mt-2">
-                REP {openPerson.rep} · Level {openPerson.level} ·{" "}
-                {openPerson.ageVerified ? "Age-verified" : "Not age-verified"}
-              </p>
-            </div>
-          ) : null}
+          {openPerson ? <PersonDetail person={openPerson} onUpdate={updatePerson} /> : null}
           {openReport ? (
             <div>
               <p className="text-h2 !text-base">
