@@ -349,7 +349,12 @@ export default async function HallPage() {
           <PostList posts={posts as FeedPost[]} compact viewerId={user.id} viewerIsAdmin={user.isAdmin} />
         </section>
 
-        <div className="mt-10">
+        {/* Desktop now gets Sign Out from DesktopNav (app/(platform)/layout.tsx,
+            2026-09-12) — Hall is only ever reachable under that same
+            full-access condition, so keeping this one too would stack two
+            sign-outs on desktop. Mobile still needs it: BottomNav has no
+            sign-out at all. */}
+        <div className="mt-10 sm:hidden">
           <SignOutButton />
         </div>
       </div>
