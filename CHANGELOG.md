@@ -8,7 +8,259 @@ to product milestones (`v0.1` = Landing, `v0.2` = Authentication, etc.).
 
 ## [Unreleased]
 
-Nothing yet — `v0.37.0` is the current released version.
+Nothing yet — `v0.41.0` is the current released version.
+
+## [0.41.0] — 2026-09-11
+
+Admin Console (Part B of the invitation-flow work) complete: all four
+zones at full depth, Notes, keyboard shortcuts, mobile pass. See
+DECISIONS.md for the per-zone research and tradeoffs.
+
+### Added
+
+- **Zone 1, Applications, full depth** — reuses `PATCH /api/admin/
+  applications/[id]` unchanged (approve/decline/hold/resend). Shows
+  current reviewer, current hold state, decision-email status, the
+  admin's own age-verified attestation — no consent/decision *history*
+  (neither is real schema for a pre-redemption applicant; see
+  DECISIONS.md).
+- **Zone 2, People, full depth** — REP + level + `RepHistory` (shown
+  regardless of `REP_UI_ENABLED`, which gates member-facing display,
+  not admin access), post/comment counts, invited-by/invited-whom/
+  partner, real `LegalConsent` history, every `ModerationAction` ever
+  logged against the member, and the `ageVerified` toggle (reuses
+  `PATCH /api/admin/members/[id]` unchanged).
+- **Zone 3, Arbitration, full depth** — side-by-side reporter/reported,
+  resolved per `targetType` (`Report.targetId` has no Prisma relation).
+  "Full history" = three things: other reports against the same
+  target, every `ModerationAction` against that target, and the
+  reporter's own filing stats. Reuses `PATCH /api/admin/reports/[id]`
+  unchanged (dismiss/review/preserve/remove).
+- **Zone 4, Invitations, full depth** — token list bucketed
+  issued/redeemed/expired/revoked (computed live via
+  `evaluateTokenLifecycle()`, not the `status` column). Failed sends
+  sort first. Member/partner tokens are display-only.
+  **New:** an admin can issue an invitation directly by email
+  (`POST /api/admin/invites/personal`), bypassing the applications
+  queue entirely — new `InviteSource.personal_invitation` (real schema
+  change), new `sendPersonalInvitationEmail`, new
+  `POST /api/admin/invite-tokens/[id]/resend`.
+- **Notes** (`AdminNote` model, new, append-only, RLS deny-all) —
+  dated observations an admin leaves on a member's record, Zone 2 only.
+- **Status bar → keyboard shortcuts** — J/K move through and open the
+  current zone's list; A/H/D trigger Approve/Hold/Decline, only in
+  Applications, only on a still-decidable row, via the same functions
+  (and confirm dialogs) the buttons already used; Cmd/K opens a
+  "jump to zone" palette; Escape closes palette-then-panel.
+
+### Fixed
+
+- **Detail-panel grids didn't collapse on mobile** — `PersonDetail`'s
+  3-column REP/Level/Trust grid forced its container wider than the
+  viewport at narrow widths (confirmed via `scrollWidth >
+  innerWidth`); `ReportDetail`'s 2-column grid wrapped mid-sentence.
+  Both collapse to 1 column below the `sm` breakpoint.
+- **A race between two Escape handlers** (the command palette's own
+  input, and the console's global handler) could close the underlying
+  detail panel along with the palette on a single keypress — the
+  global handler is now the only place Escape is handled.
+
+### Verified
+
+- Every new query (per-target resolution, bulk `RepHistory`/
+  `LegalConsent`/`ModerationAction`/`AdminNote` fetches, the reverse
+  `invitedById` lookup, token-lifecycle bucketing) run against real
+  production data where possible; full interaction coverage (all
+  action buttons, all zones, keyboard shortcuts, mobile layout) via a
+  temporary unauthenticated fixture harness, deleted after each step —
+  this sandbox can't hold a real admin session against `localhost`.
+- `tsc`, `check:rls`, and a clean `next build` after every step.
+
+## [0.40.5] — 2026-09-11
+
+### Fixed
+
+- **Sign-out was unreachable from every `/ritual` page** — a member
+  whose ritual is incomplete could reach nothing else in the app, and
+  none of the four `/ritual` pages rendered a sign-out control
+  (`BottomNav` is mobile-only and doesn't help; desktop has no nav
+  chrome outside what a page renders). New `app/(platform)/ritual/
+  layout.tsx` adds a persistent Sign Out control to all four pages,
+  reusing the existing `SignOutButton` unchanged.
+
+### Changed
+
+- **Founder exception: `isAdmin` accounts skip the Initiation Ritual
+  entirely** — Lord Obsidian doesn't pass through initiation. Scoped
+  as a narrow `isAdmin` check at each existing ritual gate
+  (`/feed`/`/compose`/`/members`/`/hall`/`/ritual` itself), plus
+  `canAccessRoom()` short-circuiting to `true` for admins before any
+  other check. Ritual logic for every other member is unchanged.
+
+## [0.40.4] — 2026-09-10
+
+### Changed
+
+- **Launch date moved October 1 → November 1, 2026.** `DOORS_OPEN_DATE`
+  is a Vercel runtime env var, not a repo value — updated every
+  in-repo trace that could be (`.env.example`, code comments); every
+  place deliberately left alone (CHANGELOG/DECISIONS' own prior
+  entries, legal documents' effective dates) is reported in
+  DECISIONS.md, not silently edited.
+
+### Added
+
+- **Live countdown on the landing page** to the fixed launch instant
+  (correct for any viewer timezone), replacing itself with a
+  placeholder component the moment it reaches zero, no reload. The
+  antechamber page needed no code change — it already derives its copy
+  from the same `DOORS_OPEN_DATE`.
+
+## [0.40.3] — 2026-09-10
+
+### Added
+
+- **Admin Console status bar** — six live counts (New Applications, On
+  Hold, Failed Sends, Open Reports, Members, Not Age-Verified), each
+  clickable to filter its zone's list. Failed Sends gets an alert
+  treatment (solid fill + pulse) above zero — a failed decision-email
+  send means a real person can't get in. Applications query widened to
+  an `OR` (pending/held **or** has a send error) so a failed send stays
+  visible even after the underlying decision has moved on.
+
+## [0.40.2] — 2026-09-10
+
+### Fixed
+
+- **Newcomers-room 30-day window permanently locked out anyone who
+  hadn't posted before it closed** — including their only remaining
+  path to finishing the Initiation Ritual (step 4 requires posting in
+  that exact room). Confirmed live: 1 of 2 active members already
+  stuck. `canAccessRoom()` now also allows access whenever the
+  caller's ritual is still incomplete, reverting to the plain 30-day
+  rule the moment it completes — verified against real accounts in
+  both states.
+
+## [0.40.1] — 2026-09-09
+
+### Added
+
+- **Admin Console, Part B kickoff** — `/admin` rebuilt as a
+  single-screen operational console. `/admin/applications`,
+  `/admin/members`, `/admin/reports`, `/admin/waiting-list` now redirect
+  here (kept, not deleted). Step 1: shell, zone switching (plain
+  component state, never a navigation), a shared detail-panel overlay
+  with Escape/backdrop-close. Each zone starts as a minimal, real list;
+  full depth follows in later versions (see `0.41.0`).
+
+## [0.40.0] — 2026-09-09
+
+Invitation Panel flow complete — the back half (A5-A7) plus final copy.
+
+### Added
+
+- **A5: Hold**, a third non-terminal review outcome alongside
+  Approve/Decline (reason + optional note; the queue now lists
+  pending and held together).
+- **A6: real `InviteToken` issuance on Accept** (`source: "application"`),
+  replacing the legacy manual-copy-link path. Redemption needed no
+  changes to `/join/[token]` — the new source falls through the same
+  conditionals `purchase_card` already did. The admin never sees the
+  token or a join URL.
+- **A7: email as the only door** — Accept/Decline send the
+  already-written templates; a failed send persistently resurfaces in
+  the queue (not just for whoever was watching when it happened) with
+  a Resend action.
+
+### Changed
+
+- **Final copy pass**: application receipt email dropped entirely (the
+  on-screen confirmation carries that job alone); confirmation reduced
+  to one line; two required safety checkboxes replace the placeholder
+  block.
+- **Merged a duplicated 18+ checkbox** — the standalone age checkbox
+  and the new safety checkbox's age clause said the same thing twice;
+  removed the standalone one.
+
+### Fixed
+
+- **Invite token TTL: 90 days → 20 days** (`HARD_CAP_DAYS`), ahead of
+  A6 minting tokens through it.
+
+## [0.39.0] — 2026-09-08
+
+Four moderation gaps closed, plus two same-day follow-ups. See
+DECISIONS.md for the per-gap reasoning.
+
+### Added
+
+- **Gap 1** — admin-only soft-delete for comments and messages
+  (`DELETE /api/admin/comments/:id`, `DELETE /api/admin/messages/:id`).
+  Tombstone, never hard-delete; every deletion logs a
+  `ModerationAction`.
+- **Gap 2** — reporting extended to comments and chat messages
+  (`ReportTargetType.comment`/`.message`).
+- **Gap 3** — an author can no longer delete a post while it has an
+  open report (409); admin hard-delete is unaffected.
+- **Gap 4** — every `ageVerified` toggle and invite-token admin action
+  (arm/revoke/source-reassign) now writes an attributed
+  `ModerationAction` — previously silent.
+- **Follow-up:** a "Remove" action in the reports queue for comment/
+  message reports (reuses Gap 1's routes, one call reviews *and*
+  removes).
+- **Follow-up:** `RoomChat` tombstones now go live via Realtime
+  (a second `UPDATE` subscription), not just on next fetch.
+
+### Fixed
+
+- Landing hero: removed trailing periods ("Your World." → "Your
+  World").
+
+## [0.38.1] — 2026-08-28
+
+### Fixed
+
+- **Landing primary block's outbound link removed** — it no longer
+  links anywhere or names a store; a correction, not a placeholder.
+- **Brand spelling, "Toros" → "Torross"**, across the attorney-reviewed
+  legal package (7 occurrences) — a separate, explicit pass after the
+  same fix in code/CLAUDE.md was flagged rather than applied
+  unilaterally to legal text.
+
+## [0.38.0] — 2026-08-23
+
+Invitation Panel flow, Phase 1 (A1-A3) — the physical card now points
+at one public panel instead of carrying its own unique access right.
+
+### Added
+
+- **Schema groundwork**: `InviteSource.application`, a distinct
+  `Waitlist.applicationTokenId` (legacy `inviteToken` field frozen),
+  `WaitlistStatus.held`, `ApplicationOrigin`.
+- **`/invitation`** — the single public form every card's QR points
+  at: name, email, city (optional), 18+ checkbox, a safety/publicity
+  placeholder block, then the free-text question. Writes into the
+  existing `Waitlist` table via new `POST /api/applications`.
+- **Landing-page pivot**: "Request Consideration" split into two paths
+  — the physical artifact (primary) and a bare-email waiting list
+  (secondary, new `WaitingListEntry` model, not `Waitlist`).
+- **A3**: the application receipt email now records its own send
+  status (`receiptEmailSentAt`/`receiptEmailSendError`) instead of
+  swallowing failure.
+
+### Removed
+
+- **Print-batch generation retired** (`POST /api/admin/invite-batches`
+  now 410s) — Batch 01's 500 unused tokens marked `revoked`, not
+  deleted. The old landing form and its `POST /api/waitlist` target
+  retired the same way (410, not deleted).
+
+### Verified
+
+- Full flow live against `test-`-prefixed data at every step, cleaned
+  up after; found and fixed a real client-side validation bug along
+  the way (an error state was set but never rendered). `tsc`/build
+  clean; RLS enabled on all 30 tables.
 
 ## [0.37.0] — 2026-08-18
 
