@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { prisma } from "@/lib/db/prisma";
-import { evaluateTokenLifecycle } from "@/lib/invites/lifecycle";
+import { TOKEN_SELECT, shapeTokenRow, sortTokensFailedFirst } from "@/lib/admin/token-shape";
 import AdminConsole from "@/components/admin/AdminConsole";
 
 // Admin Console (2026-09-09, see DECISIONS.md) — Part B of the
@@ -137,7 +137,7 @@ export default async function AdminConsolePage() {
     notFound();
   }
 
-  const [applications, peopleBase, reports, tokensRaw, counts] = await Promise.all([
+  const [applications, peopleBase, reports, tokensPage, tokensTotal, counts] = await Promise.all([
     prisma.waitlist.findMany({
       where: {
         OR: [{ status: { in: ["pending", "held"] } }, { decisionEmailSendError: { not: null } }],
@@ -202,29 +202,18 @@ export default async function AdminConsolePage() {
         },
       },
     }),
+    // Pagination (2026-09-12): fetch one extra row to know whether a
+    // second page exists (see tokensNextCursor below), same trick the
+    // "load more" route (/api/admin/invite-tokens) uses for every page
+    // after this one. `id` breaks createdAt ties so the cursor is
+    // actually stable — two tokens minted in the same batch can share a
+    // timestamp.
     prisma.inviteToken.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 50,
-      select: {
-        id: true,
-        source: true,
-        status: true,
-        createdAt: true,
-        validUntil: true,
-        clientWindowDays: true,
-        firstScannedAt: true,
-        clientExpiresAt: true,
-        revokedAt: true,
-        redeemedAt: true,
-        redeemedById: true,
-        inviterId: true,
-        partnerOfId: true,
-        sentToEmail: true,
-        sentToName: true,
-        emailSentAt: true,
-        emailSendError: true,
-      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: 51,
+      select: TOKEN_SELECT,
     }),
+    prisma.inviteToken.count(),
     Promise.all([
       prisma.waitlist.count({ where: { status: "pending" } }),
       prisma.waitlist.count({ where: { status: "held" } }),
@@ -436,12 +425,16 @@ export default async function AdminConsolePage() {
   // writes InviteTokenStatus.expired) and sort failed sends to the
   // front, per instruction.
   const now = new Date();
-  const tokens = [...tokensRaw].sort((a, b) => {
-    const aFailed = Boolean(a.sentToEmail) && !a.emailSentAt;
-    const bFailed = Boolean(b.sentToEmail) && !b.emailSentAt;
-    if (aFailed !== bFailed) return aFailed ? -1 : 1;
-    return b.createdAt.getTime() - a.createdAt.getTime();
-  });
+
+  // Pagination (2026-09-12, closing the "454 of 504 tokens invisible"
+  // gap flagged in the E2E audit): tokensPage fetched 51 rows above: the
+  // 51st, if present, means there's another page — its own id (not the
+  // 50th's) is the cursor, since /api/admin/invite-tokens's `cursor`
+  // means "everything after this id" and re-fetching starting at row 50
+  // would just return row 50 again.
+  const tokensHasMore = tokensPage.length > 50;
+  const tokensNextCursor = tokensHasMore ? tokensPage[50].id : null;
+  const tokens = sortTokensFailedFirst(tokensPage.slice(0, 50));
 
   // reviewedBy (Waitlist), invitedById/partnerId (User), adminId
   // (ModerationAction, Zones 2/3), and redeemedById/inviterId/
@@ -655,33 +648,9 @@ export default async function AdminConsolePage() {
           })),
         };
       })}
-      tokens={tokens.map((t) => {
-        const lifecycle = evaluateTokenLifecycle(t, now);
-        const bucket: "redeemed" | "revoked" | "expired" | "issued" = t.redeemedAt
-          ? "redeemed"
-          : t.revokedAt
-            ? "revoked"
-            : !lifecycle.ok
-              ? "expired"
-              : "issued";
-        return {
-          id: t.id,
-          source: t.source,
-          status: t.status,
-          bucket,
-          createdAt: t.createdAt.toISOString(),
-          validUntil: t.validUntil ? t.validUntil.toISOString() : null,
-          revokedAt: t.revokedAt ? t.revokedAt.toISOString() : null,
-          redeemedAt: t.redeemedAt ? t.redeemedAt.toISOString() : null,
-          redeemedByName: t.redeemedById ? (nameById.get(t.redeemedById) ?? null) : null,
-          inviterName: t.inviterId ? (nameById.get(t.inviterId) ?? null) : null,
-          partnerOfName: t.partnerOfId ? (nameById.get(t.partnerOfId) ?? null) : null,
-          sentToEmail: t.sentToEmail,
-          sentToName: t.sentToName,
-          emailSentAt: t.emailSentAt ? t.emailSentAt.toISOString() : null,
-          emailSendError: t.emailSendError,
-        };
-      })}
+      tokens={tokens.map((t) => shapeTokenRow(t, nameById, now))}
+      tokensNextCursor={tokensNextCursor}
+      tokensTotal={tokensTotal}
     />
   );
 }

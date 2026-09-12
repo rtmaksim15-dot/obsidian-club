@@ -158,6 +158,8 @@ type Props = {
   people: Person[];
   reports: ReportRow[];
   tokens: TokenRow[];
+  tokensNextCursor: string | null;
+  tokensTotal: number;
 };
 
 // Admin Console shell (2026-09-09, see DECISIONS.md) — "one route, one
@@ -185,11 +187,21 @@ type Props = {
 // default view once its status moves past pending/held, while still
 // surfacing it under "Failed Sends" if it has a send error, decided or
 // not (see Step 2 commit for why that has to be true).
-export default function AdminConsole({ counts, applications: initialApplications, people: initialPeople, reports: initialReports, tokens: initialTokens }: Props) {
+export default function AdminConsole({
+  counts,
+  applications: initialApplications,
+  people: initialPeople,
+  reports: initialReports,
+  tokens: initialTokens,
+  tokensNextCursor: initialTokensNextCursor,
+  tokensTotal,
+}: Props) {
   const [applications, setApplications] = useState(initialApplications);
   const [people, setPeople] = useState(initialPeople);
   const [reports, setReports] = useState(initialReports);
   const [tokens, setTokens] = useState(initialTokens);
+  const [tokensNextCursor, setTokensNextCursor] = useState(initialTokensNextCursor);
+  const [tokensLoading, setTokensLoading] = useState(false);
   const [zone, setZone] = useState<Zone>("applications");
   const [openId, setOpenId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>(null);
@@ -226,6 +238,24 @@ export default function AdminConsole({ counts, applications: initialApplications
 
   function addToken(token: TokenRow) {
     setTokens((prev) => [token, ...prev]);
+  }
+
+  // Zone 4 pagination (2026-09-12) — only 50 of, at last count, 504
+  // tokens loaded server-side; "Load more" appends the next page from
+  // /api/admin/invite-tokens rather than re-fetching everything.
+  async function loadMoreTokens() {
+    if (!tokensNextCursor || tokensLoading) return;
+    setTokensLoading(true);
+    try {
+      const res = await fetch(`/api/admin/invite-tokens?cursor=${tokensNextCursor}`);
+      const json = await res.json();
+      if (res.ok) {
+        setTokens((prev) => [...prev, ...json.tokens]);
+        setTokensNextCursor(json.nextCursor);
+      }
+    } finally {
+      setTokensLoading(false);
+    }
   }
 
   const visibleApplications = applications.filter((a) => {
@@ -419,6 +449,19 @@ export default function AdminConsole({ counts, applications: initialApplications
               ))}
           </ul>
         )}
+
+        {zone === "invitations" ? (
+          <div className="mt-4 flex items-center gap-4">
+            <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
+              Showing {tokens.length} of {tokensTotal}
+            </p>
+            {tokensNextCursor ? (
+              <button type="button" className="btn-secondary" disabled={tokensLoading} onClick={loadMoreTokens}>
+                {tokensLoading ? "…" : "Load more"}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {openId ? (
