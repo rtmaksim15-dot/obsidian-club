@@ -354,7 +354,7 @@ export default function AdminConsole({
       <div className="mx-auto max-w-4xl">
         <p className="text-label mb-6">Admin Console</p>
 
-        <StatusBar counts={counts} onSelect={selectStat} />
+        <StatusBar counts={counts} activeZone={zone} activeFilter={filter} onSelect={selectStat} />
 
         <div className="mb-6 flex gap-2 border-b border-ob-border">
           {ZONES.map((z) => (

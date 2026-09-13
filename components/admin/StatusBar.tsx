@@ -22,7 +22,17 @@ type Stat = { key: string; label: string; value: number; zone: Zone; filter: Fil
 // person is stuck outside with no way in, so above zero it gets the
 // club's own alert treatment (solid accent fill, pulsing), not the
 // same quiet styling as the other five.
-export default function StatusBar({ counts, onSelect }: { counts: Counts; onSelect: (zone: Zone, filter: Filter) => void }) {
+export default function StatusBar({
+  counts,
+  activeZone,
+  activeFilter,
+  onSelect,
+}: {
+  counts: Counts;
+  activeZone: Zone;
+  activeFilter: Filter;
+  onSelect: (zone: Zone, filter: Filter) => void;
+}) {
   const stats: Stat[] = [
     { key: "pending", label: "New Applications", value: counts.pending, zone: "applications", filter: "pending" },
     { key: "held", label: "On Hold", value: counts.held, zone: "applications", filter: "held" },
@@ -43,18 +53,29 @@ export default function StatusBar({ counts, onSelect }: { counts: Counts; onSele
     <div className="card mb-6 flex flex-wrap gap-x-8 gap-y-4">
       {stats.map((s) => {
         const isAlert = s.alert && s.value > 0;
+        // Selected state (2026-09-12) is a border + tint, deliberately
+        // never the alert's solid fill — Failed Sends must stay
+        // recognizable as an alarm even when it's also the active
+        // filter, not just "another selected stat."
+        const isSelected = s.zone === activeZone && s.filter === activeFilter;
         return (
           <button
             key={s.key}
             type="button"
             onClick={() => onSelect(s.zone, s.filter)}
-            className={`flex flex-col items-start rounded-ob px-3 py-1.5 text-left transition-colors ${
+            className={`flex flex-col items-start rounded-ob border px-3 py-1.5 text-left transition-colors ${
               isAlert ? "animate-pulse" : ""
             }`}
             style={
               isAlert
-                ? { backgroundColor: "var(--color-accent)", color: "#fff" }
-                : { color: "var(--color-text-primary)" }
+                ? { backgroundColor: "var(--color-accent)", borderColor: "var(--color-accent)", color: "#fff" }
+                : isSelected
+                  ? {
+                      backgroundColor: "var(--color-accent-glow)",
+                      borderColor: "var(--color-accent)",
+                      color: "var(--color-text-primary)",
+                    }
+                  : { borderColor: "transparent", color: "var(--color-text-primary)" }
             }
           >
             <span className="text-h2 !text-2xl !normal-case !tracking-normal" style={isAlert ? { color: "#fff" } : undefined}>
