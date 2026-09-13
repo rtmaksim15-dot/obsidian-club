@@ -351,136 +351,143 @@ export default function AdminConsole({
 
   return (
     <main className="min-h-screen bg-ob-black px-6 py-10 text-ob-text">
-      <div className="mx-auto max-w-4xl">
-        <p className="text-label mb-6">Admin Console</p>
+      {/* Desktop pass (2026-09-13): at `lg` and up, an open row's detail
+          renders as a second column in this same flex row (via
+          DetailPanel's own responsive classes — see that file) instead
+          of an overlay covering the list. Below `lg`, `openId` still
+          renders exactly as an overlay; nothing here changes for it. */}
+      <div className="mx-auto max-w-4xl lg:flex lg:max-w-6xl lg:items-start lg:gap-8">
+        <div className="lg:min-w-0 lg:flex-1">
+          <p className="text-label mb-6">Admin Console</p>
 
-        <StatusBar counts={counts} activeZone={zone} activeFilter={filter} onSelect={selectStat} />
+          <StatusBar counts={counts} activeZone={zone} activeFilter={filter} onSelect={selectStat} />
 
-        <div className="mb-6 flex gap-2 border-b border-ob-border">
-          {ZONES.map((z) => (
+          <div className="mb-6 flex gap-2 border-b border-ob-border">
+            {ZONES.map((z) => (
+              <button
+                key={z.id}
+                type="button"
+                onClick={() => switchZone(z.id)}
+                className="px-4 py-2 text-caption"
+                style={{
+                  color: zone === z.id ? "var(--color-text-primary)" : "var(--color-text-muted)",
+                  borderBottom: zone === z.id ? "2px solid var(--color-accent)" : "2px solid transparent",
+                }}
+              >
+                {z.label}
+              </button>
+            ))}
+          </div>
+
+          {filter ? (
             <button
-              key={z.id}
               type="button"
-              onClick={() => switchZone(z.id)}
-              className="px-4 py-2 text-caption"
-              style={{
-                color: zone === z.id ? "var(--color-text-primary)" : "var(--color-text-muted)",
-                borderBottom: zone === z.id ? "2px solid var(--color-accent)" : "2px solid transparent",
-              }}
+              onClick={() => setFilter(null)}
+              className="text-caption mb-4 inline-flex items-center gap-2 rounded-ob border px-3 py-1.5"
+              style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
             >
-              {z.label}
+              Showing: {FILTER_LABELS[filter]} <span aria-hidden="true">×</span>
             </button>
-          ))}
+          ) : null}
+
+          {zone === "invitations" ? <CreatePersonalInvite onCreated={addToken} /> : null}
+
+          {currentList.length === 0 ? (
+            <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
+              Nothing here.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {zone === "applications" &&
+                visibleApplications.map((a) => (
+                  <li
+                    key={a.id}
+                    className="card cursor-pointer"
+                    onClick={() => setOpenId(a.id)}
+                  >
+                    <p className="text-data">{a.name || a.email}</p>
+                    <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
+                      {a.status}
+                    </p>
+                    {a.decisionEmailSendError ? (
+                      <p className="text-caption mt-1 font-semibold" style={{ color: "var(--color-error)" }}>
+                        Send failed — {a.decisionEmailSendError}
+                      </p>
+                    ) : null}
+                  </li>
+                ))}
+              {zone === "people" &&
+                visiblePeople.map((p) => (
+                  <li key={p.id} className="card cursor-pointer" onClick={() => setOpenId(p.id)}>
+                    <p className="text-data">{p.displayName}</p>
+                    <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
+                      REP {p.rep} · {levelName(p.level)} · {p.ageVerified ? "Age-verified" : "Not age-verified"}
+                    </p>
+                  </li>
+                ))}
+              {zone === "arbitration" &&
+                visibleReports.map((r) => (
+                  <li key={r.id} className="card cursor-pointer" onClick={() => setOpenId(r.id)}>
+                    <p className="text-data">{r.target.label}</p>
+                    <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
+                      {r.targetType} · {r.category} · reported by {r.reporter.displayName}
+                    </p>
+                    {r.isRedLine ? (
+                      <p className="text-caption mt-1 font-semibold" style={{ color: "var(--color-error)" }}>
+                        Red line
+                      </p>
+                    ) : null}
+                  </li>
+                ))}
+              {zone === "invitations" &&
+                tokens.map((t) => (
+                  <li key={t.id} className="card cursor-pointer" onClick={() => setOpenId(t.id)}>
+                    <p className="text-data">{t.sentToEmail ?? t.source}</p>
+                    <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
+                      {t.source} · {t.bucket}
+                    </p>
+                    {t.sentToEmail && !t.emailSentAt ? (
+                      <p className="text-caption mt-1 font-semibold" style={{ color: "var(--color-error)" }}>
+                        Send failed{t.emailSendError ? ` — ${t.emailSendError}` : ""}
+                      </p>
+                    ) : null}
+                  </li>
+                ))}
+            </ul>
+          )}
+
+          {zone === "invitations" ? (
+            <div className="mt-4 flex items-center gap-4">
+              <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
+                Showing {tokens.length} of {tokensTotal}
+              </p>
+              {tokensNextCursor ? (
+                <button type="button" className="btn-secondary" disabled={tokensLoading} onClick={loadMoreTokens}>
+                  {tokensLoading ? "…" : "Load more"}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
-        {filter ? (
-          <button
-            type="button"
-            onClick={() => setFilter(null)}
-            className="text-caption mb-4 inline-flex items-center gap-2 rounded-ob border px-3 py-1.5"
-            style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
-          >
-            Showing: {FILTER_LABELS[filter]} <span aria-hidden="true">×</span>
-          </button>
-        ) : null}
-
-        {zone === "invitations" ? <CreatePersonalInvite onCreated={addToken} /> : null}
-
-        {currentList.length === 0 ? (
-          <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
-            Nothing here.
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {zone === "applications" &&
-              visibleApplications.map((a) => (
-                <li
-                  key={a.id}
-                  className="card cursor-pointer"
-                  onClick={() => setOpenId(a.id)}
-                >
-                  <p className="text-data">{a.name || a.email}</p>
-                  <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
-                    {a.status}
-                  </p>
-                  {a.decisionEmailSendError ? (
-                    <p className="text-caption mt-1 font-semibold" style={{ color: "var(--color-error)" }}>
-                      Send failed — {a.decisionEmailSendError}
-                    </p>
-                  ) : null}
-                </li>
-              ))}
-            {zone === "people" &&
-              visiblePeople.map((p) => (
-                <li key={p.id} className="card cursor-pointer" onClick={() => setOpenId(p.id)}>
-                  <p className="text-data">{p.displayName}</p>
-                  <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
-                    REP {p.rep} · {levelName(p.level)} · {p.ageVerified ? "Age-verified" : "Not age-verified"}
-                  </p>
-                </li>
-              ))}
-            {zone === "arbitration" &&
-              visibleReports.map((r) => (
-                <li key={r.id} className="card cursor-pointer" onClick={() => setOpenId(r.id)}>
-                  <p className="text-data">{r.target.label}</p>
-                  <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
-                    {r.targetType} · {r.category} · reported by {r.reporter.displayName}
-                  </p>
-                  {r.isRedLine ? (
-                    <p className="text-caption mt-1 font-semibold" style={{ color: "var(--color-error)" }}>
-                      Red line
-                    </p>
-                  ) : null}
-                </li>
-              ))}
-            {zone === "invitations" &&
-              tokens.map((t) => (
-                <li key={t.id} className="card cursor-pointer" onClick={() => setOpenId(t.id)}>
-                  <p className="text-data">{t.sentToEmail ?? t.source}</p>
-                  <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
-                    {t.source} · {t.bucket}
-                  </p>
-                  {t.sentToEmail && !t.emailSentAt ? (
-                    <p className="text-caption mt-1 font-semibold" style={{ color: "var(--color-error)" }}>
-                      Send failed{t.emailSendError ? ` — ${t.emailSendError}` : ""}
-                    </p>
-                  ) : null}
-                </li>
-              ))}
-          </ul>
-        )}
-
-        {zone === "invitations" ? (
-          <div className="mt-4 flex items-center gap-4">
-            <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
-              Showing {tokens.length} of {tokensTotal}
-            </p>
-            {tokensNextCursor ? (
-              <button type="button" className="btn-secondary" disabled={tokensLoading} onClick={loadMoreTokens}>
-                {tokensLoading ? "…" : "Load more"}
-              </button>
+        {openId ? (
+          <DetailPanel onClose={() => setOpenId(null)}>
+            {openApplication ? (
+              <ApplicationDetail
+                ref={applicationDetailRef}
+                application={openApplication}
+                onUpdate={updateApplication}
+                onClose={() => setOpenId(null)}
+              />
             ) : null}
-          </div>
+            {openPerson ? <PersonDetail person={openPerson} onUpdate={updatePerson} /> : null}
+            {openReport ? (
+              <ReportDetail report={openReport} onUpdate={updateReport} onClose={() => setOpenId(null)} />
+            ) : null}
+            {openToken ? <TokenDetail token={openToken} onUpdate={updateToken} /> : null}
+          </DetailPanel>
         ) : null}
       </div>
-
-      {openId ? (
-        <DetailPanel onClose={() => setOpenId(null)}>
-          {openApplication ? (
-            <ApplicationDetail
-              ref={applicationDetailRef}
-              application={openApplication}
-              onUpdate={updateApplication}
-              onClose={() => setOpenId(null)}
-            />
-          ) : null}
-          {openPerson ? <PersonDetail person={openPerson} onUpdate={updatePerson} /> : null}
-          {openReport ? (
-            <ReportDetail report={openReport} onUpdate={updateReport} onClose={() => setOpenId(null)} />
-          ) : null}
-          {openToken ? <TokenDetail token={openToken} onUpdate={updateToken} /> : null}
-        </DetailPanel>
-      ) : null}
 
       {paletteOpen ? (
         <CommandPalette zones={ZONES} onSelect={switchZone} onClose={() => setPaletteOpen(false)} />
