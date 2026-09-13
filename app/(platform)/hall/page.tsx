@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { getRitualStatus } from "@/lib/auth/ritual";
 import { getDoorsState } from "@/lib/config/doors";
+import { getAppUrl } from "@/lib/config/site-url";
 import { getLevelProgress } from "@/lib/rating/level-progress";
 import { syncReferralLifecycle } from "@/lib/rating/referral-lifecycle";
 import { checkLevelUp } from "@/lib/rating/level-progression";
@@ -140,8 +141,9 @@ export default async function HallPage() {
     ]);
 
   const progress = getLevelProgress(user, { hasPublishedContent: posts.length >= 1 });
-  const referralLink = `${process.env.NEXT_PUBLIC_APP_URL || ""}/?ref=${user.referralCode}`;
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+  const appUrl = getAppUrl();
+  const referralLink = appUrl ? `${appUrl}/?ref=${user.referralCode}` : null;
+  const baseUrl = appUrl;
   const hasOutstandingMemberInvite = memberInviteTokens.some((t) => !t.redeemedAt);
   const resolvedPartner = withPartner?.partner ?? withPartner?.partnerOf ?? null;
 
@@ -240,13 +242,21 @@ export default async function HallPage() {
           <section className="mt-10">
             <p className="text-label mb-3">Your Invitation</p>
             <div className="card">
-              <p className="text-caption" style={{ color: "var(--color-text-secondary)" }}>
-                Your personal link
-              </p>
-              <p className="text-data mt-1 break-all">{referralLink}</p>
-              <p className="text-caption mt-3">
-                {referralCount} joined via your invitation.
-              </p>
+              {referralLink ? (
+                <>
+                  <p className="text-caption" style={{ color: "var(--color-text-secondary)" }}>
+                    Your personal link
+                  </p>
+                  <p className="text-data mt-1 break-all">{referralLink}</p>
+                  <p className="text-caption mt-3">
+                    {referralCount} joined via your invitation.
+                  </p>
+                </>
+              ) : (
+                <p className="text-caption font-semibold" style={{ color: "var(--color-error)" }}>
+                  Your invitation link is temporarily unavailable.
+                </p>
+              )}
             </div>
           </section>
         ) : null}
@@ -275,9 +285,13 @@ export default async function HallPage() {
                       Invitation accepted — {t.redeemedBy.displayName},{" "}
                       {new Date(t.redeemedAt!).toLocaleDateString("en-US", { dateStyle: "medium", timeZone: "UTC" })}
                     </li>
-                  ) : (
+                  ) : baseUrl ? (
                     <li key={t.id}>
                       <CopyShareLink url={`${baseUrl}/join/${t.token}`} />
+                    </li>
+                  ) : (
+                    <li key={t.id} className="text-caption font-semibold" style={{ color: "var(--color-error)" }}>
+                      This invitation link is temporarily unavailable.
                     </li>
                   ),
                 )}
@@ -293,8 +307,12 @@ export default async function HallPage() {
               <p className="text-caption" style={{ color: "var(--color-success)" }}>
                 Partner of {resolvedPartner.displayName}
               </p>
-            ) : partnerToken ? (
+            ) : partnerToken && baseUrl ? (
               <CopyShareLink url={`${baseUrl}/join/${partnerToken.token}`} />
+            ) : partnerToken ? (
+              <p className="text-caption font-semibold" style={{ color: "var(--color-error)" }}>
+                This link is temporarily unavailable.
+              </p>
             ) : (
               <CreatePartnerButton />
             )}

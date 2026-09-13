@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Cinzel, Cormorant_Garamond, Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
+import { getAppUrl } from "@/lib/config/site-url";
 import "./globals.css";
 
 // Brand fonts (DESIGN.md §3). Cinzel — headings/brand; Cormorant — body; Inter — data/UI.
@@ -27,9 +28,11 @@ const title = "Obsidian Club — Private Community";
 const description = "A closed society for those who understand.";
 
 export const metadata: Metadata = {
-  // NOTE: set NEXT_PUBLIC_APP_URL in .env.local / Vercel once the domain is
-  // live — otherwise OG/canonical URLs below resolve against localhost.
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
+  // A missing NEXT_PUBLIC_APP_URL still falls back to localhost here —
+  // crashing every page over a metadata field would be a worse outcome
+  // than a wrong OG image — but getAppUrl() logs it loudly server-side
+  // instead of failing silently (see lib/config/site-url.ts).
+  metadataBase: new URL(getAppUrl() ?? "http://localhost:3000"),
   title,
   description,
   manifest: "/manifest.json",
