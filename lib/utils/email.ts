@@ -184,11 +184,10 @@ export async function sendPersonalInvitationEmail(
 }
 
 /**
- * NOT YET WIRED (2026-09-09, see DECISIONS.md) — the decline email for
- * the invitation-panel flow. Same status as
- * `sendApplicationAcceptedEmail` above: no caller yet, written now so
- * the copy isn't lost. Deliberately gives no reason — PRODUCT.md's
- * "declines carry no explanation" applies here too.
+ * The decline email for the invitation-panel flow, wired since
+ * 2026-09-09 (see DECISIONS.md) — called from PATCH
+ * /api/admin/applications/[id]'s decline branch. Deliberately gives no
+ * reason — PRODUCT.md's "declines carry no explanation" applies here too.
  */
 export async function sendApplicationDeclinedEmail(email: string): Promise<{ ok: boolean; error?: string }> {
   const html = emailShell(`

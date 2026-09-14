@@ -11,7 +11,9 @@ import { prisma } from "@/lib/db/prisma";
 // and their CSV/QR exports downloadable for the historical record — see
 // A1's "do not drop, do not delete" instruction. Same not-discoverable
 // pattern as every other admin page here — notFound(), not a
-// redirect/403 page, for non-admins.
+// redirect/403 page, for non-admins. Also intentionally not linked from
+// the Admin Console (see app/(platform)/admin/page.tsx's own comment) —
+// direct-URL only for an admin who knows it's here.
 export default async function InviteBatchesPage() {
   const admin = await requireAdmin();
   if (!admin) {

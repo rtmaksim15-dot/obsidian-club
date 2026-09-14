@@ -7,7 +7,9 @@ import { REP_UI_ENABLED } from "@/lib/config/feature-flags";
 // not-discoverable pattern as /admin/applications: 404, not a redirect,
 // for non-admins. v1 is feed-first — REP UI is deferred, so this 404s
 // for everyone (admins included) while the flag is off, not just for
-// non-admins.
+// non-admins. Intentionally not linked from the Admin Console (see
+// app/(platform)/admin/page.tsx's own comment) — a link to a page that
+// always 404s would be worse than no link.
 export default async function AdminRepPage() {
   if (!REP_UI_ENABLED) {
     notFound();

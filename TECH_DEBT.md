@@ -633,15 +633,13 @@ whether a component references it). See `DECISIONS.md`, 2026-07-04.
 - ~~Uploadthing account~~ — **no longer needed, 2026-07-20**: avatar
   upload moved to Supabase Storage (User Profiles task), which needs no
   separate account. See CHANGELOG.md/DECISIONS.md, 2026-07-20.
-- **New (2026-07-17): a Supabase dashboard toggle only Max can flip** —
-  Authentication → Providers → Email → "Allow new users to sign up."
-  `app/register/route.ts` blocks this app's own `/register` path, but
-  Supabase's project-level Auth REST API still accepts a raw signup call
-  directly from the public anon key no matter what this codebase does —
-  the service-role key doesn't expose project-Auth-settings access, only
-  data-layer admin calls. Until this toggle is off, closed registration
-  isn't airtight at the infrastructure level, even though every path
-  inside the app itself is now closed. See DECISIONS.md, 2026-07-17.
+- ~~A Supabase dashboard toggle only Max can flip~~ — **confirmed off,
+  2026-09-13**: Authentication → Providers → Email → "Allow new users to
+  sign up" is now disabled, closing the infrastructure-level gap this
+  entry tracked since 2026-07-17 (Supabase's project-level Auth REST API
+  no longer accepts a raw signup call directly from the public anon key,
+  regardless of what `app/register/route.ts` does at the app level). See
+  DECISIONS.md, 2026-07-17.
 - **Updated (2026-08-11, v0.36.1), legal package — build unblocked with
   founder-approved v1 content; several real gaps remain, tracked here
   so they don't get lost:**
@@ -808,9 +806,14 @@ CHANGELOG.md `v0.19.0` and DECISIONS.md, 2026-07-27.
 ## Library deferred, Rooms trimmed to Newcomers-only — resolved 2026-07-27
 
 Same roadmap (§III/§IV) names the feed, post creation, comments, and
-people search as "building now" — Library isn't in that list. Same
-pattern as the other flags: `LIBRARY_UI_ENABLED = false` swaps
-`/library`'s real content for a minimal teaser, route/nav tab kept.
+people search as "building now" — Library isn't in that list. At the
+time this entry was written, the plan was the same pattern as the other
+flags: `LIBRARY_UI_ENABLED = false` swapping `/library`'s real content
+for a minimal teaser, route/nav tab kept. **Superseded two days later**
+— see "Library's real composer/browse code was deleted, not gated"
+further down: the real content ended up deleted outright, not gated.
+Flipping `LIBRARY_UI_ENABLED` today restores nothing; the route/nav tab
+staying in place is the only part of this entry still accurate.
 
 The two House of Rope demo articles seeded 2026-07-09 ("What Is
 Shibari?", "Getting Started in House of Rope") were unpublished

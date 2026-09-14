@@ -9,9 +9,15 @@ import AdminConsole from "@/components/admin/AdminConsole";
 // /admin/applications, /admin/members, /admin/reports, and
 // /admin/waiting-list (all now redirect here) as a single operational
 // console with four in-place zones. /admin/invite-batches and
-// /admin/rep are untouched for now — neither was named in the fold
-// instruction, and invite-batches' function is superseded by Zone 4
-// but not yet redirected until that zone actually lands.
+// /admin/rep are intentionally direct-URL only, not linked from here
+// (2026-09-13, correcting this comment's earlier "not yet redirected
+// until Zone 4 lands" — Zone 4 landed 2026-09-11 and neither was
+// redirected, on purpose): invite-batches is a read-only historical
+// record of the old purchase-card generator (see that page's own
+// comment) with nothing left for Zone 4 to supersede, and /admin/rep
+// 404s for everyone, admins included, while REP_UI_ENABLED is false —
+// linking to a page that always 404s would be worse than not linking
+// it at all.
 //
 // Step 1 (2026-09-09 commit): shell, zone switching, and panel
 // open/close mechanics. Step 2 (2026-09-10, see DECISIONS.md): the
