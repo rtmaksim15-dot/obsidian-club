@@ -1154,6 +1154,12 @@ model Thread {
   participants ThreadParticipant[]
   messages     DirectMessage[]
 
+  // Lets DirectMessage's compound foreign key exist at all — see that
+  // model's comment. Also means participantAId/BId are immutable in
+  // practice the moment a message exists: Postgres refuses to update a
+  // referenced key while a dependent row points at it, with no
+  // ON UPDATE CASCADE declared here to override that.
+  @@unique([id, participantAId, participantBId])
   @@index([participantAId])
   @@index([participantBId])
   @@map("threads")
@@ -1196,6 +1202,30 @@ model ThreadParticipant {
 // deletedById mirror Room's Message model exactly — laid down now so a
 // moderation surface can be added later without a schema change, per
 // instruction; no such surface is built in this pass.
+//
+// The `thread` relation below is deliberately compound —
+// (threadId, participantAId, participantBId) referencing Thread's
+// (id, participantAId, participantBId) unique — not a plain threadId ->
+// Thread.id foreign key. A plain FK only guarantees the thread exists;
+// it says nothing about whether THIS row's participant ids actually
+// match that thread's real two participants. Every write path in this
+// codebase already sets them correctly (copied server-side from the
+// Thread record, never accepted from client input — see the DM API
+// routes), but "the application always gets it right" is exactly the
+// kind of guarantee that erodes over time with the next change nobody
+// double-checks against this comment. The compound FK makes a
+// divergence a constraint violation, not a silent bad row: Postgres
+// itself refuses an insert/update whose three columns don't correspond
+// to a real Thread with exactly those participant ids.
+//
+// `onUpdate: Restrict` on that relation is explicit, not left at
+// Prisma's default (CASCADE) — confirmed live that the default silently
+// let a direct Thread.update() change participantBId and cascade the
+// rewrite onto every existing DirectMessage row, which would have meant
+// retroactively changing who can read old messages live via Realtime.
+// Restrict makes that same update fail outright (P2003) the moment a
+// message exists, which is what "participants are immutable after
+// creation" (item 5's answer, 2026-09-14) actually requires.
 model DirectMessage {
   id             String    @id @default(uuid()) @db.Uuid
   threadId       String    @map("thread_id") @db.Uuid
@@ -1208,7 +1238,7 @@ model DirectMessage {
   deletedAt      DateTime? @map("deleted_at")
   deletedById    String?   @map("deleted_by_id") @db.Uuid
 
-  thread    Thread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  thread    Thread @relation(fields: [threadId, participantAId, participantBId], references: [id, participantAId, participantBId], onDelete: Cascade, onUpdate: Restrict)
   sender    User   @relation("DirectMessagesSent", fields: [senderId], references: [id])
   deletedBy User?  @relation("DirectMessageDeletedBy", fields: [deletedById], references: [id])
 

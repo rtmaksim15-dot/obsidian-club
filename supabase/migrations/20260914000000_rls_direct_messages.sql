@@ -45,6 +45,46 @@
 -- isn't already rendering that thread, and GET /api/dm/threads/:id/messages
 -- (what any real client calls on a ping) enforces the full, current
 -- ThreadParticipant/leftAt check server-side before returning content.
+--
+-- Addendum, same day: this policy is only as trustworthy as
+-- direct_messages.participant_a_id/b_id actually being correct. Every
+-- application write path already sets them server-side from the real
+-- Thread record, never from client input — but "the application always
+-- gets it right" was flagged as not good enough on its own for content
+-- this private, so prisma/schema.prisma's DirectMessage now also has a
+-- compound foreign key: (thread_id, participant_a_id, participant_b_id)
+-- references threads(id, participant_a_id, participant_b_id), with
+-- onUpdate: Restrict (not Prisma's CASCADE default — confirmed live
+-- that the default let a Thread.update() silently rewrite every
+-- existing message's participant ids, which would have retroactively
+-- changed who this policy lets subscribe to old messages). Two
+-- concrete guarantees now enforced by Postgres itself, not just code
+-- review: a DirectMessage's participant ids can never diverge from its
+-- real thread's, and a thread's two participants can never change once
+-- a message exists. Verified live, 2026-09-14: a deliberately mismatched
+-- insert and a post-message Thread.update() both fail with P2003.
+--
+-- An end-to-end isolation test (three real Supabase Auth sessions — two
+-- thread participants, one uninvolved third member — subscribed
+-- directly to the raw postgres_changes channel on this table) was built
+-- and run 2026-09-14, but came back inconclusive, not passing: neither
+-- the real participant NOR the third member received any event.
+-- pg_publication_tables confirmed why — `direct_messages` isn't in the
+-- supabase_realtime publication yet (only messages/notifications/posts/
+-- rooms are; enabling it is a manual Supabase Dashboard step, the same
+-- class of one-time action `messages` itself needed, deliberately left
+-- to Max rather than attempted over SQL — see DECISIONS.md, 2026-09-14).
+-- The isolation test itself is real and repeatable; it simply cannot
+-- produce a true pass/fail until that step is done. Re-run it once
+-- Realtime is enabled here, and do not treat "no leak observed" as
+-- proof of isolation until the positive control (the real participant)
+-- also receives its own event in the same run — a leak test with a dead
+-- channel looks identical to a leak test that passed.
+--
+-- Don't reduce this policy to `auth.uid() is not null` to "match
+-- messages" once Realtime is on — that would silently reopen the exact
+-- leak this addendum exists to document, for a table where it's
+-- materially worse than it is for Room chat's already-shared content.
 
 alter table conversation_requests enable row level security;
 alter table threads               enable row level security;
