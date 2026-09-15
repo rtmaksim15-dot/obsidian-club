@@ -1071,6 +1071,15 @@ model LegalConsent {
   termsVersion   String   @map("terms_version")
   privacyVersion String   @map("privacy_version")
   aupVersion     String   @map("aup_version")
+  // Direct Messages (2026-09-14, see DECISIONS.md) — nullable, unlike
+  // the three above: most rows here are the registration-time event and
+  // predate this field, or belong to a member who's never opened
+  // /messages. A row recording DM-rules acceptance (lib/legal/dm-rules.ts)
+  // still carries forward the member's then-current terms/privacy/aup
+  // versions into the three columns above, so every row stays a
+  // complete snapshot rather than the table growing partially-null rows
+  // by document type.
+  dmRulesVersion String?  @map("dm_rules_version")
   acceptedAt     DateTime @default(now()) @map("accepted_at")
   acceptedIp     String?  @map("accepted_ip")
 

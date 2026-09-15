@@ -168,6 +168,7 @@ export default function PersonDetail({
             {person.consents.map((c) => (
               <li key={c.id} className="text-caption" style={{ color: "var(--color-text-secondary)" }}>
                 {formatDate(c.acceptedAt)} — Terms {c.termsVersion}, Privacy {c.privacyVersion}, AUP {c.aupVersion}
+                {c.dmRulesVersion ? `, DM Rules ${c.dmRulesVersion}` : ""}
                 {c.acceptedIp ? ` (${c.acceptedIp})` : ""}
               </li>
             ))}

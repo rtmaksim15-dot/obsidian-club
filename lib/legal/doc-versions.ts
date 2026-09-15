@@ -8,3 +8,9 @@ export const LEGAL_DOC_VERSIONS = {
   privacy: "2026-08-11.0",
   aup: "2026-08-11.0",
 } as const;
+
+// Direct Messages (2026-09-14, see DECISIONS.md) — versioned
+// independently of the three above: it's a narrower, feature-specific
+// ruleset, not part of the platform-wide re-consent gate
+// (lib/legal/reconsent.ts deliberately never reads this).
+export const DM_RULES_VERSION = "2026-09-15.0";

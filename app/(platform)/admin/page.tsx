@@ -318,9 +318,17 @@ export default async function AdminConsolePage() {
   const commentTargetIds = reports.filter((r) => r.targetType === "comment").map((r) => r.targetId);
   const messageTargetIds = reports.filter((r) => r.targetType === "message").map((r) => r.targetId);
   const profileTargetIds = reports.filter((r) => r.targetType === "profile").map((r) => r.targetId);
+  // Direct Messages (2026-09-14, see DECISIONS.md): deliberately never
+  // selects `content` here. This query resolves enough to identify and
+  // label the report (sender, deleted state) — the message text itself
+  // is only ever readable through GET /api/admin/reports/:id/message,
+  // one report at a time, logged. Making it structurally impossible for
+  // this eager, page-load-time query to leak content is the point, not
+  // just a convention to remember.
+  const directMessageTargetIds = reports.filter((r) => r.targetType === "direct_message").map((r) => r.targetId);
   const reportTargetPairs = reports.map((r) => ({ targetType: r.targetType, targetId: r.targetId }));
 
-  const [targetPosts, targetComments, targetMessages, targetProfiles, siblingReports, targetModerationActions] =
+  const [targetPosts, targetComments, targetMessages, targetProfiles, targetDirectMessages, siblingReports, targetModerationActions] =
     await Promise.all([
       postTargetIds.length
         ? prisma.post.findMany({
@@ -369,6 +377,17 @@ export default async function AdminConsolePage() {
             select: { id: true, displayName: true, username: true, level: true, trustScore: true, ageVerified: true, joinedAt: true },
           })
         : Promise.resolve([]),
+      directMessageTargetIds.length
+        ? prisma.directMessage.findMany({
+            where: { id: { in: directMessageTargetIds } },
+            select: {
+              id: true,
+              isDeleted: true,
+              createdAt: true,
+              sender: { select: { id: true, displayName: true, username: true } },
+            },
+          })
+        : Promise.resolve([]),
       // (a) other reports (any status) against the exact same target —
       // uses the existing @@index([targetType, targetId]); excluded per
       // report by id below, not in the query itself (an OR of every
@@ -395,6 +414,7 @@ export default async function AdminConsolePage() {
   const commentById = new Map(targetComments.map((c) => [c.id, c]));
   const messageById = new Map(targetMessages.map((m) => [m.id, m]));
   const profileById = new Map(targetProfiles.map((u) => [u.id, u]));
+  const directMessageById = new Map(targetDirectMessages.map((m) => [m.id, m]));
 
   const targetKey = (t: string, id: string) => `${t}:${id}`;
   const siblingReportsByTarget = new Map<string, typeof siblingReports>();
@@ -524,6 +544,7 @@ export default async function AdminConsolePage() {
           termsVersion: c.termsVersion,
           privacyVersion: c.privacyVersion,
           aupVersion: c.aupVersion,
+          dmRulesVersion: c.dmRulesVersion,
           acceptedAt: c.acceptedAt.toISOString(),
           acceptedIp: c.acceptedIp,
         })),
@@ -595,7 +616,7 @@ export default async function AdminConsolePage() {
             // visible there. Linked anyway; it's still often useful.
             contextHref = `/rooms/${message.room.slug}`;
           }
-        } else {
+        } else if (r.targetType === "profile") {
           const profile = profileById.get(r.targetId);
           if (!profile) {
             label = "[member no longer exists]";
@@ -605,6 +626,22 @@ export default async function AdminConsolePage() {
             authorName = profile.displayName;
             authorUsername = profile.username;
             contextHref = `/profile/${profile.username}`;
+          }
+        } else {
+          // direct_message (2026-09-14, see DECISIONS.md) — label is
+          // deliberately never the message's own content; `content` was
+          // never even selected in the query above. No contextHref
+          // either — admins don't get a link into the thread, only the
+          // logged, one-message-at-a-time reveal in ReportDetail.
+          const dm = directMessageById.get(r.targetId);
+          if (!dm) {
+            label = "[message no longer exists]";
+          } else {
+            label = dm.isDeleted ? "[message already removed]" : "Direct message (view to read)";
+            authorId = dm.sender.id;
+            authorName = dm.sender.displayName;
+            authorUsername = dm.sender.username;
+            isDeleted = dm.isDeleted;
           }
         }
 

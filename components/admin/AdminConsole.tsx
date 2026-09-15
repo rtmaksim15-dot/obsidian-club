@@ -82,7 +82,15 @@ export type Person = {
   inviteeNames: string[];
   partnerName: string | null;
   repHistory: { id: string; delta: number; reason: string | null; source: string | null; createdAt: string }[];
-  consents: { id: string; termsVersion: string; privacyVersion: string; aupVersion: string; acceptedAt: string; acceptedIp: string | null }[];
+  consents: {
+    id: string;
+    termsVersion: string;
+    privacyVersion: string;
+    aupVersion: string;
+    dmRulesVersion: string | null;
+    acceptedAt: string;
+    acceptedIp: string | null;
+  }[];
   adminActions: { id: string; action: string; note: string | null; createdAt: string; adminName: string | null }[];
   notes: { id: string; body: string; createdAt: string; authorName: string | null }[];
 };

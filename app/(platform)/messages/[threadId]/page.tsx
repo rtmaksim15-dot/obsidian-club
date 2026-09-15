@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { isRitualComplete } from "@/lib/auth/ritual";
 import { getDoorsState } from "@/lib/config/doors";
 import { isBlockedEitherWay } from "@/lib/moderation/block";
+import { needsDmRulesAcceptance } from "@/lib/legal/dm-rules";
 import DmThreadChat from "@/components/shared/DmThreadChat";
 import LeaveThreadButton from "@/components/shared/LeaveThreadButton";
 import BlockButton from "@/components/shared/BlockButton";
@@ -22,6 +23,10 @@ export default async function ThreadPage({ params }: { params: { threadId: strin
     if (!(await isRitualComplete(user))) redirect("/ritual");
     if (getDoorsState().active) redirect("/antechamber");
   }
+
+  // Item 4 — a direct link to a thread (e.g. a notification) shouldn't
+  // bypass the gate on /messages itself.
+  if (await needsDmRulesAcceptance(user.id)) redirect("/messages");
 
   const participant = await prisma.threadParticipant.findUnique({
     where: { threadId_userId: { threadId: params.threadId, userId: user.id } },

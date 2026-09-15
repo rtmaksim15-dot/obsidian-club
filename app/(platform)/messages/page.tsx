@@ -3,8 +3,10 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { isRitualComplete } from "@/lib/auth/ritual";
 import { getDoorsState } from "@/lib/config/doors";
+import { needsDmRulesAcceptance } from "@/lib/legal/dm-rules";
 import { effectiveRequestStatus, isRequestExpired } from "@/lib/dm/lifecycle";
 import MessagesInbox from "@/components/shared/MessagesInbox";
+import DmRulesGate from "@/components/shared/DmRulesGate";
 
 // /messages (2026-09-14, see DECISIONS.md) — item 2: requests arrive
 // here, not in a separate spam folder, alongside already-accepted
@@ -21,6 +23,13 @@ export default async function MessagesPage() {
   if (!user.isAdmin) {
     if (!(await isRitualComplete(user))) redirect("/ritual");
     if (getDoorsState().active) redirect("/antechamber");
+  }
+
+  // Item 4 — applies to every member, admins included: this is a
+  // feature-specific ruleset, not the ritual, and nothing carves out an
+  // exception for it.
+  if (await needsDmRulesAcceptance(user.id)) {
+    return <DmRulesGate />;
   }
 
   const [requestRows, participations] = await Promise.all([

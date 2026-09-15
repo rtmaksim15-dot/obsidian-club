@@ -39,10 +39,34 @@ export default function ReportDetail({
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dmContent, setDmContent] = useState<string | null>(null);
+  const [dmLoading, setDmLoading] = useState(false);
+  const [dmError, setDmError] = useState<string | null>(null);
 
   const r = report;
   const canPreserve = r.targetType === "post" && r.isRedLine;
   const canRemove = r.targetType === "comment" || r.targetType === "message";
+
+  // Direct Messages (2026-09-14, see DECISIONS.md) — the only place in
+  // the admin console a message's actual text ever appears. Fetched on
+  // click, not on panel open, so opening the panel to read the reporter/
+  // category doesn't itself count as reading the message; every fetch
+  // is logged server-side regardless of whether the admin reads what
+  // comes back.
+  async function revealMessage() {
+    setDmLoading(true);
+    setDmError(null);
+    try {
+      const res = await fetch(`/api/admin/reports/${r.id}/message`);
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || "Could not load.");
+      setDmContent(json.message.content || "(removed)");
+    } catch (e) {
+      setDmError(e instanceof Error ? e.message : "Could not load.");
+    } finally {
+      setDmLoading(false);
+    }
+  }
 
   async function act(action: Action) {
     if (!window.confirm(CONFIRM_MESSAGE[action])) return;
@@ -113,6 +137,22 @@ export default function ReportDetail({
             <a href={r.target.contextHref} target="_blank" rel="noreferrer" className="text-caption mt-2 inline-block" style={{ color: "var(--color-accent)" }}>
               View in context ↗
             </a>
+          ) : null}
+          {r.targetType === "direct_message" && !r.target.isDeleted ? (
+            <div className="mt-3">
+              {dmContent !== null ? (
+                <p className="text-body !text-base italic">&ldquo;{dmContent}&rdquo;</p>
+              ) : (
+                <button type="button" className="btn-secondary" disabled={dmLoading} onClick={revealMessage}>
+                  {dmLoading ? "…" : "View message"}
+                </button>
+              )}
+              {dmError ? (
+                <p className="text-caption mt-2" style={{ color: "var(--color-error)" }}>
+                  {dmError}
+                </p>
+              ) : null}
+            </div>
           ) : null}
         </div>
       </div>
