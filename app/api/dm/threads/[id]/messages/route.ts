@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
+import { isBlockedEitherWay } from "@/lib/moderation/block";
 
 const PAGE_SIZE = 100;
 const MAX_MESSAGE_LENGTH = 2000;
@@ -87,6 +88,14 @@ export async function POST(request: Request, { params }: { params: { id: string 
   });
   if (!thread) {
     return NextResponse.json({ error: "Conversation not found." }, { status: 404 });
+  }
+
+  // Item 5: a block "prevents any future request" and, per instruction,
+  // also rejects new messages into an existing thread — history stays
+  // readable (preserve, never delete), only sending is cut off.
+  const otherId = thread.participantAId === user.id ? thread.participantBId : thread.participantAId;
+  if (await isBlockedEitherWay(user.id, otherId)) {
+    return NextResponse.json({ error: "You can't send messages in this conversation." }, { status: 403 });
   }
 
   try {

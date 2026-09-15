@@ -9,6 +9,17 @@ import { getCurrentUser } from "@/lib/auth/session";
 // not just this row's own direction — a block is "we don't see each
 // other," not "I don't see them." Blocking also tears down any existing
 // follow relationship in both directions, same as unfollowing would.
+//
+// Direct Messages (2026-09-14, see DECISIONS.md), item 5: a block
+// "cancels any pending request in both directions." `cancelled` is its
+// own status, deliberately not reused from `declined` — the two-strike
+// door (lib/dm/lifecycle.ts#isStrike) only counts a real decline or a
+// silent expiry, not a block, since a block already closes the door on
+// its own, unconditionally. No notification either way: blocking is
+// silent by design, same as leaving a thread is. An existing accepted
+// thread is untouched here — new messages into it are rejected at send
+// time (POST /api/dm/threads/:id/messages), history stays readable;
+// preserve, never delete, same principle Report already uses.
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
   const user = await getCurrentUser();
   if (!user) {
@@ -44,6 +55,16 @@ export async function POST(_request: Request, { params }: { params: { id: string
             { followerId: target.id, followingId: user.id },
           ],
         },
+      }),
+      prisma.conversationRequest.updateMany({
+        where: {
+          status: "pending",
+          OR: [
+            { senderId: user.id, recipientId: target.id },
+            { senderId: target.id, recipientId: user.id },
+          ],
+        },
+        data: { status: "cancelled", respondedAt: new Date() },
       }),
     ]);
     return NextResponse.json({ blocked: true });
