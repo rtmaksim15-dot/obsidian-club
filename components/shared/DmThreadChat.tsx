@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/auth/supabase-browser";
+import ReportButton from "./ReportButton";
 
 type Message = {
   id: string;
@@ -108,7 +109,7 @@ export default function DmThreadChat({ threadId, currentUserId, initialMessages 
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-ob-black text-ob-text">
+    <div className="flex min-h-0 flex-1 flex-col bg-ob-black text-ob-text">
       <div className="flex-1 space-y-4 overflow-y-auto px-6 py-6">
         {messages.length === 0 ? (
           <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
@@ -148,6 +149,9 @@ export default function DmThreadChat({ threadId, currentUserId, initialMessages 
                 ) : (
                   <p className="text-body mt-0.5 !text-base">{m.content}</p>
                 )}
+                {!m.isDeleted && m.sender.id !== currentUserId ? (
+                  <ReportButton targetType="direct_message" targetId={m.id} />
+                ) : null}
               </div>
             </div>
           ))

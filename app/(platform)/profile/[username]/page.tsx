@@ -6,7 +6,9 @@ import FollowButton from "@/components/shared/FollowButton";
 import BlockButton from "@/components/shared/BlockButton";
 import ReportButton from "@/components/shared/ReportButton";
 import PostCard, { type FeedPost } from "@/components/shared/PostCard";
+import RequestConversationButton from "@/components/shared/RequestConversationButton";
 import { isBlockedEitherWay } from "@/lib/moderation/block";
+import { isRitualComplete } from "@/lib/auth/ritual";
 import { LEVEL_NAMES } from "@/lib/rating/levels";
 import { REP_UI_ENABLED, HOUSES_UI_ENABLED, LEVELS_UI_ENABLED } from "@/lib/config/feature-flags";
 
@@ -56,6 +58,10 @@ export default async function ProfilePage({ params }: { params: { username: stri
   // relationship never even reaches the point of fetching posts/follow
   // state for a profile neither party should be looking at.
   const blocked = viewer && !isOwnProfile ? await isBlockedEitherWay(viewer.id, user.id) : false;
+
+  const canRequestConversation =
+    viewer && !isOwnProfile ? viewer.isAdmin || (await isRitualComplete(viewer)) : false;
+
   if (blocked) {
     return (
       <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
@@ -207,6 +213,17 @@ export default async function ProfilePage({ params }: { params: { username: stri
             <FollowButton userId={user.id} initialFollowing={Boolean(isFollowing)} />
             <BlockButton userId={user.id} initialBlocked={false} />
             <ReportButton targetType="profile" targetId={user.id} />
+          </div>
+        ) : null}
+
+        {/* Direct Messages (2026-09-14), item 1 — eligibility mirrors
+            lib/dm/eligibility.ts's ritual gate; the API re-checks
+            everything else (already-pending, two-strike door, daily
+            limit) regardless, this just avoids showing the button to
+            someone it would always reject outright. */}
+        {viewer && !isOwnProfile && canRequestConversation ? (
+          <div className="mt-4">
+            <RequestConversationButton recipientId={user.id} />
           </div>
         ) : null}
 

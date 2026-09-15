@@ -6,7 +6,8 @@ import { REPORT_CATEGORIES, isRedLineCategory } from "@/lib/moderation/report";
 
 // Moderation gap 2 (2026-09-08, see DECISIONS.md): comment/message
 // added — live conversation previously had no reporting path at all.
-const VALID_TARGET_TYPES: ReportTargetType[] = ["post", "profile", "comment", "message"];
+// Direct Messages (2026-09-14) added direct_message the same way.
+const VALID_TARGET_TYPES: ReportTargetType[] = ["post", "profile", "comment", "message", "direct_message"];
 const VALID_CATEGORIES = REPORT_CATEGORIES.map((c) => c.value);
 
 type Body = { targetType?: string; targetId?: string; category?: string; note?: string };
@@ -73,7 +74,7 @@ export async function POST(request: Request) {
     if (comment.authorId === user.id) {
       return NextResponse.json({ error: "You can't report your own comment." }, { status: 422 });
     }
-  } else {
+  } else if (targetType === "message") {
     const message = await prisma.message.findUnique({
       where: { id: targetId },
       select: { id: true, userId: true, isDeleted: true },
@@ -82,6 +83,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "That message no longer exists." }, { status: 404 });
     }
     if (message.userId === user.id) {
+      return NextResponse.json({ error: "You can't report your own message." }, { status: 422 });
+    }
+  } else {
+    const dm = await prisma.directMessage.findUnique({
+      where: { id: targetId },
+      select: { id: true, senderId: true, isDeleted: true },
+    });
+    if (!dm || dm.isDeleted) {
+      return NextResponse.json({ error: "That message no longer exists." }, { status: 404 });
+    }
+    if (dm.senderId === user.id) {
       return NextResponse.json({ error: "You can't report your own message." }, { status: 422 });
     }
   }
