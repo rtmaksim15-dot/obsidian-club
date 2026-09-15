@@ -265,6 +265,15 @@ model User {
   adminNotesAboutMe          AdminNote[]       @relation("AdminNotesAboutMember")
   adminNotesAuthored         AdminNote[]       @relation("AdminNotesAuthored")
 
+  // Direct Messages (2026-09-14, see DECISIONS.md)
+  conversationRequestsSent     ConversationRequest[] @relation("ConversationRequestsSent")
+  conversationRequestsReceived ConversationRequest[] @relation("ConversationRequestsReceived")
+  threadsAsParticipantA        Thread[]              @relation("ThreadAsParticipantA")
+  threadsAsParticipantB        Thread[]              @relation("ThreadAsParticipantB")
+  threadParticipations         ThreadParticipant[]
+  directMessagesSent           DirectMessage[]       @relation("DirectMessagesSent")
+  directMessagesDeletedByMe    DirectMessage[]       @relation("DirectMessageDeletedBy")
+
   @@map("users")
 }
 
@@ -931,6 +940,12 @@ enum ReportTargetType {
   // only — no relation changes needed.
   comment
   message
+  // Direct Messages (2026-09-14) — deliberately distinct from `message`
+  // above (Room chat's Message model): the report route resolves each
+  // target type against a specific table, and `message` already means
+  // "Room-scoped Message.id." Reusing it for DirectMessage.id would let
+  // a report resolve against the wrong table for either shape.
+  direct_message
 }
 
 // underage/non_consensual/threat are the "red line" categories (see
@@ -1063,6 +1078,142 @@ model LegalConsent {
 
   @@index([userId])
   @@map("legal_consents")
+}
+
+// ============================================================
+// DIRECT MESSAGES (2026-09-14, see DECISIONS.md)
+// ============================================================
+// A conversation begins with consent, never with intrusion: nobody can
+// message anybody until the recipient has agreed. ConversationRequest
+// is that consent gate; Thread/ThreadParticipant/DirectMessage exist
+// only once it's granted. RLS is deny-all on all four tables except
+// DirectMessage's own SELECT policy (see the migration) — the same
+// narrow, join-free exception `messages_select_authenticated` already
+// uses for Room chat (2026-08-04), needed because Realtime's
+// postgres_changes authorization doesn't evaluate joins reliably. Real
+// per-thread access control lives entirely server-side (every DM API
+// route verifies ThreadParticipant with leftAt null before returning or
+// accepting anything) — RLS here only gates whether Realtime's "something
+// changed" ping fires, exactly like the Room chat precedent.
+
+enum ConversationRequestStatus {
+  pending
+  accepted
+  declined
+  expired
+  // Set only when a block cancels a still-pending request (either
+  // direction) — never counts toward the two-strike limit below, since
+  // a block already closes the door unconditionally on its own.
+  cancelled
+}
+
+// One request per row, permanently — including its openingMessage, even
+// once declined/expired/cancelled. That's deliberate (the two/five-day
+// rules need real history to enforce), not an oversight: the recipient
+// never agreed to receive that text, so no code path may surface a
+// non-pending request's openingMessage to anyone but the sender
+// (who already wrote it) or moderation later — see the API routes.
+model ConversationRequest {
+  id             String                    @id @default(uuid()) @db.Uuid
+  senderId       String                    @map("sender_id") @db.Uuid
+  recipientId    String                    @map("recipient_id") @db.Uuid
+  openingMessage String                    @map("opening_message")
+  status         ConversationRequestStatus @default(pending)
+  createdAt      DateTime                  @default(now()) @map("created_at")
+  respondedAt    DateTime?                 @map("responded_at")
+  // Set only on accept — the thread this request became.
+  threadId       String?                   @unique @map("thread_id") @db.Uuid
+
+  sender    User    @relation("ConversationRequestsSent", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient User    @relation("ConversationRequestsReceived", fields: [recipientId], references: [id], onDelete: Cascade)
+  thread    Thread? @relation(fields: [threadId], references: [id])
+
+  // Powers the two-strike lookup (declined/expired requests, sender ->
+  // recipient) and the recipient's pending-requests inbox.
+  @@index([senderId, recipientId])
+  @@index([recipientId, status])
+  @@map("conversation_requests")
+}
+
+// Always exactly two participants — participantAId/BId are an unordered
+// pair (no canonical sort; nothing queries "the thread between A and B"
+// through these two columns directly, ThreadParticipant is the real
+// lookup path). Cached here, not just derived from ThreadParticipant,
+// so a new DirectMessage can copy them without an extra query on every
+// send — see that model's comment for the actual reason they need to
+// exist at all (Realtime RLS).
+model Thread {
+  id             String   @id @default(uuid()) @db.Uuid
+  participantAId String   @map("participant_a_id") @db.Uuid
+  participantBId String   @map("participant_b_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  participantA User                 @relation("ThreadAsParticipantA", fields: [participantAId], references: [id])
+  participantB User                 @relation("ThreadAsParticipantB", fields: [participantBId], references: [id])
+  request      ConversationRequest?
+  participants ThreadParticipant[]
+  messages     DirectMessage[]
+
+  @@index([participantAId])
+  @@index([participantBId])
+  @@map("threads")
+}
+
+// Membership + "leave" state. Leaving sets leftAt on the caller's own
+// row only — silent, no notice to the other participant (the canon),
+// and never deletes the Thread or its DirectMessage rows: the other
+// participant's history is untouched. A left participant is excluded
+// from every server-side access check below (can no longer read or
+// send into the thread), same "preserve, never delete" principle
+// Report/Block already use elsewhere in this schema.
+model ThreadParticipant {
+  threadId String    @map("thread_id") @db.Uuid
+  userId   String    @map("user_id") @db.Uuid
+  joinedAt DateTime  @default(now()) @map("joined_at")
+  leftAt   DateTime? @map("left_at")
+
+  thread Thread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@id([threadId, userId])
+  @@index([userId])
+  @@map("thread_participants")
+}
+
+// participantAId/BId here are a deliberate denormalization, copied from
+// Thread at write time, for exactly one reason: a join-free Realtime RLS
+// policy. `messages_select_authenticated` (Room chat, 2026-08-04) could
+// only be self-contained (`auth.uid() is not null`) because Room content
+// isn't 1:1-private — the same policy on a DM table would let any
+// authenticated member subscribe to any thread's live content, bypassing
+// every server-side check entirely (Realtime's postgres_changes
+// authorization runs against RLS directly, never through this app's API
+// routes). Copying the two participant ids onto the row itself lets the
+// policy be `auth.uid() = participant_a_id or auth.uid() = participant_b_id`
+// — still join-free, but scoped to the two actual people, not everyone.
+// Never read by application code for access control; the real check is
+// ThreadParticipant, server-side, in every route. isDeleted/deletedAt/
+// deletedById mirror Room's Message model exactly — laid down now so a
+// moderation surface can be added later without a schema change, per
+// instruction; no such surface is built in this pass.
+model DirectMessage {
+  id             String    @id @default(uuid()) @db.Uuid
+  threadId       String    @map("thread_id") @db.Uuid
+  senderId       String    @map("sender_id") @db.Uuid
+  participantAId String    @map("participant_a_id") @db.Uuid
+  participantBId String    @map("participant_b_id") @db.Uuid
+  content        String
+  createdAt      DateTime  @default(now()) @map("created_at")
+  isDeleted      Boolean   @default(false) @map("is_deleted")
+  deletedAt      DateTime? @map("deleted_at")
+  deletedById    String?   @map("deleted_by_id") @db.Uuid
+
+  thread    Thread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  sender    User   @relation("DirectMessagesSent", fields: [senderId], references: [id])
+  deletedBy User?  @relation("DirectMessageDeletedBy", fields: [deletedById], references: [id])
+
+  @@index([threadId])
+  @@map("direct_messages")
 }
 
 // ============================================================
