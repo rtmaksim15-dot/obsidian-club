@@ -74,7 +74,61 @@ async function main() {
     console.log("RLS is enabled on every table.");
   }
 
+  await checkRoomLevelGateTripwire(prisma);
+
   await prisma.$disconnect();
+}
+
+// Tripwire (2026-09-15, see DECISIONS.md): `messages`' own Realtime
+// SELECT policy is `auth.uid() is not null` — confirmed live to not
+// evaluate joins reliably (see the 2026-08-04 migration), so it can
+// only ever be this self-contained, never room.minLevel-aware. Today
+// every room has minLevel 1, so that's a harmless gap in practice. The
+// day anyone raises a room's minLevel above 1 (Houses/Levels are the
+// named next priority in CLAUDE.md) without first closing this, any
+// authenticated member — any level — can subscribe to that room's raw
+// postgres_changes channel and read its live content, bypassing
+// canAccessRoom() entirely. This check fails loudly at exactly that
+// moment instead of relying on someone remembering a comment.
+async function checkRoomLevelGateTripwire(prisma: InstanceType<typeof import("@prisma/client").PrismaClient>) {
+  const elevatedRooms = await prisma.$queryRaw<{ slug: string; name: string; min_level: number; is_active: boolean }[]>`
+    select slug, name, min_level, is_active from rooms where min_level > 1 order by slug;
+  `;
+  if (elevatedRooms.length === 0) return;
+
+  const policies = await prisma.$queryRaw<{ qual: string | null }[]>`
+    select qual from pg_policies where tablename = 'messages' and cmd = 'SELECT';
+  `;
+  const policyText = policies.map((p) => p.qual ?? "").join(" ");
+  const enforcesLevelGate = /min_level/i.test(policyText);
+  if (enforcesLevelGate) return;
+
+  console.error(
+    "\nRLS TRIPWIRE: room-level access gate not enforced by Realtime.\n\n" +
+      "The following room(s) have minLevel > 1 (a real access restriction " +
+      "canAccessRoom() enforces in application code):\n\n" +
+      elevatedRooms.map((r) => `  - ${r.slug} (minLevel ${r.min_level}, isActive: ${r.is_active})`).join("\n") +
+      "\n\nBut messages' own Realtime SELECT policy is " +
+      `"${policyText.trim() || "(no SELECT policy found)"}" — it does not ` +
+      "reference min_level at all, so it cannot be enforcing this gate. " +
+      "Realtime authorizes postgres_changes delivery directly against this " +
+      "policy, never through this app's API routes: right now, any " +
+      "authenticated member — regardless of level — can subscribe to the " +
+      "raw channel for one of these rooms and receive its live message " +
+      "content, bypassing canAccessRoom() entirely.\n\n" +
+      "This was harmless while every room's minLevel was 1; it stops being " +
+      "harmless the moment any room above is reactivated or its minLevel is " +
+      "raised for real. Fix needed before that happens: denormalize the " +
+      "gate onto `messages` itself the same way direct_messages denormalizes " +
+      "participant_a_id/b_id (see supabase/migrations/20260914000000_rls_" +
+      "direct_messages.sql) — e.g. a `min_level` column copied from the " +
+      "room at message-insert time — so the policy can stay join-free " +
+      "(Realtime doesn't evaluate joins reliably) while actually checking " +
+      "it, then update messages_select_authenticated to reference it. Do " +
+      "not just add a join to rooms; that policy has already been proven " +
+      "not to fire for Realtime.",
+  );
+  process.exitCode = 1;
 }
 
 main().catch((err) => {

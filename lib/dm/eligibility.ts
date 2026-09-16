@@ -3,6 +3,7 @@ import type { User, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { isRitualComplete } from "@/lib/auth/ritual";
 import { isBlockedEitherWay } from "@/lib/moderation/block";
+import { needsDmRulesAcceptance } from "@/lib/legal/dm-rules";
 import { effectiveRequestStatus, isStrike } from "./lifecycle";
 
 export const MAX_STRIKES = 2;
@@ -37,6 +38,12 @@ export async function getRequestEligibility(
   // than inventing a different rule for one feature.
   if (!sender.isAdmin && !(await isRitualComplete(sender))) {
     return { ok: false, status: 403, error: "Complete the Initiation Ritual before requesting a conversation." };
+  }
+
+  // Item 4's DM rules acceptance applies to everyone, admins included —
+  // nothing carved out an exception for it, unlike the ritual gate above.
+  if (await needsDmRulesAcceptance(sender.id)) {
+    return { ok: false, status: 403, error: "Accept the DM rules before requesting a conversation." };
   }
 
   if (await isBlockedEitherWay(sender.id, recipientId)) {

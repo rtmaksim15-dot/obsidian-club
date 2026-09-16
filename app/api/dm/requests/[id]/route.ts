@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import { isBlockedEitherWay } from "@/lib/moderation/block";
+import { needsDmRulesAcceptance } from "@/lib/legal/dm-rules";
 import { effectiveRequestStatus } from "@/lib/dm/lifecycle";
 
 type Body = { action?: "accept" | "decline" };
@@ -72,8 +73,16 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return NextResponse.json({ ok: true });
   }
 
-  // Accept. Defense in depth: re-check the block in case one happened
-  // after this request was shown to the recipient.
+  // Accept. Defense in depth, both checks: the /messages page already
+  // hides the Accept control behind needsDmRulesAcceptance (a recipient
+  // who hasn't accepted can't normally see a pending request to click
+  // Accept on at all) and re-checks the block on every load — but this
+  // route is a gate in its own right, not just a UI-reachability
+  // question, so both are re-verified here regardless of how the
+  // request reached this endpoint.
+  if (await needsDmRulesAcceptance(user.id)) {
+    return NextResponse.json({ error: "Accept the DM rules before accepting a conversation." }, { status: 403 });
+  }
   if (await isBlockedEitherWay(existing.senderId, existing.recipientId)) {
     return NextResponse.json({ error: "You can't reach this member." }, { status: 403 });
   }

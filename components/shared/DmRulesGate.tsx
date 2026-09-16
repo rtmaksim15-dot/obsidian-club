@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-// Item 4 — shown once, the first time a member opens /messages.
-export default function DmRulesGate() {
+// Item 4 — shown once, the first time a member opens /messages, or
+// reached via /messages/rules?next=... from "Request a conversation" on
+// a profile so accepting routes back there instead of into the inbox.
+export default function DmRulesGate({ next }: { next?: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -14,7 +16,8 @@ export default function DmRulesGate() {
     setError(null);
     const res = await fetch("/api/dm/rules-acceptance", { method: "POST" });
     if (res.ok) {
-      router.refresh();
+      if (next) router.push(next);
+      else router.refresh();
     } else {
       setError("Could not record your acceptance. Try again shortly.");
       setBusy(false);

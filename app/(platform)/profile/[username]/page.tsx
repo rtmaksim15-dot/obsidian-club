@@ -9,6 +9,7 @@ import PostCard, { type FeedPost } from "@/components/shared/PostCard";
 import RequestConversationButton from "@/components/shared/RequestConversationButton";
 import { isBlockedEitherWay } from "@/lib/moderation/block";
 import { isRitualComplete } from "@/lib/auth/ritual";
+import { needsDmRulesAcceptance } from "@/lib/legal/dm-rules";
 import { LEVEL_NAMES } from "@/lib/rating/levels";
 import { REP_UI_ENABLED, HOUSES_UI_ENABLED, LEVELS_UI_ENABLED } from "@/lib/config/feature-flags";
 
@@ -61,6 +62,7 @@ export default async function ProfilePage({ params }: { params: { username: stri
 
   const canRequestConversation =
     viewer && !isOwnProfile ? viewer.isAdmin || (await isRitualComplete(viewer)) : false;
+  const needsDmRules = canRequestConversation && viewer ? await needsDmRulesAcceptance(viewer.id) : false;
 
   if (blocked) {
     return (
@@ -223,7 +225,11 @@ export default async function ProfilePage({ params }: { params: { username: stri
             someone it would always reject outright. */}
         {viewer && !isOwnProfile && canRequestConversation ? (
           <div className="mt-4">
-            <RequestConversationButton recipientId={user.id} />
+            <RequestConversationButton
+              recipientId={user.id}
+              needsDmRules={needsDmRules}
+              returnTo={`/profile/${user.username}`}
+            />
           </div>
         ) : null}
 

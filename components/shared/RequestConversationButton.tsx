@@ -5,7 +5,22 @@ import { useState } from "react";
 // "Request a conversation" (item 1) — on a member's profile. Opens a
 // short form with one required opening message; sending it makes the
 // request, it does not open a thread (see /messages for accept/decline).
-export default function RequestConversationButton({ recipientId }: { recipientId: string }) {
+//
+// If the viewer hasn't accepted the DM rules yet (needsDmRules), this
+// renders as a plain link to the rules screen instead of the form —
+// with `next` pointing back at this exact profile (returnTo), so
+// accepting routes them back here, not into their inbox. The server
+// re-checks this regardless (lib/dm/eligibility.ts) — this is UX, not
+// the actual gate.
+export default function RequestConversationButton({
+  recipientId,
+  needsDmRules,
+  returnTo,
+}: {
+  recipientId: string;
+  needsDmRules: boolean;
+  returnTo: string;
+}) {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
@@ -43,6 +58,14 @@ export default function RequestConversationButton({ recipientId }: { recipientId
         Request sent.
         {remaining !== null ? ` ${remaining} request${remaining === 1 ? "" : "s"} left today.` : ""}
       </p>
+    );
+  }
+
+  if (needsDmRules) {
+    return (
+      <a href={`/messages/rules?next=${encodeURIComponent(returnTo)}`} className="btn-ghost">
+        Request a conversation
+      </a>
     );
   }
 
