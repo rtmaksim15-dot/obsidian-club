@@ -89,16 +89,22 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
 // DELETE /api/posts/:id — author or admin.
 //
-// Moderation gap 3 (2026-09-08, see DECISIONS.md): an author can no
-// longer delete their own post while it has an open report — deleting
-// it (a real, cascading hard delete of the post and every comment/like
-// on it) would take the evidence a report exists to preserve with it.
-// Deliberately narrow: only blocks the AUTHOR path. Admin deletion is
-// unchanged — the correct admin action on a reported post is `preserve`
-// via /admin/reports (PATCH /api/admin/reports/:id), not this route,
-// but this route doesn't enforce that choice for admins. Says the post
-// is under review, not why, matching every other report-adjacent
-// member-facing message in this codebase.
+// Preserve, never delete, while a report is open — no exception for
+// admins. Moderation gap 3 (2026-09-08, see DECISIONS.md) originally
+// blocked only the author path, on the reasoning that the correct admin
+// action on a reported post is `preserve` via /admin/reports (PATCH
+// /api/admin/reports/:id), not this route — but this route didn't
+// enforce that choice, so an admin (or an author who happens to be one)
+// hitting DELETE directly could still hard-delete a post — and cascade
+// away every comment/like on it — out from under an open report,
+// leaving that Report stuck at status "open" and pointing at nothing.
+// Closed 2026-09-16 (see DECISIONS.md): the open-report check now runs
+// for every caller, admins included, and also covers a report filed
+// against any of the post's own comments — deleting the post would
+// cascade those away too, taking that evidence with it just as
+// surely as deleting the post itself would. An admin who genuinely
+// needs the content gone still has the real path: soft-remove through
+// /admin/reports, which never destroys the row.
 export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
   const user = await getCurrentUser();
   if (!user) {
@@ -112,14 +118,22 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   if (post.authorId !== user.id && !user.isAdmin) {
     return NextResponse.json({ error: "You can only delete your own content." }, { status: 403 });
   }
-  if (post.authorId === user.id && !user.isAdmin) {
-    const openReport = await prisma.report.findFirst({
-      where: { targetType: "post", targetId: post.id, status: "open" },
-      select: { id: true },
-    });
-    if (openReport) {
-      return NextResponse.json({ error: "This post is under review and can't be deleted right now." }, { status: 409 });
-    }
+
+  const commentIds = (await prisma.comment.findMany({ where: { postId: post.id }, select: { id: true } })).map(
+    (c) => c.id,
+  );
+  const openReport = await prisma.report.findFirst({
+    where: {
+      status: "open",
+      OR: [
+        { targetType: "post", targetId: post.id },
+        ...(commentIds.length > 0 ? [{ targetType: "comment" as const, targetId: { in: commentIds } }] : []),
+      ],
+    },
+    select: { id: true },
+  });
+  if (openReport) {
+    return NextResponse.json({ error: "This post is under review and can't be deleted right now." }, { status: 409 });
   }
 
   await prisma.post.delete({ where: { id: params.id } });
