@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Image from "next/image";
 import LogoMark from "@/components/ui/LogoMark";
-import WaitingListForm from "@/components/shared/WaitingListForm";
+import EmailCaptureForm from "@/components/shared/EmailCaptureForm";
 import { Reveal, RevealGroup, RevealItem } from "@/components/shared/Reveal";
 import LaunchCountdown from "@/components/shared/LaunchCountdown";
 import { getCurrentUser } from "@/lib/auth/session";
@@ -289,20 +289,16 @@ export default async function LandingPage() {
       </section>
 
       {/* ============ HOW YOU GET IN ============ */}
-      {/* Landing-page pivot (2026-08-23, see DECISIONS.md): the old
-          inline application form (ApplicationForm.tsx) is retired —
-          this is now two paths, not a form. Path 1 (the artifact,
-          primary, visual weight) is a statement only, no link and no
-          store named (2026-08-24 correction — it used to link out;
-          that's been removed for good, not a placeholder gap); path 2
-          (the waiting list, secondary, quieter) is WaitingListForm
-          below. Path 1's statement got final copy 2026-09-09 (see
-          DECISIONS.md); path 2's pre-submission line below is still a
-          placeholder — only its post-submission acknowledgement
-          ("Noted.", in WaitingListForm.tsx) has landed so far. The old
-          subhead ("Answer plainly...") described filling out a form and
-          no longer applies to either path, so it's dropped rather than
-          kept and wrong. */}
+      {/* Landing-page pivot (2026-08-23, see DECISIONS.md); email
+          capture rebuilt 2026-09-17 (see DECISIONS.md) — the old
+          two-path layout (a statement-only card plus a separately
+          placeholder-copy'd WaitingListForm) is now one block with
+          exact, final copy throughout. No PLACEHOLDER text remains.
+          EmailCaptureForm posts to /api/email-capture (EmailCapture
+          table, not Waitlist/WaitingListEntry — see that route's own
+          comment). The old subhead ("Answer plainly...") described
+          filling out an application form and never applied to this
+          statement-only path, so it stays dropped. */}
       <section id="apply" className="scroll-mt-16 bg-ob-dark px-[clamp(20px,6vw,64px)] py-[clamp(80px,12vh,150px)]">
         <div className="mx-auto max-w-[600px]">
           <Reveal className="mb-12 text-center">
@@ -314,33 +310,12 @@ export default async function LandingPage() {
             </h2>
           </Reveal>
 
-          {/* Path 1 — primary, through the artifact. Statement only —
-              no link, no store named (removed 2026-08-24 per
-              instruction). Still the visually prominent block, it just
-              doesn't lead anywhere. Final copy (2026-09-09, see
-              DECISIONS.md) — the club's impersonal voice. */}
           <Reveal>
             <div className="card-premium text-center" style={{ padding: "clamp(40px, 6vw, 64px)" }}>
               <p className="text-body">Invitations arrive with the object.</p>
-              <p className="text-body mt-4">
-                They are not sold, and they cannot be requested. If you are meant to have one, you will find it in
-                your hands.
-              </p>
-            </div>
-          </Reveal>
-
-          {/* Path 2 — secondary, quieter, the waiting list. Deliberately
-              plainer than the card above: no card-premium border/glow,
-              no name/age/question — just an email and a submit. */}
-          <Reveal>
-            <div className="mt-12 text-center">
-              <p className="text-caption" style={{ color: "var(--color-warning)" }}>
-                PLACEHOLDER — copy pending
-              </p>
-              <p className="text-caption mt-2" style={{ color: "var(--color-text-muted)" }}>
-                Statement: not ready yet — leave your email.
-              </p>
-              <WaitingListForm />
+              <p className="text-body mt-4">They cannot be requested.</p>
+              <p className="text-body mt-4">Leave an address. It may be remembered.</p>
+              <EmailCaptureForm />
             </div>
           </Reveal>
         </div>

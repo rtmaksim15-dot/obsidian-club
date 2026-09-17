@@ -9,6 +9,7 @@ import ReportDetail from "./ReportDetail";
 import TokenDetail from "./TokenDetail";
 import CreatePersonalInvite from "./CreatePersonalInvite";
 import CommandPalette from "./CommandPalette";
+import EmailCapturesPanel, { type EmailCaptureRow } from "./EmailCapturesPanel";
 import { levelName } from "@/lib/rating/levels";
 
 export type Zone = "applications" | "people" | "arbitration" | "invitations";
@@ -168,6 +169,8 @@ type Props = {
   tokens: TokenRow[];
   tokensNextCursor: string | null;
   tokensTotal: number;
+  emailCaptures: EmailCaptureRow[];
+  emailCapturesTotal: number;
 };
 
 // Admin Console shell (2026-09-09, see DECISIONS.md) — "one route, one
@@ -203,6 +206,8 @@ export default function AdminConsole({
   tokens: initialTokens,
   tokensNextCursor: initialTokensNextCursor,
   tokensTotal,
+  emailCaptures,
+  emailCapturesTotal,
 }: Props) {
   const [applications, setApplications] = useState(initialApplications);
   const [people, setPeople] = useState(initialPeople);
@@ -369,6 +374,8 @@ export default function AdminConsole({
           <p className="text-label mb-6">Admin Console</p>
 
           <StatusBar counts={counts} activeZone={zone} activeFilter={filter} onSelect={selectStat} />
+
+          <EmailCapturesPanel captures={emailCaptures} total={emailCapturesTotal} />
 
           <div className="mb-6 flex gap-2 border-b border-ob-border">
             {ZONES.map((z) => (

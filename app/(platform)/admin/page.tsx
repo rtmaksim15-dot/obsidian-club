@@ -143,7 +143,7 @@ export default async function AdminConsolePage() {
     notFound();
   }
 
-  const [applications, peopleBase, reports, tokensPage, tokensTotal, counts] = await Promise.all([
+  const [applications, peopleBase, reports, tokensPage, tokensTotal, counts, emailCaptures, emailCapturesTotal] = await Promise.all([
     prisma.waitlist.findMany({
       where: {
         OR: [{ status: { in: ["pending", "held"] } }, { decisionEmailSendError: { not: null } }],
@@ -235,6 +235,12 @@ export default async function AdminConsolePage() {
       membersTotal,
       notAgeVerified,
     })),
+    prisma.emailCapture.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 20,
+      select: { id: true, email: true, createdAt: true },
+    }),
+    prisma.emailCapture.count(),
   ]);
 
   const peopleIds = peopleBase.map((p) => p.id);
@@ -492,6 +498,8 @@ export default async function AdminConsolePage() {
   return (
     <AdminConsole
       counts={counts}
+      emailCaptures={emailCaptures.map((c) => ({ id: c.id, email: c.email, createdAt: c.createdAt.toISOString() }))}
+      emailCapturesTotal={emailCapturesTotal}
       applications={applications.map((a) => ({
         id: a.id,
         name: a.name,

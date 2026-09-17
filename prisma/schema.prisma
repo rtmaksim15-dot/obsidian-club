@@ -274,6 +274,9 @@ model User {
   directMessagesSent           DirectMessage[]       @relation("DirectMessagesSent")
   directMessagesDeletedByMe    DirectMessage[]       @relation("DirectMessageDeletedBy")
 
+  // Admin access hardening (2026-09-17, see DECISIONS.md)
+  adminAuthEvents AdminAuthEvent[]
+
   @@map("users")
 }
 
@@ -1274,4 +1277,62 @@ model WaitingListEntry {
   invitedAt DateTime? @map("invited_at")
 
   @@map("waiting_list_entries")
+}
+
+// Landing email capture (2026-09-17, see DECISIONS.md) — replaces the
+// #apply section's placeholder-copy form. Deliberately its own table,
+// not WaitingListEntry above and not Waitlist (the applications queue):
+// this is anonymous interest capture with no review workflow and no
+// email ever sent back, so it needs neither of those models' fields.
+// WaitingListEntry/its form/route are retired in place (410), same
+// pattern as the older /api/waitlist — not deleted, kept for the
+// historical rows already in it.
+model EmailCapture {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String   @unique
+  // sha256(salt + ip), never the raw address — enough to spot abuse
+  // patterns without storing a real IP long-term. Nullable: a request
+  // with no determinable IP (shouldn't happen behind Vercel, but
+  // getClientIp() has a documented "unknown" fallback) still gets the
+  // email stored rather than rejected.
+  hashedIp  String?  @map("hashed_ip")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("email_captures")
+}
+
+// ============================================================
+// ADMIN ACCESS HARDENING (2026-09-17, see DECISIONS.md)
+// ============================================================
+// Admin identity itself no longer comes from anywhere in this schema —
+// see lib/auth/admin-allowlist.ts (an env var, ADMIN_USER_IDS). This
+// log exists only to record sign-in and MFA-challenge attempts against
+// an allowlisted account, success and failure, for the alerting and
+// audit trail item 2 asks for. `userId` is nullable and `email` is
+// stored directly (not just via the relation) because a failed
+// sign-in attempt against a real admin email doesn't always resolve to
+// a user the normal way this app expects — logging the attempted email
+// verbatim is the whole point of an auth log; a resolvable `userId` is
+// filled in whenever the attempt matched a real, allowlisted account.
+enum AdminAuthEventType {
+  sign_in_success
+  sign_in_failure
+  mfa_challenge_success
+  mfa_challenge_failure
+}
+
+model AdminAuthEvent {
+  id        String             @id @default(uuid()) @db.Uuid
+  userId    String?            @map("user_id") @db.Uuid
+  email     String
+  type      AdminAuthEventType
+  ip        String
+  userAgent String?            @map("user_agent")
+  createdAt DateTime           @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([type, createdAt])
+  @@map("admin_auth_events")
 }
