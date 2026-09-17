@@ -5,6 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Logo from "@/components/ui/Logo";
 import { createClient } from "@/lib/auth/supabase-browser";
 
+function safeNext(raw: string | null): string {
+  return raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : "/feed";
+}
+
 // Gates the "Continue with Apple" button on a real, working backend —
 // Supabase's Apple provider needs a paid Apple Developer account, a
 // Services ID, and a signed key configured in its own dashboard (none
@@ -31,19 +35,33 @@ function LoginForm() {
     setSubmitting(true);
     setError(null);
 
-    const supabase = createClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
+    // Item 2, 2026-09-17 (see DECISIONS.md): the sign-in call itself
+    // moved server-side (POST /api/auth/sign-in) so every attempt
+    // against an admin account is logged unconditionally, not just
+    // when this client happens to also call a separate logging
+    // endpoint. The response also reports whether an MFA step-up is
+    // available so this can route to it before the sign-in is
+    // considered complete.
+    const res = await fetch("/api/auth/sign-in", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
     });
+    const body = await res.json().catch(() => ({}));
 
-    if (signInError) {
-      setError("Invalid email or password.");
+    if (!res.ok) {
+      setError(body?.error ?? "Invalid email or password.");
       setSubmitting(false);
       return;
     }
 
-    router.push(searchParams.get("next") || "/feed");
+    const next = safeNext(searchParams.get("next"));
+    if (body.nextLevel === "aal2" && body.currentLevel !== "aal2") {
+      router.push(`/login/mfa?next=${encodeURIComponent(next)}`);
+      return;
+    }
+
+    router.push(next);
     router.refresh();
   }
 

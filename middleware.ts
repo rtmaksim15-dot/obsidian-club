@@ -24,6 +24,7 @@ const PROTECTED_PREFIXES = [
   "/ritual",
   "/codex",
   "/messages",
+  "/account",
 ];
 
 export async function middleware(request: NextRequest) {

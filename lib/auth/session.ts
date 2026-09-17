@@ -1,6 +1,7 @@
 import { createClient } from "./supabase-server";
 import { prisma } from "@/lib/db/prisma";
 import { touchDailyLogin } from "@/lib/rating/rep-engine";
+import { isAdminId } from "./admin-allowlist";
 
 /**
  * Current authenticated member, joined against this app's own `User` row
@@ -36,6 +37,14 @@ export async function getCurrentUser() {
     touchDailyLogin(user.id).catch((err) =>
       console.error("[session] Failed to touch daily-login streak:", err),
     );
+
+    // Admin access hardening (item 2, 2026-09-17, see DECISIONS.md): the
+    // DB column is never trusted for authorization from this point on —
+    // every caller of getCurrentUser() (there are ~17 across this app)
+    // gets the allowlist's answer instead, overwritten here rather than
+    // at each call site, so a raw DB write to this column can no longer
+    // grant admin to anyone.
+    user.isAdmin = isAdminId(user.id);
   }
 
   return user;

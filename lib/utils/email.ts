@@ -204,6 +204,36 @@ export async function sendApplicationDeclinedEmail(email: string): Promise<{ ok:
   return sendEmail(email, "Your request", html);
 }
 
+// Admin access hardening (item 2, 2026-09-17, see DECISIONS.md) — a
+// real out-of-band notification every time the admin account's password
+// (or OAuth) check succeeds, sent to a fixed, separate address rather
+// than the admin account's own login email (the point is an independent
+// channel: if someone else's credentials get past the first factor,
+// this should still reach a real person). Deliberately not run through
+// emailShell()'s club-voice styling — this reads as a plain security
+// notice, not member-facing marketing/transactional copy.
+const ADMIN_ALERT_EMAIL = "rtmaksim15@gmail.com";
+
+export async function sendAdminSignInAlert(params: {
+  email: string;
+  ip: string;
+  userAgent: string | null;
+  at: Date;
+}): Promise<{ ok: boolean; error?: string }> {
+  const html = `
+    <div style="background:#0A0908;padding:32px 24px;font-family:Georgia,'Times New Roman',serif;color:#EDEAE4;">
+      <div style="max-width:480px;margin:0 auto;">
+        <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">
+          The admin account (${escapeHtml(params.email)}) just signed in.
+        </p>
+        <p style="font-size:14px;color:#9E9A94;line-height:1.7;margin:0 0 8px;">Time: ${params.at.toISOString()}</p>
+        <p style="font-size:14px;color:#9E9A94;line-height:1.7;margin:0 0 8px;">IP: ${escapeHtml(params.ip)}</p>
+        <p style="font-size:14px;color:#9E9A94;line-height:1.7;margin:0;">User agent: ${escapeHtml(params.userAgent ?? "(none)")}</p>
+      </div>
+    </div>`;
+  return sendEmail(ADMIN_ALERT_EMAIL, "Admin sign-in", html);
+}
+
 /** Shared send + defensive-no-op wrapper for every transactional email. */
 async function sendEmail(to: string, subject: string, html: string): Promise<{ ok: boolean; error?: string }> {
   const apiKey = process.env.RESEND_API_KEY;

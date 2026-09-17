@@ -2,6 +2,9 @@ import { createServerClient, type CookieOptionsWithName } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { track } from "@/lib/analytics/track";
+import { isAdminId } from "@/lib/auth/admin-allowlist";
+import { logAdminAuthEvent } from "@/lib/security/admin-auth-log";
+import { getClientIp } from "@/lib/security/rate-limit";
 
 // GET /auth/callback — Supabase OAuth (PKCE) redirect target. Google
 // Sign-In (and any future OAuth provider) redirects here with a `code`
@@ -80,6 +83,32 @@ export async function GET(request: NextRequest) {
           type: "auth.login",
           meta: { provider: authUser.app_metadata?.provider ?? "unknown" },
         });
+
+        // Admin access hardening (item 2, 2026-09-17, see DECISIONS.md)
+        // — this is the OAuth counterpart to POST /api/auth/sign-in's
+        // logging; the password path can't reuse this route (it never
+        // hits a code-exchange callback), so both sign-in paths get
+        // their own logging site rather than trying to force one
+        // through the other.
+        if (isAdminId(member.id)) {
+          await logAdminAuthEvent({
+            userId: member.id,
+            email: member.email,
+            type: "sign_in_success",
+            ip: getClientIp(request),
+            userAgent: request.headers.get("user-agent"),
+          });
+        }
+
+        // Same step-up check as the password path (POST
+        // /api/auth/sign-in) — an OAuth sign-in establishes a real
+        // session too, so it needs the identical MFA gate before
+        // landing anywhere real.
+        const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (aalData?.nextLevel === "aal2" && aalData.currentLevel !== "aal2") {
+          return redirectWithCookies(`/login/mfa?next=${encodeURIComponent(next)}`, cookiesToSet);
+        }
+
         return redirectWithCookies(next, cookiesToSet);
       }
 
