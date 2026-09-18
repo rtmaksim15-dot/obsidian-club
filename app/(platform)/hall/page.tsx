@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { getRitualStatus } from "@/lib/auth/ritual";
-import { getDoorsState } from "@/lib/config/doors";
+import { getDoorsState, bypassesDoors } from "@/lib/config/doors";
 import { getAppUrl } from "@/lib/config/site-url";
 import { getLevelProgress } from "@/lib/rating/level-progress";
 import { syncReferralLifecycle } from "@/lib/rating/referral-lifecycle";
@@ -58,9 +58,10 @@ export default async function HallPage() {
     if (!ritual.complete) redirect("/ritual");
   }
 
-  // Doors mechanic (2026-08-08) — admins always bypass; everyone else
-  // sees the antechamber instead of real content while doors.active.
-  if (!user.isAdmin && getDoorsState().active) redirect("/antechamber");
+  // Doors mechanic (2026-08-08) — admins and launch-preview accounts
+  // (PREVIEW_USER_IDS) always bypass; everyone else sees the
+  // antechamber instead of real content while doors.active.
+  if (!bypassesDoors(user) && getDoorsState().active) redirect("/antechamber");
 
   // No real cron yet (see TECH_DEBT.md) — check referral lifecycle
   // transitions and level-up eligibility opportunistically whenever a

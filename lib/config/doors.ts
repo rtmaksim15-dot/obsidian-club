@@ -1,3 +1,6 @@
+import "server-only";
+import { isPreviewId } from "@/lib/auth/preview-allowlist";
+
 // The Doors mechanic (pre-launch cleanup, 2026-08-08) — the November 1
 // cohort launch gate (moved from October 1, 2026-09-10). Unlike
 // feature-flags.ts's compile-time booleans,
@@ -11,6 +14,20 @@
 // active) rather than open — a typo'd date should mean "members wait a
 // little longer," not "the club opens early by accident."
 export type DoorsState = { active: boolean; date: Date | null };
+
+/**
+ * Whether this user skips the doors/antechamber holding gate outright —
+ * admins (already exempt from the ritual too) and manually invited
+ * launch-preview accounts (PREVIEW_USER_IDS, still subject to the
+ * ritual and every room-access rule — this bypasses only the holding
+ * page). Single choke point so every gate site (there are several —
+ * feed/compose/members/hall/messages, and the nav-visibility check in
+ * (platform)/layout.tsx) stays consistent instead of each one
+ * separately remembering both allowlists.
+ */
+export function bypassesDoors(user: { id: string; isAdmin: boolean }): boolean {
+  return user.isAdmin || isPreviewId(user.id);
+}
 
 export function getDoorsState(): DoorsState {
   const raw = process.env.DOORS_OPEN_DATE;

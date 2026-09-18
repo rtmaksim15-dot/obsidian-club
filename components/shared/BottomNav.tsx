@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Home, Users, Plus, Archive, User } from "lucide-react";
+import { Home, Users, Plus, Archive, User, MessageCircle } from "lucide-react";
 
 // Mobile bottom navigation — Threads-style redesign (OBSIDIAN_ROADMAP_v3.0,
 // 2026-07-29): five icon-only tabs, no text labels. Order: Feed, Community,
@@ -16,15 +16,21 @@ import { Home, Users, Plus, Archive, User } from "lucide-react";
 // codebase, and a dedicated route matches how /ritual's steps are already
 // built. Desktop keeps the platform usable without this (pages are still
 // directly reachable by URL).
+//
+// Messages (item 3, 2026-09-18, see DECISIONS.md) — added as a sixth tab,
+// right after Profile, rather than replacing one of the five: none of the
+// existing five is a natural fit to drop, and Messages is a distinct enough
+// destination (DMs, not community content) to earn its own icon.
 const ITEMS = [
   { href: "/feed", label: "Feed", icon: Home },
   { href: "/rooms", label: "Community", icon: Users },
   { href: "/compose", label: "Create Post", icon: Plus },
   { href: "/vault", label: "Vault", icon: Archive },
   { href: "/hall", label: "Profile", icon: User },
+  { href: "/messages", label: "Messages", icon: MessageCircle },
 ];
 
-export default function BottomNav() {
+export default function BottomNav({ unreadDm = false }: { unreadDm?: boolean }) {
   const pathname = usePathname();
 
   return (
@@ -39,10 +45,17 @@ export default function BottomNav() {
             key={label}
             href={href}
             aria-label={label}
-            className="flex flex-1 items-center justify-center py-4"
+            className="relative flex flex-1 items-center justify-center py-4"
             style={{ color: active ? "var(--color-accent)" : "var(--color-text-muted)" }}
           >
             <Icon size={22} strokeWidth={1.5} />
+            {href === "/messages" && unreadDm ? (
+              <span
+                aria-label="Unread messages"
+                className="absolute right-1/3 top-3 h-2 w-2 rounded-full"
+                style={{ backgroundColor: "var(--color-accent)" }}
+              />
+            ) : null}
           </a>
         );
       })}

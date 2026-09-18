@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { isRitualComplete } from "@/lib/auth/ritual";
-import { getDoorsState } from "@/lib/config/doors";
+import { getDoorsState, bypassesDoors } from "@/lib/config/doors";
 import { needsDmRulesAcceptance } from "@/lib/legal/dm-rules";
 import DmRulesGate from "@/components/shared/DmRulesGate";
 
@@ -19,10 +19,12 @@ export default async function MessagesRulesPage({ searchParams }: { searchParams
   const next = rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/messages";
   if (!user) redirect(`/login?next=${encodeURIComponent(next)}`);
 
+  // Ritual and Doors are checked separately (2026-09-18, launch preview,
+  // see DECISIONS.md) — see messages/page.tsx.
   if (!user.isAdmin) {
     if (!(await isRitualComplete(user))) redirect("/ritual");
-    if (getDoorsState().active) redirect("/antechamber");
   }
+  if (!bypassesDoors(user) && getDoorsState().active) redirect("/antechamber");
 
   if (!(await needsDmRulesAcceptance(user.id))) redirect(next);
 

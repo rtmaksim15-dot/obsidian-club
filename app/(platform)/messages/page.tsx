@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { isRitualComplete } from "@/lib/auth/ritual";
-import { getDoorsState } from "@/lib/config/doors";
+import { getDoorsState, bypassesDoors } from "@/lib/config/doors";
 import { needsDmRulesAcceptance } from "@/lib/legal/dm-rules";
 import { effectiveRequestStatus, isRequestExpired } from "@/lib/dm/lifecycle";
 import MessagesInbox from "@/components/shared/MessagesInbox";
@@ -20,10 +20,14 @@ export default async function MessagesPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/messages");
 
+  // Ritual and Doors are checked separately (2026-09-18, launch preview,
+  // see DECISIONS.md): a PREVIEW_USER_IDS account still has to pass the
+  // ritual like a real member — only the holding-page gate is bypassed
+  // for it (bypassesDoors also covers isAdmin, unchanged from before).
   if (!user.isAdmin) {
     if (!(await isRitualComplete(user))) redirect("/ritual");
-    if (getDoorsState().active) redirect("/antechamber");
   }
+  if (!bypassesDoors(user) && getDoorsState().active) redirect("/antechamber");
 
   // Item 4 — applies to every member, admins included: this is a
   // feature-specific ruleset, not the ritual, and nothing carves out an

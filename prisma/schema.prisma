@@ -1185,10 +1185,15 @@ model Thread {
 // send into the thread), same "preserve, never delete" principle
 // Report/Block already use elsewhere in this schema.
 model ThreadParticipant {
-  threadId String    @map("thread_id") @db.Uuid
-  userId   String    @map("user_id") @db.Uuid
-  joinedAt DateTime  @default(now()) @map("joined_at")
-  leftAt   DateTime? @map("left_at")
+  threadId   String    @map("thread_id") @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  joinedAt   DateTime  @default(now()) @map("joined_at")
+  leftAt     DateTime? @map("left_at")
+  // Messages nav unread indicator (item 3, 2026-09-18, see DECISIONS.md)
+  // — set to now() whenever this participant opens the thread. Unread =
+  // the thread's latest message is newer than this and wasn't sent by
+  // this same participant. Null (never opened) counts as unread.
+  lastReadAt DateTime? @map("last_read_at")
 
   thread Thread @relation(fields: [threadId], references: [id], onDelete: Cascade)
   user   User   @relation(fields: [userId], references: [id])
