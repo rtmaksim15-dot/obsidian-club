@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/auth/supabase-browser";
-import ReportButton from "./ReportButton";
+import ContentMenu from "./ContentMenu";
 
 type Message = {
   id: string;
@@ -12,7 +12,7 @@ type Message = {
   isDeleted?: boolean;
   replyToId: string | null;
   createdAt: string;
-  user: { id: string; displayName: string; avatarUrl: string | null; level: number };
+  user: { id: string; username: string; displayName: string; avatarUrl: string | null; level: number };
 };
 
 type Props = {
@@ -154,7 +154,7 @@ export default function RoomChat({ room, currentUserId, initialMessages }: Props
         ) : (
           messages.map((m) => (
             <div key={m.id} className="flex items-start gap-3">
-              <div className={`avatar avatar-level-${m.user.level} h-9 w-9 shrink-0`}>
+              <a href={`/profile/${m.user.username}`} className={`avatar avatar-level-${m.user.level} h-9 w-9 shrink-0`}>
                 {m.user.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={m.user.avatarUrl} alt={m.user.displayName} loading="lazy" className="h-full w-full object-cover" />
@@ -163,16 +163,21 @@ export default function RoomChat({ room, currentUserId, initialMessages }: Props
                     {m.user.displayName.charAt(0).toUpperCase()}
                   </div>
                 )}
-              </div>
-              <div>
-                <p className="text-data">
-                  {m.user.displayName}
-                  {m.user.id === currentUserId ? (
-                    <span className="text-caption ml-2" style={{ color: "var(--color-text-muted)" }}>
-                      you
-                    </span>
+              </a>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <a href={`/profile/${m.user.username}`} className="text-data">
+                    {m.user.displayName}
+                    {m.user.id === currentUserId ? (
+                      <span className="text-caption ml-2" style={{ color: "var(--color-text-muted)" }}>
+                        you
+                      </span>
+                    ) : null}
+                  </a>
+                  {!m.isDeleted && m.user.id !== currentUserId ? (
+                    <ContentMenu targetType="message" targetId={m.id} preview={m.content} canReport />
                   ) : null}
-                </p>
+                </div>
                 {m.isDeleted ? (
                   <p className="text-body mt-0.5 !text-base italic" style={{ color: "var(--color-text-muted)" }}>
                     Message removed by moderator.
@@ -180,9 +185,6 @@ export default function RoomChat({ room, currentUserId, initialMessages }: Props
                 ) : (
                   <p className="text-body mt-0.5 !text-base">{m.content}</p>
                 )}
-                {!m.isDeleted && m.user.id !== currentUserId ? (
-                  <ReportButton targetType="message" targetId={m.id} />
-                ) : null}
               </div>
             </div>
           ))

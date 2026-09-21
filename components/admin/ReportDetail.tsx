@@ -92,7 +92,11 @@ export default function ReportDetail({
   return (
     <div>
       <p className="text-label mb-1">{r.targetType} · {r.category}</p>
-      {r.isRedLine ? (
+      {r.category === "underage" ? (
+        <p className="text-data font-semibold" style={{ color: "var(--color-error)" }}>
+          URGENT — Underage
+        </p>
+      ) : r.isRedLine ? (
         <p className="text-data font-semibold" style={{ color: "var(--color-error)" }}>
           Red line
         </p>

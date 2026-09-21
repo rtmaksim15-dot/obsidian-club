@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { HARD_CAP_DAYS, joinUrl } from "@/lib/invites/lifecycle";
+import { getAppUrl } from "@/lib/config/site-url";
 
 // Transactional emails. Email clients don't reliably load custom fonts or
 // read CSS variables, so brand colors are inlined here as literal hex —
@@ -232,6 +233,50 @@ export async function sendAdminSignInAlert(params: {
       </div>
     </div>`;
   return sendEmail(ADMIN_ALERT_EMAIL, "Admin sign-in", html);
+}
+
+/**
+ * New-report alert (item 6, 2026-09-20, see DECISIONS.md) — one per
+ * report filed, to the same fixed, independent address as the admin
+ * sign-in alert, and in the same plain-security-notice style rather
+ * than emailShell()'s member-facing voice. Deliberately never includes
+ * the reported content itself — only the reason, the item type, and a
+ * link into the admin console (?report=<id>, which AdminConsole reads
+ * client-side to jump straight to it) — so a report about, say, doxxing
+ * doesn't itself leak the doxxing content into an inbox. Underage
+ * reports get an URGENT-prefixed subject; the queue ordering and visual
+ * flag for that category live in app/(platform)/admin/page.tsx and
+ * AdminConsole.tsx, not here.
+ */
+export async function sendReportAlert(params: {
+  reportId: string;
+  targetType: string;
+  categoryLabel: string;
+  isUnderage: boolean;
+}): Promise<{ ok: boolean; error?: string }> {
+  const appUrl = getAppUrl();
+  const consoleLink = appUrl ? `${appUrl}/admin?report=${params.reportId}` : null;
+
+  const html = `
+    <div style="background:#0A0908;padding:32px 24px;font-family:Georgia,'Times New Roman',serif;color:#EDEAE4;">
+      <div style="max-width:480px;margin:0 auto;">
+        <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">
+          A new report was filed.
+        </p>
+        <p style="font-size:14px;color:#9E9A94;line-height:1.7;margin:0 0 8px;">Reason: ${escapeHtml(params.categoryLabel)}</p>
+        <p style="font-size:14px;color:#9E9A94;line-height:1.7;margin:0 0 8px;">Item type: ${escapeHtml(params.targetType)}</p>
+        ${
+          consoleLink
+            ? `<p style="font-size:14px;line-height:1.7;margin:16px 0 0;">
+                 <a href="${consoleLink}" style="color:#EDEAE4;">Review it in the admin console</a>
+               </p>`
+            : ""
+        }
+      </div>
+    </div>`;
+
+  const subject = params.isUnderage ? "URGENT: New report — Underage" : `New report — ${params.categoryLabel}`;
+  return sendEmail(ADMIN_ALERT_EMAIL, subject, html);
 }
 
 /** Shared send + defensive-no-op wrapper for every transactional email. */

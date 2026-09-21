@@ -7,8 +7,7 @@ import { isBlockedEitherWay } from "@/lib/moderation/block";
 import { needsDmRulesAcceptance } from "@/lib/legal/dm-rules";
 import DmThreadChat from "@/components/shared/DmThreadChat";
 import LeaveThreadButton from "@/components/shared/LeaveThreadButton";
-import BlockButton from "@/components/shared/BlockButton";
-import ReportButton from "@/components/shared/ReportButton";
+import ContentMenu from "@/components/shared/ContentMenu";
 
 // /messages/:threadId (2026-09-14, see DECISIONS.md). Same 404-for-
 // everything shape as the API routes: doesn't exist, isn't yours, or
@@ -69,7 +68,7 @@ export default async function ThreadPage({ params }: { params: { threadId: strin
       content: true,
       isDeleted: true,
       createdAt: true,
-      sender: { select: { id: true, displayName: true, avatarUrl: true } },
+      sender: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
     },
   });
   const initialMessages = messages.map((m) => ({
@@ -98,8 +97,14 @@ export default async function ThreadPage({ params }: { params: { threadId: strin
         </a>
         <div className="flex items-center gap-4">
           <LeaveThreadButton threadId={thread.id} />
-          <BlockButton userId={other.id} initialBlocked={blocked} />
-          <ReportButton targetType="profile" targetId={other.id} />
+          <ContentMenu
+            targetType="profile"
+            targetId={other.id}
+            preview={other.displayName}
+            canReport
+            blockUserId={other.id}
+            blockInitialBlocked={blocked}
+          />
         </div>
       </header>
 

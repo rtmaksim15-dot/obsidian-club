@@ -11,7 +11,7 @@ const messageSelect = {
   content: true,
   isDeleted: true,
   createdAt: true,
-  sender: { select: { id: true, displayName: true, avatarUrl: true } },
+  sender: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
 };
 
 // A left participant loses both read and write access — "leave the

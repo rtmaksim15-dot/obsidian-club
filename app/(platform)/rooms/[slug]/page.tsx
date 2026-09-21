@@ -37,7 +37,7 @@ export default async function RoomPage({ params }: { params: { slug: string } })
       isDeleted: true,
       replyToId: true,
       createdAt: true,
-      user: { select: { id: true, displayName: true, avatarUrl: true, level: true } },
+      user: { select: { id: true, username: true, displayName: true, avatarUrl: true, level: true } },
     },
   });
   const messages = rawMessages.map((m) => (m.isDeleted ? { ...m, content: "" } : m));

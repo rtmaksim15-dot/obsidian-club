@@ -3,6 +3,7 @@ import type { ReportCategory, ReportTargetType } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import { REPORT_CATEGORIES, isRedLineCategory } from "@/lib/moderation/report";
+import { sendReportAlert } from "@/lib/utils/email";
 
 // Moderation gap 2 (2026-09-08, see DECISIONS.md): comment/message
 // added — live conversation previously had no reporting path at all.
@@ -108,6 +109,18 @@ export async function POST(request: Request) {
       note: body.note?.trim() || null,
     },
   });
+
+  // Item 6, 2026-09-20 (see DECISIONS.md) — a real out-of-band alert per
+  // report, same fire-and-forget posture as track()'s analytics calls:
+  // a failed send shouldn't fail the report itself, the row above is
+  // already the durable record.
+  const categoryLabel = REPORT_CATEGORIES.find((c) => c.value === category)?.label ?? category;
+  sendReportAlert({
+    reportId: report.id,
+    targetType,
+    categoryLabel,
+    isUnderage: category === "underage",
+  }).catch((err) => console.error("[reports] Failed to send report alert email:", err));
 
   return NextResponse.json({ id: report.id }, { status: 201 });
 }

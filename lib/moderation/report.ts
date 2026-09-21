@@ -5,13 +5,34 @@ import type { ReportCategory } from "@prisma/client";
 // on review, trigger preservation instead of deletion (see
 // Post.isPreserved, app/admin/reports). Order here is also display
 // order in the report picker.
-export const REPORT_CATEGORIES: { value: ReportCategory; label: string; isRedLine: boolean }[] = [
-  { value: "underage", label: "Underage", isRedLine: true },
-  { value: "non_consensual", label: "Non-consensual", isRedLine: true },
-  { value: "threat", label: "Threat", isRedLine: true },
-  { value: "doxxing", label: "Doxxing", isRedLine: false },
-  { value: "commercial_solicitation", label: "Commercial solicitation", isRedLine: false },
-  { value: "other", label: "Other", isRedLine: false },
+//
+// `description` (dedicated report modal, item 6, 2026-09-20, see
+// DECISIONS.md) is the one-line plain-language explanation shown next
+// to each reason in the modal — kept alongside `label` so the modal and
+// any future picker read from one source, never a second hardcoded copy
+// of the taxonomy. Reason codes (`value`) are unchanged.
+export const REPORT_CATEGORIES: { value: ReportCategory; label: string; description: string; isRedLine: boolean }[] = [
+  { value: "underage", label: "Underage", description: "Involves someone under 18.", isRedLine: true },
+  {
+    value: "non_consensual",
+    label: "Non-consensual",
+    description: "Shared without the person's consent.",
+    isRedLine: true,
+  },
+  { value: "threat", label: "Threat", description: "Threatens someone's safety.", isRedLine: true },
+  {
+    value: "doxxing",
+    label: "Doxxing",
+    description: "Reveals someone's real identity or location.",
+    isRedLine: false,
+  },
+  {
+    value: "commercial_solicitation",
+    label: "Commercial solicitation",
+    description: "Selling or advertising services.",
+    isRedLine: false,
+  },
+  { value: "other", label: "Other", description: "Something else.", isRedLine: false },
 ];
 
 export function isRedLineCategory(category: ReportCategory): boolean {

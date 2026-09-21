@@ -27,7 +27,7 @@ const postSelect = (viewerId: string) => ({
   likesCount: true,
   createdAt: true,
   publishedAt: true,
-  author: { select: { id: true, displayName: true, avatarUrl: true, level: true, rep: true } },
+  author: { select: { id: true, username: true, displayName: true, avatarUrl: true, level: true, rep: true } },
   house: { select: { id: true, name: true, slug: true } },
   likes: { where: { userId: viewerId }, select: { userId: true } },
   _count: { select: { comments: true } },

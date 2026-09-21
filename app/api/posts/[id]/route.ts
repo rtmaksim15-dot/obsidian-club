@@ -14,7 +14,7 @@ const postSelect = {
   likesCount: true,
   createdAt: true,
   publishedAt: true,
-  author: { select: { id: true, displayName: true, avatarUrl: true, level: true } },
+  author: { select: { id: true, username: true, displayName: true, avatarUrl: true, level: true } },
   _count: { select: { comments: true } },
 };
 

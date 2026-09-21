@@ -8,7 +8,7 @@ const commentSelect = {
   content: true,
   isDeleted: true,
   createdAt: true,
-  author: { select: { id: true, displayName: true, avatarUrl: true, level: true } },
+  author: { select: { id: true, username: true, displayName: true, avatarUrl: true, level: true } },
 };
 
 // GET /api/posts/:id/comments — flat, chronological (oldest first, like

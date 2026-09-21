@@ -243,6 +243,16 @@ export default async function AdminConsolePage() {
     prisma.emailCapture.count(),
   ]);
 
+  // Underage reports are the single most urgent category — bumped
+  // above threat/non_consensual within the existing isRedLine-desc,
+  // createdAt-asc ordering from the query itself (item 6, 2026-09-20,
+  // see DECISIONS.md). Array.prototype.sort is stable, so within each
+  // rank the query's own order survives untouched.
+  const sortedReports = [...reports].sort((a, b) => {
+    const rank = (r: (typeof reports)[number]) => (r.category === "underage" ? 0 : r.isRedLine ? 1 : 2);
+    return rank(a) - rank(b);
+  });
+
   const peopleIds = peopleBase.map((p) => p.id);
 
   // Zone 2's batch: one query per concern across every listed member,
@@ -570,7 +580,7 @@ export default async function AdminConsolePage() {
           authorName: nameById.get(n.authorId) ?? null,
         })),
       }))}
-      reports={reports.map((r) => {
+      reports={sortedReports.map((r) => {
         let label: string;
         let authorId: string | null = null;
         let authorName: string | null = null;

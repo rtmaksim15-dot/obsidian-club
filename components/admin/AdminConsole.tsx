@@ -221,6 +221,19 @@ export default function AdminConsole({
   const [paletteOpen, setPaletteOpen] = useState(false);
   const applicationDetailRef = useRef<ApplicationDetailHandle>(null);
 
+  // Report email alert deep link (item 6, 2026-09-20, see DECISIONS.md)
+  // — sendReportAlert() links to /admin?report=<id>; this jumps straight
+  // to that report on load, same zone+openId the row's own onClick
+  // already sets. A resolved-and-since-hidden report (filtered out of
+  // visibleReports) simply finds nothing to open — no error state, the
+  // zone switch alone is still useful.
+  useEffect(() => {
+    const reportId = new URLSearchParams(window.location.search).get("report");
+    if (!reportId) return;
+    setZone("arbitration");
+    setOpenId(reportId);
+  }, []);
+
   function switchZone(next: Zone) {
     setZone(next);
     setFilter(null);
@@ -442,12 +455,21 @@ export default function AdminConsole({
                 ))}
               {zone === "arbitration" &&
                 visibleReports.map((r) => (
-                  <li key={r.id} className="card cursor-pointer" onClick={() => setOpenId(r.id)}>
+                  <li
+                    key={r.id}
+                    id={`report-${r.id}`}
+                    className="card cursor-pointer"
+                    onClick={() => setOpenId(r.id)}
+                  >
                     <p className="text-data">{r.target.label}</p>
                     <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
                       {r.targetType} · {r.category} · reported by {r.reporter.displayName}
                     </p>
-                    {r.isRedLine ? (
+                    {r.category === "underage" ? (
+                      <p className="text-caption mt-1 font-semibold" style={{ color: "var(--color-error)" }}>
+                        URGENT — Underage
+                      </p>
+                    ) : r.isRedLine ? (
                       <p className="text-caption mt-1 font-semibold" style={{ color: "var(--color-error)" }}>
                         Red line
                       </p>

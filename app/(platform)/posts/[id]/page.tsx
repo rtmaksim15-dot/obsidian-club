@@ -23,7 +23,7 @@ export default async function PostDetailPage({ params }: { params: { id: string 
       isPublished: true,
       likesCount: true,
       createdAt: true,
-      author: { select: { id: true, displayName: true, avatarUrl: true, level: true, rep: true } },
+      author: { select: { id: true, username: true, displayName: true, avatarUrl: true, level: true, rep: true } },
       house: { select: { id: true, name: true, slug: true } },
       likes: { where: { userId: user.id }, select: { userId: true } },
       _count: { select: { comments: true } },
@@ -42,7 +42,7 @@ export default async function PostDetailPage({ params }: { params: { id: string 
       content: true,
       isDeleted: true,
       createdAt: true,
-      author: { select: { id: true, displayName: true, avatarUrl: true, level: true } },
+      author: { select: { id: true, username: true, displayName: true, avatarUrl: true, level: true } },
     },
   });
   const comments = rawComments.map((c) => (c.isDeleted ? { ...c, content: "" } : c));

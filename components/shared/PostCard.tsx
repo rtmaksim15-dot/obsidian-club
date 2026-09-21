@@ -1,7 +1,6 @@
 import type { PostType } from "@prisma/client";
 import LikeButton from "./LikeButton";
-import ReportButton from "./ReportButton";
-import DeletePostButton from "./DeletePostButton";
+import ContentMenu from "./ContentMenu";
 import { REP_UI_ENABLED, HOUSES_UI_ENABLED, LEVELS_UI_ENABLED } from "@/lib/config/feature-flags";
 
 export type FeedPost = {
@@ -12,7 +11,7 @@ export type FeedPost = {
   mediaUrls: unknown;
   likesCount: number;
   createdAt: string | Date;
-  author: { id: string; displayName: string; avatarUrl: string | null; level: number; rep: number };
+  author: { id: string; username: string; displayName: string; avatarUrl: string | null; level: number; rep: number };
   house: { id: string; name: string; slug: string } | null;
   likes: { userId: string }[];
   _count: { comments: number };
@@ -67,12 +66,17 @@ export default function PostCard({
   });
 
   const commentsLabel = `${post._count.comments} ${post._count.comments === 1 ? "comment" : "comments"}`;
+  const reportPreview = post.title || post.content || "";
 
   const body = (
     <div className="min-w-0 flex-1">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          {compact ? null : <p className="text-data">{post.author.displayName}</p>}
+          {compact ? null : (
+            <a href={`/profile/${post.author.username}`} className="text-data">
+              {post.author.displayName}
+            </a>
+          )}
           <span className="text-caption" style={{ color: "var(--color-text-muted)" }}>
             {timestamp}
           </span>
@@ -83,15 +87,25 @@ export default function PostCard({
           ) : null}
         </div>
 
-        {post.house && HOUSES_UI_ENABLED ? (
-          <a
-            href={`/houses/${post.house.slug}`}
-            className="text-caption shrink-0 rounded-ob border px-2 py-1 uppercase tracking-brand"
-            style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
-          >
-            {post.house.name}
-          </a>
-        ) : null}
+        <div className="flex shrink-0 items-center gap-2">
+          {post.house && HOUSES_UI_ENABLED ? (
+            <a
+              href={`/houses/${post.house.slug}`}
+              className="text-caption rounded-ob border px-2 py-1 uppercase tracking-brand"
+              style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
+            >
+              {post.house.name}
+            </a>
+          ) : null}
+          <ContentMenu
+            targetType="post"
+            targetId={post.id}
+            preview={reportPreview}
+            canReport={canReport}
+            deletePostId={canDelete ? post.id : undefined}
+            deleteRedirectTo={deleteRedirectTo}
+          />
+        </div>
       </div>
 
       {post.title ? <p className="text-h2 !text-lg mt-1">{post.title}</p> : null}
@@ -113,8 +127,6 @@ export default function PostCard({
             {commentsLabel}
           </span>
         )}
-        {canDelete ? <DeletePostButton postId={post.id} redirectTo={deleteRedirectTo} /> : null}
-        {canReport ? <ReportButton targetType="post" targetId={post.id} /> : null}
       </div>
     </div>
   );
@@ -129,7 +141,10 @@ export default function PostCard({
 
   return (
     <article className="flex gap-3 py-4" style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
-      <div className={`avatar h-9 w-9 shrink-0 ${LEVELS_UI_ENABLED ? `avatar-level-${post.author.level}` : ""}`}>
+      <a
+        href={`/profile/${post.author.username}`}
+        className={`avatar h-9 w-9 shrink-0 ${LEVELS_UI_ENABLED ? `avatar-level-${post.author.level}` : ""}`}
+      >
         {post.author.avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={post.author.avatarUrl} alt={post.author.displayName} loading="lazy" className="h-full w-full object-cover" />
@@ -138,7 +153,7 @@ export default function PostCard({
             {post.author.displayName.charAt(0).toUpperCase()}
           </div>
         )}
-      </div>
+      </a>
       {body}
     </article>
   );

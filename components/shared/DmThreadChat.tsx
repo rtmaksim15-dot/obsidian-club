@@ -2,14 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/auth/supabase-browser";
-import ReportButton from "./ReportButton";
+import ContentMenu from "./ContentMenu";
 
 type Message = {
   id: string;
   content: string;
   isDeleted?: boolean;
   createdAt: string;
-  sender: { id: string; displayName: string; avatarUrl: string | null };
+  sender: { id: string; username: string; displayName: string; avatarUrl: string | null };
 };
 
 type Props = {
@@ -118,7 +118,7 @@ export default function DmThreadChat({ threadId, currentUserId, initialMessages 
         ) : (
           messages.map((m) => (
             <div key={m.id} className="flex items-start gap-3">
-              <div className="avatar h-9 w-9 shrink-0">
+              <a href={`/profile/${m.sender.username}`} className="avatar h-9 w-9 shrink-0">
                 {m.sender.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -132,16 +132,21 @@ export default function DmThreadChat({ threadId, currentUserId, initialMessages 
                     {m.sender.displayName.charAt(0).toUpperCase()}
                   </div>
                 )}
-              </div>
-              <div>
-                <p className="text-data">
-                  {m.sender.displayName}
-                  {m.sender.id === currentUserId ? (
-                    <span className="text-caption ml-2" style={{ color: "var(--color-text-muted)" }}>
-                      you
-                    </span>
+              </a>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <a href={`/profile/${m.sender.username}`} className="text-data">
+                    {m.sender.displayName}
+                    {m.sender.id === currentUserId ? (
+                      <span className="text-caption ml-2" style={{ color: "var(--color-text-muted)" }}>
+                        you
+                      </span>
+                    ) : null}
+                  </a>
+                  {!m.isDeleted && m.sender.id !== currentUserId ? (
+                    <ContentMenu targetType="direct_message" targetId={m.id} preview={m.content} canReport />
                   ) : null}
-                </p>
+                </div>
                 {m.isDeleted ? (
                   <p className="text-body mt-0.5 !text-base italic" style={{ color: "var(--color-text-muted)" }}>
                     Message removed by moderator.
@@ -149,9 +154,6 @@ export default function DmThreadChat({ threadId, currentUserId, initialMessages 
                 ) : (
                   <p className="text-body mt-0.5 !text-base">{m.content}</p>
                 )}
-                {!m.isDeleted && m.sender.id !== currentUserId ? (
-                  <ReportButton targetType="direct_message" targetId={m.id} />
-                ) : null}
               </div>
             </div>
           ))

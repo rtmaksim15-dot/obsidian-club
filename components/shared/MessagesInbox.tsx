@@ -84,6 +84,17 @@ export default function MessagesInbox({
           </p>
         ) : null}
 
+        {requests.length === 0 && initialThreads.length === 0 ? (
+          <div className="mb-10">
+            <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
+              Conversations start from a member&apos;s profile — find someone and send a message.
+            </p>
+            <a href="/members" className="btn-primary mt-4 inline-block">
+              Find members
+            </a>
+          </div>
+        ) : null}
+
         {requests.length > 0 ? (
           <section className="mb-10">
             <p className="text-label mb-3">Requests</p>
@@ -128,6 +139,7 @@ export default function MessagesInbox({
           </section>
         ) : null}
 
+        {requests.length > 0 || initialThreads.length > 0 ? (
         <section>
           <p className="text-label mb-3">Conversations</p>
           {initialThreads.length === 0 ? (
@@ -155,6 +167,7 @@ export default function MessagesInbox({
             </ul>
           )}
         </section>
+        ) : null}
       </div>
     </main>
   );

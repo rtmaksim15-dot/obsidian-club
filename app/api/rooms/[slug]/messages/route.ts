@@ -16,7 +16,7 @@ const messageSelect = {
   mediaUrl: true,
   replyToId: true,
   createdAt: true,
-  user: { select: { id: true, displayName: true, avatarUrl: true, level: true } },
+  user: { select: { id: true, username: true, displayName: true, avatarUrl: true, level: true } },
 };
 
 // GET /api/rooms/:slug/messages — latest PAGE_SIZE messages, oldest-first

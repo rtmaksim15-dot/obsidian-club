@@ -13,7 +13,7 @@ export const feedPostSelect = {
   type: true,
   likesCount: true,
   createdAt: true,
-  author: { select: { id: true, displayName: true, avatarUrl: true, level: true, rep: true } },
+  author: { select: { id: true, username: true, displayName: true, avatarUrl: true, level: true, rep: true } },
   house: { select: { id: true, name: true, slug: true } },
   _count: { select: { comments: true } },
 } as const;

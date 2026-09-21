@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import ReportButton from "./ReportButton";
+import ContentMenu from "./ContentMenu";
 
 type Comment = {
   id: string;
@@ -13,7 +13,7 @@ type Comment = {
   // replies to it still read coherently.
   isDeleted?: boolean;
   createdAt: string;
-  author: { id: string; displayName: string; avatarUrl: string | null; level: number };
+  author: { id: string; username: string; displayName: string; avatarUrl: string | null; level: number };
 };
 
 function formatTimestamp(iso: string) {
@@ -80,7 +80,7 @@ export default function CommentSection({
         <ul className="space-y-4">
           {comments.map((c) => (
             <li key={c.id} className="flex items-start gap-3">
-              <div className={`avatar avatar-level-${c.author.level} h-8 w-8 shrink-0`}>
+              <a href={`/profile/${c.author.username}`} className={`avatar avatar-level-${c.author.level} h-8 w-8 shrink-0`}>
                 {c.author.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={c.author.avatarUrl} alt={c.author.displayName} loading="lazy" className="h-full w-full object-cover" />
@@ -89,9 +89,16 @@ export default function CommentSection({
                     {c.author.displayName.charAt(0).toUpperCase()}
                   </div>
                 )}
-              </div>
-              <div>
-                <p className="text-data !text-sm">{c.author.displayName}</p>
+              </a>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <a href={`/profile/${c.author.username}`} className="text-data !text-sm">
+                    {c.author.displayName}
+                  </a>
+                  {!c.isDeleted && c.author.id !== currentUserId ? (
+                    <ContentMenu targetType="comment" targetId={c.id} preview={c.content} canReport />
+                  ) : null}
+                </div>
                 {c.isDeleted ? (
                   <p className="text-body !text-base italic" style={{ color: "var(--color-text-muted)" }}>
                     Comment removed by moderator.
@@ -99,11 +106,8 @@ export default function CommentSection({
                 ) : (
                   <p className="text-body !text-base">{c.content}</p>
                 )}
-                <p className="text-caption mt-1 flex items-center gap-3" style={{ color: "var(--color-text-muted)" }}>
+                <p className="text-caption mt-1" style={{ color: "var(--color-text-muted)" }}>
                   {formatTimestamp(c.createdAt)}
-                  {!c.isDeleted && c.author.id !== currentUserId ? (
-                    <ReportButton targetType="comment" targetId={c.id} />
-                  ) : null}
                 </p>
               </div>
             </li>

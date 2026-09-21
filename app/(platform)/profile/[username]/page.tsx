@@ -3,13 +3,12 @@ import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import ReviewForm from "@/components/shared/ReviewForm";
 import FollowButton from "@/components/shared/FollowButton";
-import BlockButton from "@/components/shared/BlockButton";
-import ReportButton from "@/components/shared/ReportButton";
+import ContentMenu from "@/components/shared/ContentMenu";
 import PostCard, { type FeedPost } from "@/components/shared/PostCard";
-import RequestConversationButton from "@/components/shared/RequestConversationButton";
+import MessageButton from "@/components/shared/MessageButton";
 import { isBlockedEitherWay } from "@/lib/moderation/block";
 import { isRitualComplete } from "@/lib/auth/ritual";
-import { needsDmRulesAcceptance } from "@/lib/legal/dm-rules";
+import { getMessageButtonState } from "@/lib/dm/relationship";
 import { LEVEL_NAMES } from "@/lib/rating/levels";
 import { REP_UI_ENABLED, HOUSES_UI_ENABLED, LEVELS_UI_ENABLED } from "@/lib/config/feature-flags";
 
@@ -62,7 +61,10 @@ export default async function ProfilePage({ params }: { params: { username: stri
 
   const canRequestConversation =
     viewer && !isOwnProfile ? viewer.isAdmin || (await isRitualComplete(viewer)) : false;
-  const needsDmRules = canRequestConversation && viewer ? await needsDmRulesAcceptance(viewer.id) : false;
+  const messageButtonState =
+    viewer && !isOwnProfile && !blocked && canRequestConversation
+      ? await getMessageButtonState(viewer, user.id)
+      : null;
 
   if (blocked) {
     return (
@@ -116,7 +118,7 @@ export default async function ProfilePage({ params }: { params: { username: stri
           type: true,
           likesCount: true,
           createdAt: true,
-          author: { select: { id: true, displayName: true, avatarUrl: true, level: true, rep: true } },
+          author: { select: { id: true, username: true, displayName: true, avatarUrl: true, level: true, rep: true } },
           house: { select: { id: true, name: true, slug: true } },
           likes: { where: { userId: viewer?.id ?? "" }, select: { userId: true } },
           _count: { select: { comments: true } },
@@ -213,21 +215,29 @@ export default async function ProfilePage({ params }: { params: { username: stri
         {viewer && !isOwnProfile ? (
           <div className="mt-6 flex items-center gap-4">
             <FollowButton userId={user.id} initialFollowing={Boolean(isFollowing)} />
-            <BlockButton userId={user.id} initialBlocked={false} />
-            <ReportButton targetType="profile" targetId={user.id} />
+            <ContentMenu
+              targetType="profile"
+              targetId={user.id}
+              preview={user.displayName}
+              canReport
+              blockUserId={user.id}
+              blockInitialBlocked={false}
+            />
           </div>
         ) : null}
 
-        {/* Direct Messages (2026-09-14), item 1 — eligibility mirrors
-            lib/dm/eligibility.ts's ritual gate; the API re-checks
-            everything else (already-pending, two-strike door, daily
-            limit) regardless, this just avoids showing the button to
-            someone it would always reject outright. */}
-        {viewer && !isOwnProfile && canRequestConversation ? (
+        {/* Direct Messages (2026-09-14, item 1) — state (start / pending
+            either direction / existing thread / hidden) computed by
+            lib/dm/relationship.ts#getMessageButtonState; the API
+            re-checks everything else (two-strike door, daily limit)
+            regardless, this just avoids showing a button that would
+            always reject outright, or the wrong shape of button
+            (item 2, 2026-09-20, see DECISIONS.md). */}
+        {viewer && !isOwnProfile && messageButtonState && messageButtonState.type !== "hidden" ? (
           <div className="mt-4">
-            <RequestConversationButton
+            <MessageButton
+              initialState={messageButtonState}
               recipientId={user.id}
-              needsDmRules={needsDmRules}
               returnTo={`/profile/${user.username}`}
             />
           </div>
