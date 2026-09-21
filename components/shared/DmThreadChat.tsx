@@ -109,7 +109,7 @@ export default function DmThreadChat({ threadId, currentUserId, initialMessages 
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-ob-black text-ob-text">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-ob-black text-ob-text">
       <div className="flex-1 space-y-4 overflow-y-auto px-6 py-6">
         {messages.length === 0 ? (
           <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
@@ -161,7 +161,19 @@ export default function DmThreadChat({ threadId, currentUserId, initialMessages 
         <div ref={bottomRef} />
       </div>
 
-      <form onSubmit={handleSend} className="border-t border-ob-border px-6 py-4">
+      {/* shrink-0 + safe-area padding (item 1, 2026-09-22, see
+          DECISIONS.md): this form is a normal flex-bottom child of a
+          h-dvh-constrained ancestor (see messages/[threadId]/page.tsx),
+          which is what actually keeps it above the keyboard rather than
+          behind it — no fixed positioning or visualViewport JS needed
+          once the ancestor's height itself already tracks the shrunk
+          viewport. The safe-area padding is separate: the iPhone home-
+          indicator inset, same as BottomNav.tsx already accounts for. */}
+      <form
+        onSubmit={handleSend}
+        className="shrink-0 border-t border-ob-border px-6 pt-4"
+        style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
+      >
         {error ? (
           <p className="text-caption mb-2" style={{ color: "var(--color-error)" }}>
             {error}
@@ -174,6 +186,15 @@ export default function DmThreadChat({ threadId, currentUserId, initialMessages 
             onChange={(e) => setDraft(e.target.value)}
             placeholder="Write something"
             maxLength={2000}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="sentences"
+            spellCheck={false}
+            name="dm-message-draft"
+            data-lpignore="true"
+            data-1p-ignore="true"
+            data-bwignore="true"
+            data-form-type="other"
           />
           <button type="submit" className="btn-primary shrink-0" disabled={sending || !draft.trim()}>
             Send

@@ -1,4 +1,5 @@
 import { redirect, notFound } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { isRitualComplete } from "@/lib/auth/ritual";
@@ -80,22 +81,36 @@ export default async function ThreadPage({ params }: { params: { threadId: strin
   }));
 
   return (
-    <div className="flex min-h-screen flex-col bg-ob-black text-ob-text">
-      <header className="flex items-center justify-between border-b border-ob-border px-6 py-6">
-        <a href={`/profile/${other.username}`} className="flex items-center gap-3">
-          <div className="avatar h-9 w-9 shrink-0">
-            {other.avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={other.avatarUrl} alt={other.displayName} className="h-full w-full object-cover" />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center bg-ob-surface text-sm">
-                {other.displayName.charAt(0).toUpperCase()}
-              </div>
-            )}
-          </div>
-          <p className="text-h1 !text-xl">{other.displayName}</p>
-        </a>
-        <div className="flex items-center gap-4">
+    // Mobile thread layout (item 1, 2026-09-22, see DECISIONS.md): a
+    // fixed h-dvh (dynamic viewport height, not min-h-screen's static
+    // 100vh) column, with only the message list scrolling — this is
+    // what actually keeps the composer above an open on-screen keyboard
+    // on iOS/Android: dvh shrinks with the keyboard, static vh doesn't,
+    // so a static-vh layout's flex-bottom composer sits behind the
+    // keyboard instead of above it. The bottom tab bar is hidden for
+    // this same route in BottomNav.tsx (its own pathname check) rather
+    // than here, so there's no fixed nav competing for the same space.
+    <div className="flex h-dvh flex-col overflow-hidden bg-ob-black text-ob-text">
+      <header className="flex shrink-0 items-center justify-between border-b border-ob-border px-4 py-4 sm:px-6 sm:py-6">
+        <div className="flex min-w-0 items-center gap-2">
+          <a href="/messages" aria-label="Back to Messages" className="shrink-0 p-1 -ml-1">
+            <ArrowLeft size={20} strokeWidth={1.5} />
+          </a>
+          <a href={`/profile/${other.username}`} className="flex min-w-0 items-center gap-3">
+            <div className="avatar h-9 w-9 shrink-0">
+              {other.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={other.avatarUrl} alt={other.displayName} className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-ob-surface text-sm">
+                  {other.displayName.charAt(0).toUpperCase()}
+                </div>
+              )}
+            </div>
+            <p className="text-h1 !text-xl truncate">{other.displayName}</p>
+          </a>
+        </div>
+        <div className="flex shrink-0 items-center gap-4">
           <LeaveThreadButton threadId={thread.id} />
           <ContentMenu
             targetType="profile"

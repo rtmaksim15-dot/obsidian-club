@@ -6,6 +6,7 @@ import { getDoorsState, bypassesDoors } from "@/lib/config/doors";
 import { hasUnreadDm } from "@/lib/dm/unread";
 import BottomNav from "@/components/shared/BottomNav";
 import DesktopNav from "@/components/shared/DesktopNav";
+import PlatformShell from "@/components/shared/PlatformShell";
 
 // Legal re-consent gate (Block 4, 2026-08-10) — applied once here
 // rather than duplicated per-page (unlike the smaller, deliberately
@@ -47,7 +48,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
 
   return (
     <>
-      <div className={`pb-16 sm:pb-0 ${fullAccess ? "sm:pt-20" : ""}`}>{children}</div>
+      <PlatformShell fullAccess={fullAccess}>{children}</PlatformShell>
       {user ? <BottomNav unreadDm={unreadDm} /> : null}
       {fullAccess ? <DesktopNav unreadDm={unreadDm} /> : null}
     </>
