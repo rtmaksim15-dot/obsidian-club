@@ -3,10 +3,17 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { createClient } from "@/lib/auth/supabase-server";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
 import { logAdminAuthEvent } from "@/lib/security/admin-auth-log";
+import { sendAdminSignInCompletedAlert } from "@/lib/utils/email";
 
 const RATE_LIMIT = { max: 5, windowMs: 15 * 60 * 1000 };
 
-type Body = { factorId?: string; code?: string };
+// "login" (MfaChallengeForm.tsx, the per-sign-in step-up screen at
+// /login/mfa) vs "enroll" (MfaSecurityPanel.tsx, confirming a newly
+// added authenticator from /account/security while already signed in)
+// — item 3, 2026-09-22, see DECISIONS.md. Only "login" is actually a
+// sign-in completing; the stage-2 alert email fires only for it.
+type Context = "login" | "enroll";
+type Body = { factorId?: string; code?: string; context?: Context };
 
 // POST /api/auth/mfa/verify — item 2. Used for both completing a brand
 // new enrollment and the regular per-sign-in step-up: Supabase's
@@ -53,6 +60,20 @@ export async function POST(request: Request) {
       ip,
       userAgent: request.headers.get("user-agent"),
     });
+
+    // Stage 2 alert (item 3, 2026-09-22, see DECISIONS.md) — only for
+    // the login step-up completing, never for confirming a newly
+    // enrolled factor from an already-signed-in session (that isn't a
+    // sign-in). Awaited for the same reason as stage 1 — see
+    // DECISIONS.md.
+    if (!error && data && body.context === "login") {
+      await sendAdminSignInCompletedAlert({
+        email: user.email,
+        ip,
+        userAgent: request.headers.get("user-agent"),
+        at: new Date(),
+      }).catch((err) => console.error("[auth/mfa/verify] Failed to send sign-in-completed alert:", err));
+    }
   }
 
   if (error || !data) {

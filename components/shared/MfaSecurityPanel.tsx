@@ -48,7 +48,7 @@ export default function MfaSecurityPanel() {
     const res = await fetch("/api/auth/mfa/verify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ factorId: enrolling.factorId, code }),
+      body: JSON.stringify({ factorId: enrolling.factorId, code, context: "enroll" }),
     });
     const body = await res.json().catch(() => ({}));
     setBusy(false);

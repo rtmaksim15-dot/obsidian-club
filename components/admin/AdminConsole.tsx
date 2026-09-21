@@ -12,7 +12,7 @@ import CommandPalette from "./CommandPalette";
 import EmailCapturesPanel, { type EmailCaptureRow } from "./EmailCapturesPanel";
 import { levelName } from "@/lib/rating/levels";
 
-export type Zone = "applications" | "people" | "arbitration" | "invitations";
+export type Zone = "applications" | "people" | "arbitration" | "invitations" | "security";
 export type Filter = "pending" | "held" | "failedSend" | "notAgeVerified" | null;
 
 const ZONES: { id: Zone; label: string }[] = [
@@ -20,6 +20,7 @@ const ZONES: { id: Zone; label: string }[] = [
   { id: "people", label: "People" },
   { id: "arbitration", label: "Arbitration" },
   { id: "invitations", label: "Invitations" },
+  { id: "security", label: "Security" },
 ];
 
 const FILTER_LABELS: Record<Exclude<Filter, null>, string> = {
@@ -28,6 +29,26 @@ const FILTER_LABELS: Record<Exclude<Filter, null>, string> = {
   failedSend: "Failed Sends",
   notAgeVerified: "Not Age-Verified",
 };
+
+// Security zone (item 4, 2026-09-22, see DECISIONS.md) — the raw
+// AdminAuthEventType enum values, labeled for display. Time shown in
+// America/New_York, same timezone as the two sign-in alert emails these
+// rows correspond to (lib/utils/email.ts) — one clock for the same
+// events, wherever they're read.
+const SECURITY_EVENT_LABELS: Record<string, string> = {
+  sign_in_success: "Password accepted",
+  sign_in_failure: "Password rejected",
+  mfa_challenge_success: "Code verified",
+  mfa_challenge_failure: "Code rejected",
+};
+
+function formatSecurityEventTime(iso: string): string {
+  return new Date(iso).toLocaleString("en-US", {
+    timeZone: "America/New_York",
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
 
 // Zone 1 full depth (2026-09-10) — everything the review action route
 // (PATCH /api/admin/applications/[id]) reads or writes, plus what the
@@ -161,6 +182,21 @@ export type TokenRow = {
   emailSendError: string | null;
 };
 
+// Security zone (item 4, 2026-09-22, see DECISIONS.md) — read-only, no
+// detail panel: every field worth showing is already in the row, and
+// there's no admin action to take on a login record. `type` is the raw
+// AdminAuthEventType string (e.g. "sign_in_success") — labeled for
+// display in SECURITY_EVENT_LABELS below rather than here, so this type
+// stays a plain mirror of the query.
+export type SecurityEventRow = {
+  id: string;
+  email: string;
+  type: string;
+  ip: string;
+  userAgent: string | null;
+  createdAt: string;
+};
+
 type Props = {
   counts: Counts;
   applications: Application[];
@@ -171,6 +207,7 @@ type Props = {
   tokensTotal: number;
   emailCaptures: EmailCaptureRow[];
   emailCapturesTotal: number;
+  securityEvents: SecurityEventRow[];
 };
 
 // Admin Console shell (2026-09-09, see DECISIONS.md) — "one route, one
@@ -208,6 +245,7 @@ export default function AdminConsole({
   tokensTotal,
   emailCaptures,
   emailCapturesTotal,
+  securityEvents,
 }: Props) {
   const [applications, setApplications] = useState(initialApplications);
   const [people, setPeople] = useState(initialPeople);
@@ -304,7 +342,9 @@ export default function AdminConsole({
         ? visiblePeople
         : zone === "arbitration"
           ? visibleReports
-          : tokens;
+          : zone === "invitations"
+            ? tokens
+            : []; // security — read-only, nothing to select/open
 
   const openApplication = zone === "applications" ? applications.find((a) => a.id === openId) : undefined;
   const openPerson = zone === "people" ? people.find((p) => p.id === openId) : undefined;
@@ -474,6 +514,26 @@ export default function AdminConsole({
                         Red line
                       </p>
                     ) : null}
+                  </li>
+                ))}
+              {zone === "security" &&
+                securityEvents.map((e) => (
+                  <li key={e.id} className="card">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-data">{SECURITY_EVENT_LABELS[e.type] ?? e.type}</p>
+                      <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
+                        {formatSecurityEventTime(e.createdAt)}
+                      </p>
+                    </div>
+                    <p className="text-caption mt-1" style={{ color: "var(--color-text-secondary)" }}>
+                      {e.email}
+                    </p>
+                    <p className="text-caption mt-1 break-all" style={{ color: "var(--color-text-muted)" }}>
+                      IP: {e.ip}
+                    </p>
+                    <p className="text-caption mt-1 break-words" style={{ color: "var(--color-text-muted)" }}>
+                      {e.userAgent ?? "(no user agent)"}
+                    </p>
                   </li>
                 ))}
               {zone === "invitations" &&

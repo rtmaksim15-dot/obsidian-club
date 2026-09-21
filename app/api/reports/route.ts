@@ -121,7 +121,6 @@ export async function POST(request: Request) {
   // only for a genuine bug, which is worth a 500 here.
   const categoryLabel = REPORT_CATEGORIES.find((c) => c.value === category)?.label ?? category;
   await sendReportAlert({
-    reportId: report.id,
     targetType,
     categoryLabel,
     isUnderage: category === "underage",

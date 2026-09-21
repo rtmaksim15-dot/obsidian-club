@@ -5,6 +5,7 @@ import { track } from "@/lib/analytics/track";
 import { isAdminId } from "@/lib/auth/admin-allowlist";
 import { logAdminAuthEvent } from "@/lib/security/admin-auth-log";
 import { getClientIp } from "@/lib/security/rate-limit";
+import { sendAdminPasswordAcceptedAlert } from "@/lib/utils/email";
 
 // GET /auth/callback — Supabase OAuth (PKCE) redirect target. Google
 // Sign-In (and any future OAuth provider) redirects here with a `code`
@@ -106,6 +107,19 @@ export async function GET(request: NextRequest) {
         // landing anywhere real.
         const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
         if (aalData?.nextLevel === "aal2" && aalData.currentLevel !== "aal2") {
+          // Stage 1 alert (item 3, 2026-09-22, see DECISIONS.md) — same
+          // "Password accepted" copy as the password path; from this
+          // app's perspective OAuth is just a different first factor,
+          // not a third email template. Awaited for the same reason as
+          // the password path — see DECISIONS.md.
+          if (isAdminId(member.id)) {
+            await sendAdminPasswordAcceptedAlert({
+              email: member.email,
+              ip: getClientIp(request),
+              userAgent: request.headers.get("user-agent"),
+              at: new Date(),
+            }).catch((err) => console.error("[auth/callback] Failed to send password-accepted alert:", err));
+          }
           return redirectWithCookies(`/login/mfa?next=${encodeURIComponent(next)}`, cookiesToSet);
         }
 

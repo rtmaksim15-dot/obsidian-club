@@ -2,12 +2,20 @@ import "server-only";
 import type { AdminAuthEventType } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { isAdminId } from "@/lib/auth/admin-allowlist";
-import { sendAdminSignInAlert } from "@/lib/utils/email";
 
 // Admin access hardening (item 2, 2026-09-17, see DECISIONS.md). Only
 // events against a real, allowlisted admin account are worth logging —
 // see resolveAdminByEmail() below, called before this at every site
 // that might be dealing with an unknown/mistyped email.
+//
+// Pure DB write only (item 3, 2026-09-22, see DECISIONS.md) — alert
+// emailing used to live here too, fired unconditionally whenever
+// `type === "sign_in_success"`. Moved out to each call site instead:
+// this function can't tell "first-factor success, awaiting code" apart
+// from "already at aal2" or "no authenticator enrolled at all," and
+// couldn't distinguish a login step-up's mfa_challenge_success from an
+// account/security enrollment confirmation's — both are the same event
+// type. Each caller has that context; this one just records history.
 export async function logAdminAuthEvent(params: {
   userId: string | null;
   email: string;
@@ -16,15 +24,6 @@ export async function logAdminAuthEvent(params: {
   userAgent: string | null;
 }) {
   await prisma.adminAuthEvent.create({ data: params });
-
-  if (params.type === "sign_in_success") {
-    // Fire-and-forget — an alert-email failure must never fail the
-    // sign-in itself, same "never let a side effect block the real
-    // action" rule this codebase already applies to daily-login REP.
-    sendAdminSignInAlert({ email: params.email, ip: params.ip, userAgent: params.userAgent, at: new Date() }).catch(
-      (err) => console.error("[admin-auth-log] Failed to send sign-in alert:", err),
-    );
-  }
 }
 
 /**

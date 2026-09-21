@@ -1,6 +1,5 @@
 import { Resend } from "resend";
 import { HARD_CAP_DAYS, joinUrl } from "@/lib/invites/lifecycle";
-import { getAppUrl } from "@/lib/config/site-url";
 
 // Transactional emails. Email clients don't reliably load custom fonts or
 // read CSS variables, so brand colors are inlined here as literal hex —
@@ -205,58 +204,107 @@ export async function sendApplicationDeclinedEmail(email: string): Promise<{ ok:
   return sendEmail(email, "Your request", html);
 }
 
-// Admin access hardening (item 2, 2026-09-17, see DECISIONS.md) — a
-// real out-of-band notification every time the admin account's password
-// (or OAuth) check succeeds, sent to a fixed, separate address rather
-// than the admin account's own login email (the point is an independent
-// channel: if someone else's credentials get past the first factor,
-// this should still reach a real person). Deliberately not run through
-// emailShell()'s club-voice styling — this reads as a plain security
-// notice, not member-facing marketing/transactional copy.
+// Admin access hardening (item 2, 2026-09-17; split into two stages,
+// item 3, 2026-09-22, see DECISIONS.md) — real out-of-band notification
+// at each of the two points that matter, sent to a fixed, separate
+// address rather than the admin account's own login email (the point is
+// an independent channel: if someone else's credentials get past the
+// first factor, this should still reach a real person). Deliberately
+// not run through emailShell()'s club-voice styling — this reads as a
+// plain security notice, not member-facing marketing/transactional
+// copy. Time is shown in America/New_York (the admin's own timezone),
+// not the raw UTC ISO string the single combined alert used to show.
 const ADMIN_ALERT_EMAIL = "rtmaksim15@gmail.com";
 
-export async function sendAdminSignInAlert(params: {
+function formatEasternTime(date: Date): string {
+  return date.toLocaleString("en-US", {
+    timeZone: "America/New_York",
+    dateStyle: "medium",
+    timeStyle: "long",
+  });
+}
+
+function adminAlertBody(intro: string, params: { ip: string; userAgent: string | null; at: Date }): string {
+  return `
+    <div style="background:#0A0908;padding:32px 24px;font-family:Georgia,'Times New Roman',serif;color:#EDEAE4;">
+      <div style="max-width:480px;margin:0 auto;">
+        <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">${intro}</p>
+        <p style="font-size:14px;color:#9E9A94;line-height:1.7;margin:0 0 8px;">Time: ${escapeHtml(formatEasternTime(params.at))}</p>
+        <p style="font-size:14px;color:#9E9A94;line-height:1.7;margin:0 0 8px;">IP: ${escapeHtml(params.ip)}</p>
+        <p style="font-size:14px;color:#9E9A94;line-height:1.7;margin:0;">User agent: ${escapeHtml(params.userAgent ?? "(none)")}</p>
+      </div>
+    </div>`;
+}
+
+/**
+ * Stage 1 — the first factor (password, or Google OAuth) just
+ * succeeded, and a TOTP step-up is now pending. Fired from exactly one
+ * place per sign-in path (POST /api/auth/sign-in, app/auth/callback/
+ * route.ts), only when a step-up is actually about to be asked for
+ * (nextLevel === "aal2") — an admin with no authenticator enrolled yet
+ * never reaches aal2 at all, and telling them to await a code that will
+ * never be asked for would be wrong.
+ */
+export async function sendAdminPasswordAcceptedAlert(params: {
   email: string;
   ip: string;
   userAgent: string | null;
   at: Date;
 }): Promise<{ ok: boolean; error?: string }> {
-  const html = `
-    <div style="background:#0A0908;padding:32px 24px;font-family:Georgia,'Times New Roman',serif;color:#EDEAE4;">
-      <div style="max-width:480px;margin:0 auto;">
-        <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">
-          The admin account (${escapeHtml(params.email)}) just signed in.
-        </p>
-        <p style="font-size:14px;color:#9E9A94;line-height:1.7;margin:0 0 8px;">Time: ${params.at.toISOString()}</p>
-        <p style="font-size:14px;color:#9E9A94;line-height:1.7;margin:0 0 8px;">IP: ${escapeHtml(params.ip)}</p>
-        <p style="font-size:14px;color:#9E9A94;line-height:1.7;margin:0;">User agent: ${escapeHtml(params.userAgent ?? "(none)")}</p>
-      </div>
-    </div>`;
-  return sendEmail(ADMIN_ALERT_EMAIL, "Admin sign-in", html);
+  const html = adminAlertBody(`The admin account (${escapeHtml(params.email)}) passed the first check. Awaiting the authenticator code.`, params);
+  return sendEmail(ADMIN_ALERT_EMAIL, "Password accepted — awaiting code", html);
 }
 
 /**
- * New-report alert (item 6, 2026-09-20, see DECISIONS.md) — one per
- * report filed, to the same fixed, independent address as the admin
- * sign-in alert, and in the same plain-security-notice style rather
- * than emailShell()'s member-facing voice. Deliberately never includes
- * the reported content itself — only the reason, the item type, and a
- * link into the admin console (?report=<id>, which AdminConsole reads
- * client-side to jump straight to it) — so a report about, say, doxxing
- * doesn't itself leak the doxxing content into an inbox. Underage
- * reports get an URGENT-prefixed subject; the queue ordering and visual
- * flag for that category live in app/(platform)/admin/page.tsx and
- * AdminConsole.tsx, not here.
+ * Stage 2 — the TOTP code was verified and the session reached aal2:
+ * the sign-in is actually complete. Fired from exactly one place
+ * (POST /api/auth/mfa/verify), and only for that route's login-step-up
+ * context, not its other caller (confirming a newly-enrolled factor
+ * from /account/security while already signed in, which isn't "a
+ * sign-in" and would be a misleading alert to send here).
+ */
+export async function sendAdminSignInCompletedAlert(params: {
+  email: string;
+  ip: string;
+  userAgent: string | null;
+  at: Date;
+}): Promise<{ ok: boolean; error?: string }> {
+  const html = adminAlertBody(`The admin account (${escapeHtml(params.email)}) signed in.`, params);
+  return sendEmail(ADMIN_ALERT_EMAIL, "Admin sign-in completed", html);
+}
+
+/**
+ * New-report alert (item 6, 2026-09-20; rebuilt item 2, 2026-09-22, see
+ * DECISIONS.md) — one per report filed, to the same fixed, independent
+ * address as the admin sign-in alert. Deliberately never includes the
+ * reported content itself — only the reason and the item type — so a
+ * report about, say, doxxing doesn't itself leak the doxxing content
+ * into an inbox.
+ *
+ * Rebuilt to match sendAdminSignInAlert's send path exactly, after a
+ * line-by-line comparison found the report alert wasn't arriving while
+ * the sign-in alert reliably does, with both going through the same
+ * sendEmail() wrapper (same FROM, same error handling, no reply-to or
+ * custom headers on either). The one real structural difference: this
+ * email's HTML used to include an `<a href>` link into the admin
+ * console — the sign-in alert has never had a link at all. A hyperlink
+ * in an otherwise plain security-notice email, from a domain with a
+ * young sending reputation, sent several times in quick succession
+ * during QA, is a plausible reason a spam filter would treat the two
+ * differently even though Resend's API accepted every send without
+ * error — the console link is dropped here (the console is one click
+ * from /admin regardless, not worth the risk of another silent drop).
+ * The subject is also now a fixed string, not category-interpolated —
+ * matching the sign-in alert's always-identical subject — with only
+ * the underage case getting a distinct, still-fixed URGENT variant
+ * (item 6's own requirement); the reason and item type live in the
+ * body, same as time/IP/user agent do for the sign-in alert.
  */
 export async function sendReportAlert(params: {
-  reportId: string;
   targetType: string;
   categoryLabel: string;
   isUnderage: boolean;
 }): Promise<{ ok: boolean; error?: string }> {
-  const appUrl = getAppUrl();
-  const consoleLink = appUrl ? `${appUrl}/admin?report=${params.reportId}` : null;
-
   const html = `
     <div style="background:#0A0908;padding:32px 24px;font-family:Georgia,'Times New Roman',serif;color:#EDEAE4;">
       <div style="max-width:480px;margin:0 auto;">
@@ -264,18 +312,11 @@ export async function sendReportAlert(params: {
           A new report was filed.
         </p>
         <p style="font-size:14px;color:#9E9A94;line-height:1.7;margin:0 0 8px;">Reason: ${escapeHtml(params.categoryLabel)}</p>
-        <p style="font-size:14px;color:#9E9A94;line-height:1.7;margin:0 0 8px;">Item type: ${escapeHtml(params.targetType)}</p>
-        ${
-          consoleLink
-            ? `<p style="font-size:14px;line-height:1.7;margin:16px 0 0;">
-                 <a href="${consoleLink}" style="color:#EDEAE4;">Review it in the admin console</a>
-               </p>`
-            : ""
-        }
+        <p style="font-size:14px;color:#9E9A94;line-height:1.7;margin:0;">Item type: ${escapeHtml(params.targetType)}</p>
       </div>
     </div>`;
 
-  const subject = params.isUnderage ? "URGENT: New report — Underage" : `New report — ${params.categoryLabel}`;
+  const subject = params.isUnderage ? "URGENT: New report filed" : "New report filed";
   return sendEmail(ADMIN_ALERT_EMAIL, subject, html);
 }
 

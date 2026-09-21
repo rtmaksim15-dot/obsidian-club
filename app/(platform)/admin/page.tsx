@@ -143,7 +143,8 @@ export default async function AdminConsolePage() {
     notFound();
   }
 
-  const [applications, peopleBase, reports, tokensPage, tokensTotal, counts, emailCaptures, emailCapturesTotal] = await Promise.all([
+  const [applications, peopleBase, reports, tokensPage, tokensTotal, counts, emailCaptures, emailCapturesTotal, securityEventRows] =
+    await Promise.all([
     prisma.waitlist.findMany({
       where: {
         OR: [{ status: { in: ["pending", "held"] } }, { decisionEmailSendError: { not: null } }],
@@ -241,6 +242,15 @@ export default async function AdminConsolePage() {
       select: { id: true, email: true, createdAt: true },
     }),
     prisma.emailCapture.count(),
+    // Security zone (item 4, 2026-09-22, see DECISIONS.md) — read-only,
+    // newest first. `email` is a plain column on the row itself (not a
+    // relation), so no join/resolution is needed even for a userId-less
+    // failed attempt against an unrecognized address.
+    prisma.adminAuthEvent.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      select: { id: true, email: true, type: true, ip: true, userAgent: true, createdAt: true },
+    }),
   ]);
 
   // Underage reports are the single most urgent category — bumped
@@ -510,6 +520,14 @@ export default async function AdminConsolePage() {
       counts={counts}
       emailCaptures={emailCaptures.map((c) => ({ id: c.id, email: c.email, createdAt: c.createdAt.toISOString() }))}
       emailCapturesTotal={emailCapturesTotal}
+      securityEvents={securityEventRows.map((e) => ({
+        id: e.id,
+        email: e.email,
+        type: e.type,
+        ip: e.ip,
+        userAgent: e.userAgent,
+        createdAt: e.createdAt.toISOString(),
+      }))}
       applications={applications.map((a) => ({
         id: a.id,
         name: a.name,

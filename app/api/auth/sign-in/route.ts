@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptionsWithName } from "@supabase/ssr";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
 import { logAdminAuthEvent, resolveAdminByEmail } from "@/lib/security/admin-auth-log";
+import { sendAdminPasswordAcceptedAlert } from "@/lib/utils/email";
 
 // POST /api/auth/sign-in — item 2, 2026-09-17 (see DECISIONS.md). The
 // email/password path used to call supabase.auth.signInWithPassword()
@@ -77,6 +78,23 @@ export async function POST(request: NextRequest) {
   // enrolled) so it knows whether to show the code-entry screen before
   // treating sign-in as complete — see app/(auth)/login/page.tsx.
   const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+  // Stage 1 alert (item 3, 2026-09-22, see DECISIONS.md) — only when a
+  // step-up is actually about to be asked for; an admin with no
+  // authenticator enrolled never reaches nextLevel "aal2" at all, and
+  // "awaiting code" would be wrong to say if no code is ever coming.
+  // Awaited, not fire-and-forget — nothing else in this handler runs
+  // after it, and an un-awaited send here isn't guaranteed to finish
+  // the network round trip to Resend before a serverless function can
+  // freeze on return (see DECISIONS.md, the report-alert email fix).
+  if (admin && aalData?.nextLevel === "aal2" && aalData.currentLevel !== "aal2") {
+    await sendAdminPasswordAcceptedAlert({
+      email,
+      ip,
+      userAgent: request.headers.get("user-agent"),
+      at: new Date(),
+    }).catch((err) => console.error("[auth/sign-in] Failed to send password-accepted alert:", err));
+  }
 
   const response = NextResponse.json({
     ok: true,
