@@ -1,5 +1,6 @@
 import "server-only";
 import { isPreviewId } from "@/lib/auth/preview-allowlist";
+import { isAppOpen } from "@/lib/config/app-open";
 
 // The Doors mechanic (pre-launch cleanup, 2026-08-08) — the November 1
 // cohort launch gate (moved from October 1, 2026-09-10). Unlike
@@ -17,16 +18,24 @@ export type DoorsState = { active: boolean; date: Date | null };
 
 /**
  * Whether this user skips the doors/antechamber holding gate outright —
- * admins (already exempt from the ritual too) and manually invited
- * launch-preview accounts (PREVIEW_USER_IDS, still subject to the
- * ritual and every room-access rule — this bypasses only the holding
- * page). Single choke point so every gate site (there are several —
- * feed/compose/members/hall/messages, and the nav-visibility check in
- * (platform)/layout.tsx) stays consistent instead of each one
- * separately remembering both allowlists.
+ * admins (already exempt from the ritual too), manually invited
+ * launch-preview accounts (PREVIEW_USER_IDS), and, since normal-
+ * operation mode (2026-09-21, see DECISIONS.md), every signed-in member
+ * at once while APP_OPEN=true. All three still go through the ritual
+ * and every room-access rule — this bypasses only the holding page,
+ * never those. APP_OPEN makes PREVIEW_USER_IDS redundant (every member
+ * already passes) without needing to unset it. Single choke point so
+ * every gate site (there are several — feed/compose/members/hall/
+ * messages, and the nav-visibility check in (platform)/layout.tsx)
+ * stays consistent instead of each one separately remembering all
+ * three.
+ *
+ * Deliberately unrelated to getDoorsState()/DOORS_OPEN_DATE below —
+ * the public landing page's countdown reads that directly and is never
+ * affected by APP_OPEN.
  */
 export function bypassesDoors(user: { id: string; isAdmin: boolean }): boolean {
-  return user.isAdmin || isPreviewId(user.id);
+  return isAppOpen() || user.isAdmin || isPreviewId(user.id);
 }
 
 export function getDoorsState(): DoorsState {
