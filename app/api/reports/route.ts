@@ -111,11 +111,16 @@ export async function POST(request: Request) {
   });
 
   // Item 6, 2026-09-20 (see DECISIONS.md) — a real out-of-band alert per
-  // report, same fire-and-forget posture as track()'s analytics calls:
-  // a failed send shouldn't fail the report itself, the row above is
-  // already the durable record.
+  // report. Awaited, unlike track()'s fire-and-forget analytics calls:
+  // this is the last thing in the handler before the response, and a
+  // serverless function can freeze the moment it returns — an
+  // un-awaited send here isn't guaranteed to finish the network round
+  // trip to Resend before that happens (confirmed missing in practice
+  // during QA). A failed send still never fails the report itself —
+  // sendReportAlert() itself never throws for a Resend-level failure,
+  // only for a genuine bug, which is worth a 500 here.
   const categoryLabel = REPORT_CATEGORIES.find((c) => c.value === category)?.label ?? category;
-  sendReportAlert({
+  await sendReportAlert({
     reportId: report.id,
     targetType,
     categoryLabel,
