@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { createAdminClient } from "@/lib/auth/supabase-admin";
 import { detectImageSignature } from "@/lib/utils/validateImageBytes";
 import { stripExifIfPresent } from "@/lib/utils/stripExif";
+import { resolveAvatarUrl } from "@/lib/storage/resolve-media";
 
 // User Profiles task (2026-07-17): replaces the old UploadThing avatar
 // flow (never actually verifiable — UPLOADTHING_SECRET/APP_ID were
@@ -87,12 +88,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Could not upload avatar. Try again shortly." }, { status: 503 });
   }
 
-  // Cache-bust: the public URL is otherwise identical across re-uploads
-  // (fixed path), so a browser/CDN cache would keep showing the old image.
-  const { data } = admin.storage.from(BUCKET).getPublicUrl(path);
-  const avatarUrl = `${data.publicUrl}?v=${Date.now()}`;
+  // Private storage (task 2, 2026-09-23, see DECISIONS.md) — only the
+  // bare path is stored from here on; a fresh signed URL is resolved on
+  // every read (lib/storage/resolve-media.ts), never a stored permanent
+  // one. The old "?v=<timestamp>" cache-bust suffix on the public URL
+  // is no longer needed for the same reason: a signed URL's token/query
+  // string is already unique on every mint, even for this same fixed
+  // per-user path.
+  await prisma.user.update({ where: { id: user.id }, data: { avatarUrl: path } });
 
-  await prisma.user.update({ where: { id: user.id }, data: { avatarUrl } });
-
-  return NextResponse.json({ avatarUrl }, { status: 201 });
+  return NextResponse.json({ avatarUrl: await resolveAvatarUrl(path) }, { status: 201 });
 }

@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { getRitualStatus } from "@/lib/auth/ritual";
 import { getDoorsState, bypassesDoors } from "@/lib/config/doors";
+import { resolveAvatarUrls } from "@/lib/storage/resolve-media";
 
 /**
  * Members (`/members`) — OBSIDIAN_ROADMAP_v3.1 "Members and Follows."
@@ -28,11 +29,15 @@ export default async function MembersPage() {
   // antechamber instead of real content while doors.active.
   if (!bypassesDoors(user) && getDoorsState().active) redirect("/antechamber");
 
-  const members = await prisma.user.findMany({
+  const rawMembers = await prisma.user.findMany({
     where: { status: "active" },
     orderBy: { joinedAt: "asc" },
     select: { id: true, username: true, displayName: true, avatarUrl: true, bio: true },
   });
+
+  // Private storage (task 2, 2026-09-23, see DECISIONS.md).
+  const avatarUrls = await resolveAvatarUrls(rawMembers.map((m) => m.avatarUrl));
+  const members = rawMembers.map((m, i) => ({ ...m, avatarUrl: avatarUrls[i] }));
 
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">

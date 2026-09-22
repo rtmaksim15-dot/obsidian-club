@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { getRequestEligibility } from "@/lib/dm/eligibility";
 import { checkDailyRequestLimit } from "@/lib/dm/limits";
 import { effectiveRequestStatus, isRequestExpired } from "@/lib/dm/lifecycle";
+import { resolveAvatarUrls } from "@/lib/storage/resolve-media";
 
 const MAX_MESSAGE_LENGTH = 1000;
 
@@ -43,14 +44,14 @@ export async function GET() {
     });
   }
 
-  const pending = rows
-    .filter((r) => effectiveRequestStatus(r) === "pending")
-    .map((r) => ({
-      id: r.id,
-      openingMessage: r.openingMessage,
-      createdAt: r.createdAt.toISOString(),
-      sender: r.sender,
-    }));
+  const filtered = rows.filter((r) => effectiveRequestStatus(r) === "pending");
+  const avatarUrls = await resolveAvatarUrls(filtered.map((r) => r.sender.avatarUrl));
+  const pending = filtered.map((r, i) => ({
+    id: r.id,
+    openingMessage: r.openingMessage,
+    createdAt: r.createdAt.toISOString(),
+    sender: { ...r.sender, avatarUrl: avatarUrls[i] },
+  }));
 
   return NextResponse.json({ requests: pending });
 }

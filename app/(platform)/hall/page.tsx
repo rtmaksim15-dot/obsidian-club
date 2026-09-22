@@ -14,6 +14,7 @@ import CreatePartnerButton from "@/components/shared/CreatePartnerButton";
 import CopyShareLink from "@/components/shared/CopyShareLink";
 import SignOutButton from "@/components/shared/SignOutButton";
 import { REP_UI_ENABLED, LEVELS_UI_ENABLED, REFERRALS_UI_ENABLED } from "@/lib/config/feature-flags";
+import { resolveAvatarUrl, resolveAvatarUrls, resolvePostMediaUrls } from "@/lib/storage/resolve-media";
 
 /**
  * The Hall (`/hall`) — the "Profile" nav tab. Threads-level-simplicity
@@ -148,6 +149,19 @@ export default async function HallPage() {
   const hasOutstandingMemberInvite = memberInviteTokens.some((t) => !t.redeemedAt);
   const resolvedPartner = withPartner?.partner ?? withPartner?.partnerOf ?? null;
 
+  // Private storage (task 2, 2026-09-23, see DECISIONS.md).
+  const [ownAvatarUrl, postAvatarUrls] = await Promise.all([
+    resolveAvatarUrl(user.avatarUrl),
+    resolveAvatarUrls(posts.map((p) => p.author.avatarUrl)),
+  ]);
+  const resolvedPosts = await Promise.all(
+    posts.map(async (post, i) => ({
+      ...post,
+      mediaUrls: await resolvePostMediaUrls(post.mediaUrls),
+      author: { ...post.author, avatarUrl: postAvatarUrls[i] },
+    })),
+  );
+
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
       <div className="mx-auto max-w-2xl">
@@ -155,9 +169,9 @@ export default async function HallPage() {
           href={`/profile/${user.username}`}
           className={`avatar h-16 w-16 block ${LEVELS_UI_ENABLED ? `avatar-level-${user.level}` : ""}`}
         >
-          {user.avatarUrl ? (
+          {ownAvatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={user.avatarUrl} alt={user.displayName} className="h-full w-full object-cover" />
+            <img src={ownAvatarUrl} alt={user.displayName} className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full w-full items-center justify-center bg-ob-surface text-xl">
               {user.displayName.charAt(0).toUpperCase()}
@@ -365,7 +379,7 @@ export default async function HallPage() {
         {/* Own posts */}
         <section className="mt-10">
           <p className="text-label mb-3">Your Posts</p>
-          <PostList posts={posts as FeedPost[]} compact viewerId={user.id} viewerIsAdmin={user.isAdmin} />
+          <PostList posts={resolvedPosts as FeedPost[]} compact viewerId={user.id} viewerIsAdmin={user.isAdmin} />
         </section>
 
         {/* Desktop now gets Sign Out from DesktopNav (app/(platform)/layout.tsx,

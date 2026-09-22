@@ -7,6 +7,7 @@ import { needsDmRulesAcceptance } from "@/lib/legal/dm-rules";
 import { effectiveRequestStatus, isRequestExpired } from "@/lib/dm/lifecycle";
 import MessagesInbox from "@/components/shared/MessagesInbox";
 import DmRulesGate from "@/components/shared/DmRulesGate";
+import { resolveAvatarUrl } from "@/lib/storage/resolve-media";
 
 // /messages (2026-09-14, see DECISIONS.md) — item 2: requests arrive
 // here, not in a separate spam folder, alongside already-accepted
@@ -75,33 +76,38 @@ export default async function MessagesPage() {
     await prisma.conversationRequest.updateMany({ where: { id: { in: expiredIds } }, data: { status: "expired" } });
   }
 
-  const requests = requestRows
-    .filter((r) => effectiveRequestStatus(r) === "pending")
-    .map((r) => ({
-      id: r.id,
-      openingMessage: r.openingMessage,
-      createdAt: r.createdAt.toISOString(),
-      sender: r.sender,
-    }));
+  // Private storage (task 2, 2026-09-23, see DECISIONS.md).
+  const requests = await Promise.all(
+    requestRows
+      .filter((r) => effectiveRequestStatus(r) === "pending")
+      .map(async (r) => ({
+        id: r.id,
+        openingMessage: r.openingMessage,
+        createdAt: r.createdAt.toISOString(),
+        sender: { ...r.sender, avatarUrl: await resolveAvatarUrl(r.sender.avatarUrl) },
+      })),
+  );
 
-  const threads = participations
-    .map(({ thread }) => {
-      const other = thread.participantAId === user.id ? thread.participantB : thread.participantA;
-      const last = thread.messages[0] ?? null;
-      return {
-        id: thread.id,
-        otherParticipant: other,
-        lastMessage: last
-          ? {
-              content: last.isDeleted ? "" : last.content,
-              isDeleted: last.isDeleted,
-              createdAt: last.createdAt.toISOString(),
-              fromMe: last.senderId === user.id,
-            }
-          : null,
-      };
-    })
-    .sort((a, b) => (b.lastMessage?.createdAt ?? "").localeCompare(a.lastMessage?.createdAt ?? ""));
+  const threads = (
+    await Promise.all(
+      participations.map(async ({ thread }) => {
+        const other = thread.participantAId === user.id ? thread.participantB : thread.participantA;
+        const last = thread.messages[0] ?? null;
+        return {
+          id: thread.id,
+          otherParticipant: { ...other, avatarUrl: await resolveAvatarUrl(other.avatarUrl) },
+          lastMessage: last
+            ? {
+                content: last.isDeleted ? "" : last.content,
+                isDeleted: last.isDeleted,
+                createdAt: last.createdAt.toISOString(),
+                fromMe: last.senderId === user.id,
+              }
+            : null,
+        };
+      }),
+    )
+  ).sort((a, b) => (b.lastMessage?.createdAt ?? "").localeCompare(a.lastMessage?.createdAt ?? ""));
 
   return <MessagesInbox initialRequests={requests} initialThreads={threads} />;
 }

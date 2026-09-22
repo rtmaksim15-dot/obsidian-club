@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
+import { resolveAvatarUrl } from "@/lib/storage/resolve-media";
 
 // GET /api/dm/threads — the current user's active conversations (an
 // active ThreadParticipant row, leftAt null), newest-activity first,
@@ -33,23 +34,26 @@ export async function GET() {
     },
   });
 
-  const threads = participations
-    .map(({ thread }) => {
-      const other = thread.participantAId === user.id ? thread.participantB : thread.participantA;
-      const last = thread.messages[0] ?? null;
-      return {
-        id: thread.id,
-        otherParticipant: other,
-        lastMessage: last
-          ? {
-              content: last.isDeleted ? "" : last.content,
-              isDeleted: last.isDeleted,
-              createdAt: last.createdAt.toISOString(),
-              fromMe: last.senderId === user.id,
-            }
-          : null,
-      };
-    })
+  const threads = (
+    await Promise.all(
+      participations.map(async ({ thread }) => {
+        const other = thread.participantAId === user.id ? thread.participantB : thread.participantA;
+        const last = thread.messages[0] ?? null;
+        return {
+          id: thread.id,
+          otherParticipant: { ...other, avatarUrl: await resolveAvatarUrl(other.avatarUrl) },
+          lastMessage: last
+            ? {
+                content: last.isDeleted ? "" : last.content,
+                isDeleted: last.isDeleted,
+                createdAt: last.createdAt.toISOString(),
+                fromMe: last.senderId === user.id,
+              }
+            : null,
+        };
+      }),
+    )
+  )
     .sort((a, b) => {
       const at = a.lastMessage?.createdAt ?? "";
       const bt = b.lastMessage?.createdAt ?? "";

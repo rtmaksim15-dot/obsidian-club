@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
+import { resolveAvatarUrl, resolvePostMediaUrls } from "@/lib/storage/resolve-media";
 
 const postSelect = {
   id: true,
@@ -33,7 +34,11 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     return NextResponse.json({ error: "This content isn't open to you yet." }, { status: 403 });
   }
 
-  return NextResponse.json({ post });
+  const [mediaUrls, avatarUrl] = await Promise.all([
+    resolvePostMediaUrls(post.mediaUrls),
+    resolveAvatarUrl(post.author.avatarUrl),
+  ]);
+  return NextResponse.json({ post: { ...post, mediaUrls, author: { ...post.author, avatarUrl } } });
 }
 
 type Body = { title?: string; content?: string };
@@ -84,7 +89,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     select: postSelect,
   });
 
-  return NextResponse.json({ post: updated });
+  const [mediaUrls, avatarUrl] = await Promise.all([
+    resolvePostMediaUrls(updated.mediaUrls),
+    resolveAvatarUrl(updated.author.avatarUrl),
+  ]);
+  return NextResponse.json({ post: { ...updated, mediaUrls, author: { ...updated.author, avatarUrl } } });
 }
 
 // DELETE /api/posts/:id — author or admin.

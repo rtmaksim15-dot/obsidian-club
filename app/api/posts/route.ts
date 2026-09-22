@@ -9,6 +9,7 @@ import { track } from "@/lib/analytics/track";
 import { detectImageSignature } from "@/lib/utils/validateImageBytes";
 import { stripExifIfPresent } from "@/lib/utils/stripExif";
 import { createAdminClient } from "@/lib/auth/supabase-admin";
+import { resolveAvatarUrl, resolveAvatarUrls, resolvePostMediaUrls } from "@/lib/storage/resolve-media";
 
 const PAGE_SIZE = 20;
 const VALID_TYPES: PostType[] = ["post", "story", "article", "lecture", "manifesto", "course"];
@@ -62,7 +63,16 @@ export async function GET(request: Request) {
     select: postSelect(user.id),
   });
 
-  return NextResponse.json({ posts });
+  const avatarUrls = await resolveAvatarUrls(posts.map((p) => p.author.avatarUrl));
+  const resolved = await Promise.all(
+    posts.map(async (post, i) => ({
+      ...post,
+      mediaUrls: await resolvePostMediaUrls(post.mediaUrls),
+      author: { ...post.author, avatarUrl: avatarUrls[i] },
+    })),
+  );
+
+  return NextResponse.json({ posts: resolved });
 }
 
 type Body = {
@@ -140,6 +150,7 @@ export async function POST(request: Request) {
   }
 
   const photoUrl = body.photoUrl?.trim();
+  let photoPath: string | undefined;
   // Member protection mechanics (pre-launch legal package, 2026-08-09):
   // a photo can't be published without the "all depicted are adults
   // who consented to this publication" checkbox — enforced here, not
@@ -156,6 +167,14 @@ export async function POST(request: Request) {
     if (!photoUrl.startsWith(bucketPrefix)) {
       return NextResponse.json({ error: "Invalid photo." }, { status: 422 });
     }
+    // Private storage (task 2, 2026-09-23, see DECISIONS.md) — the
+    // client still sends back this "public"-shaped URL (getPublicUrl()
+    // returns the same deterministic string regardless of the bucket's
+    // actual public/private setting, so validating/parsing it needed no
+    // change), but only the bare path is ever stored from here on;
+    // mediaUrls is resolved into a fresh signed URL on every read
+    // (lib/storage/resolve-media.ts), never a stored permanent one.
+    photoPath = photoUrl.slice(bucketPrefix.length);
 
     // app/api/posts/photo/route.ts hands the browser a signed upload
     // URL and never sees the file's actual bytes (deliberately, to stay
@@ -176,7 +195,7 @@ export async function POST(request: Request) {
     // segments, so the full object (bounded at 8MB by the bucket's own
     // fileSizeLimit) is fetched once here regardless.
     try {
-      const path = photoUrl.slice(bucketPrefix.length);
+      const path = photoPath;
       const admin = createAdminClient();
       // Reads via the service-role client's own download(), not a plain
       // fetch(photoUrl) against the public endpoint (changed while
@@ -217,7 +236,7 @@ export async function POST(request: Request) {
         content,
         minLevel,
         houseId,
-        mediaUrls: photoUrl ? [photoUrl] : [],
+        mediaUrls: photoPath ? [photoPath] : [],
         isPublished: true,
         publishedAt: new Date(),
         imageConsentAt: photoUrl ? new Date() : null,
@@ -246,7 +265,12 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({ post }, { status: 201 });
+    const resolvedPost = {
+      ...post,
+      mediaUrls: await resolvePostMediaUrls(post.mediaUrls),
+      author: { ...post.author, avatarUrl: await resolveAvatarUrl(post.author.avatarUrl) },
+    };
+    return NextResponse.json({ post: resolvedPost }, { status: 201 });
   } catch (err) {
     console.error("[posts] Failed to create post:", err);
     return NextResponse.json({ error: "Could not publish. Try again shortly." }, { status: 503 });

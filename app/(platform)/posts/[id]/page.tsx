@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import PostCard from "@/components/shared/PostCard";
 import CommentSection from "@/components/shared/CommentSection";
+import { resolveAvatarUrl, resolveAvatarUrls, resolvePostMediaUrls } from "@/lib/storage/resolve-media";
 
 // Post detail (`/posts/[id]`) — Feed & Posts MVP, 2026-07-16. Same
 // gating as the feed itself (isPublished + minLevel); a post outside the
@@ -45,13 +46,24 @@ export default async function PostDetailPage({ params }: { params: { id: string 
       author: { select: { id: true, username: true, displayName: true, avatarUrl: true, level: true } },
     },
   });
-  const comments = rawComments.map((c) => (c.isDeleted ? { ...c, content: "" } : c));
+
+  // Private storage (task 2, 2026-09-23, see DECISIONS.md).
+  const [postMediaUrls, postAvatarUrl, commentAvatarUrls] = await Promise.all([
+    resolvePostMediaUrls(post.mediaUrls),
+    resolveAvatarUrl(post.author.avatarUrl),
+    resolveAvatarUrls(rawComments.map((c) => c.author.avatarUrl)),
+  ]);
+  const resolvedPost = { ...post, mediaUrls: postMediaUrls, author: { ...post.author, avatarUrl: postAvatarUrl } };
+  const comments = rawComments.map((c, i) => ({
+    ...(c.isDeleted ? { ...c, content: "" } : c),
+    author: { ...c.author, avatarUrl: commentAvatarUrls[i] },
+  }));
 
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
       <div className="mx-auto max-w-2xl">
         <PostCard
-          post={post}
+          post={resolvedPost}
           linkComments={false}
           viewerId={user.id}
           viewerIsAdmin={user.isAdmin}

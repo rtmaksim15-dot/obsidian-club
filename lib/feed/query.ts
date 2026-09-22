@@ -1,6 +1,7 @@
 import "server-only";
 import type { PostType, User } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
+import { resolveAvatarUrls, resolvePostMediaUrls } from "@/lib/storage/resolve-media";
 
 export const FEED_TYPES: PostType[] = ["post", "story"];
 export const FEED_PAGE_SIZE = 20;
@@ -54,5 +55,18 @@ export async function getFeedPosts(user: User, { skip = 0 }: { skip?: number } =
     prisma.post.count({ where }),
   ]);
 
-  return { posts, hasMore: skip + posts.length < total };
+  // Private storage (task 2, 2026-09-23, see DECISIONS.md) — resolved
+  // here, once, for both of this function's callers (the SSR feed page
+  // and the load-more API route), batched across the whole page rather
+  // than one signed-URL mint per post.
+  const avatarUrls = await resolveAvatarUrls(posts.map((p) => p.author.avatarUrl));
+  const resolvedPosts = await Promise.all(
+    posts.map(async (post, i) => ({
+      ...post,
+      mediaUrls: await resolvePostMediaUrls(post.mediaUrls),
+      author: { ...post.author, avatarUrl: avatarUrls[i] },
+    })),
+  );
+
+  return { posts: resolvedPosts, hasMore: skip + posts.length < total };
 }

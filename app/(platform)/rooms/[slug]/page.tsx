@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { canAccessRoom } from "@/lib/rating/room-access";
 import RoomChat from "@/components/shared/RoomChat";
+import { resolveAvatarUrls } from "@/lib/storage/resolve-media";
 
 export default async function RoomPage({ params }: { params: { slug: string } }) {
   const user = await getCurrentUser();
@@ -40,7 +41,9 @@ export default async function RoomPage({ params }: { params: { slug: string } })
       user: { select: { id: true, username: true, displayName: true, avatarUrl: true, level: true } },
     },
   });
-  const messages = rawMessages.map((m) => (m.isDeleted ? { ...m, content: "" } : m));
+  const redacted = rawMessages.map((m) => (m.isDeleted ? { ...m, content: "" } : m));
+  const avatarUrls = await resolveAvatarUrls(redacted.map((m) => m.user.avatarUrl));
+  const messages = redacted.map((m, i) => ({ ...m, user: { ...m.user, avatarUrl: avatarUrls[i] } }));
 
   return (
     <RoomChat

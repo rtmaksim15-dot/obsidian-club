@@ -7,6 +7,7 @@ import PostList from "@/components/shared/PostList";
 import JoinHouseButton from "@/components/shared/JoinHouseButton";
 import { track } from "@/lib/analytics/track";
 import { HOUSES_UI_ENABLED } from "@/lib/config/feature-flags";
+import { resolveAvatarUrls, resolvePostMediaUrls } from "@/lib/storage/resolve-media";
 
 /**
  * House detail (`/houses/[slug]`) — the house's own room (community) and
@@ -60,6 +61,16 @@ export default async function HouseDetailPage({ params }: { params: { slug: stri
 
   const roomLocked = room ? !(await canAccessRoom(user, room)) : false;
 
+  // Private storage (task 2, 2026-09-23, see DECISIONS.md).
+  const avatarUrls = await resolveAvatarUrls(posts.map((p) => p.author.avatarUrl));
+  const resolvedPosts = await Promise.all(
+    posts.map(async (post, i) => ({
+      ...post,
+      mediaUrls: await resolvePostMediaUrls(post.mediaUrls),
+      author: { ...post.author, avatarUrl: avatarUrls[i] },
+    })),
+  );
+
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
       <div className="mx-auto max-w-2xl">
@@ -101,7 +112,7 @@ export default async function HouseDetailPage({ params }: { params: { slug: stri
 
         <section className="mt-10">
           <p className="text-label mb-3">Content</p>
-          <PostList posts={posts} viewerId={user.id} viewerIsAdmin={user.isAdmin} />
+          <PostList posts={resolvedPosts} viewerId={user.id} viewerIsAdmin={user.isAdmin} />
         </section>
       </div>
     </main>

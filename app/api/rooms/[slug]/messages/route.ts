@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import { canAccessRoom } from "@/lib/rating/room-access";
+import { resolveAvatarUrl, resolveAvatarUrls } from "@/lib/storage/resolve-media";
 
 const PAGE_SIZE = 50;
 
@@ -49,8 +50,10 @@ export async function GET(_request: Request, { params }: { params: { slug: strin
   });
 
   const redacted = messages.map((m) => (m.isDeleted ? { ...m, content: "", mediaUrl: null } : m));
+  const avatarUrls = await resolveAvatarUrls(redacted.map((m) => m.user.avatarUrl));
+  const resolved = redacted.map((m, i) => ({ ...m, user: { ...m.user, avatarUrl: avatarUrls[i] } }));
 
-  return NextResponse.json({ messages: redacted.reverse() });
+  return NextResponse.json({ messages: resolved.reverse() });
 }
 
 type Body = { content?: string; replyToId?: string };
@@ -95,7 +98,8 @@ export async function POST(request: Request, { params }: { params: { slug: strin
       },
       select: messageSelect,
     });
-    return NextResponse.json({ message }, { status: 201 });
+    const resolvedMessage = { ...message, user: { ...message.user, avatarUrl: await resolveAvatarUrl(message.user.avatarUrl) } };
+    return NextResponse.json({ message: resolvedMessage }, { status: 201 });
   } catch (err) {
     console.error("[rooms/messages] Failed to create message:", err);
     return NextResponse.json({ error: "Could not send. Try again shortly." }, { status: 503 });

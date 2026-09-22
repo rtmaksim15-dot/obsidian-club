@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import { track } from "@/lib/analytics/track";
+import { resolveAvatarUrl, resolveAvatarUrls } from "@/lib/storage/resolve-media";
 
 const commentSelect = {
   id: true,
@@ -40,8 +41,10 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   });
 
   const redacted = comments.map((c) => (c.isDeleted ? { ...c, content: "" } : c));
+  const avatarUrls = await resolveAvatarUrls(redacted.map((c) => c.author.avatarUrl));
+  const resolved = redacted.map((c, i) => ({ ...c, author: { ...c.author, avatarUrl: avatarUrls[i] } }));
 
-  return NextResponse.json({ comments: redacted });
+  return NextResponse.json({ comments: resolved });
 }
 
 type Body = { content?: string };
@@ -88,5 +91,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
     meta: { parentId: post.id },
   });
 
-  return NextResponse.json({ comment }, { status: 201 });
+  const resolvedComment = { ...comment, author: { ...comment.author, avatarUrl: await resolveAvatarUrl(comment.author.avatarUrl) } };
+  return NextResponse.json({ comment: resolvedComment }, { status: 201 });
 }

@@ -9,6 +9,7 @@ import MessageButton from "@/components/shared/MessageButton";
 import { isBlockedEitherWay } from "@/lib/moderation/block";
 import { isRitualComplete } from "@/lib/auth/ritual";
 import { getMessageButtonState } from "@/lib/dm/relationship";
+import { resolveAvatarUrl, resolveAvatarUrls, resolvePostMediaUrls } from "@/lib/storage/resolve-media";
 import { LEVEL_NAMES } from "@/lib/rating/levels";
 import { REP_UI_ENABLED, HOUSES_UI_ENABLED, LEVELS_UI_ENABLED } from "@/lib/config/feature-flags";
 
@@ -138,13 +139,26 @@ export default async function ProfilePage({ params }: { params: { username: stri
     ? new Date(user.joinedAt).toLocaleDateString("en-US", { timeZone: "UTC" })
     : null;
 
+  // Private storage (task 2, 2026-09-23, see DECISIONS.md).
+  const [profileAvatarUrl, postAvatarUrls] = await Promise.all([
+    resolveAvatarUrl(user.avatarUrl),
+    resolveAvatarUrls(posts.map((p) => p.author.avatarUrl)),
+  ]);
+  const resolvedPosts = await Promise.all(
+    posts.map(async (post, i) => ({
+      ...post,
+      mediaUrls: await resolvePostMediaUrls(post.mediaUrls),
+      author: { ...post.author, avatarUrl: postAvatarUrls[i] },
+    })),
+  );
+
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
       <div className="mx-auto max-w-2xl">
         <div className={`avatar h-24 w-24 ${LEVELS_UI_ENABLED ? `avatar-level-${user.level}` : ""}`}>
-          {user.avatarUrl ? (
+          {profileAvatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={user.avatarUrl} alt={user.displayName} className="h-full w-full object-cover" />
+            <img src={profileAvatarUrl} alt={user.displayName} className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full w-full items-center justify-center bg-ob-surface text-2xl">
               {user.displayName.charAt(0).toUpperCase()}
@@ -336,7 +350,7 @@ export default async function ProfilePage({ params }: { params: { username: stri
             </p>
           ) : (
             <div className="space-y-6">
-              {posts.map((post) => (
+              {resolvedPosts.map((post) => (
                 <PostCard
                   key={post.id}
                   post={post as FeedPost}

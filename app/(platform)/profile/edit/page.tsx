@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import ProfileEditForm from "@/components/shared/ProfileEditForm";
 import CloseAccountButton from "@/components/shared/CloseAccountButton";
+import { resolveAvatarUrl } from "@/lib/storage/resolve-media";
 
 // Self-edit only — no [id]/[username] param at all, since this can only
 // ever be the caller's own profile. The API route re-derives the user
@@ -9,6 +10,9 @@ import CloseAccountButton from "@/components/shared/CloseAccountButton";
 export default async function ProfileEditPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/profile/edit");
+
+  // Private storage (task 2, 2026-09-23, see DECISIONS.md).
+  const avatarUrl = await resolveAvatarUrl(user.avatarUrl);
 
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
@@ -20,7 +24,7 @@ export default async function ProfileEditPage() {
             displayName: user.displayName,
             username: user.username,
             bio: user.bio ?? "",
-            avatarUrl: user.avatarUrl,
+            avatarUrl,
             locationCity: user.locationCity ?? "",
             role: user.role,
             interests: user.interests,

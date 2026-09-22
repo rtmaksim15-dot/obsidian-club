@@ -9,6 +9,7 @@ import { needsDmRulesAcceptance } from "@/lib/legal/dm-rules";
 import DmThreadChat from "@/components/shared/DmThreadChat";
 import LeaveThreadButton from "@/components/shared/LeaveThreadButton";
 import ContentMenu from "@/components/shared/ContentMenu";
+import { resolveAvatarUrl, resolveAvatarUrls } from "@/lib/storage/resolve-media";
 
 // /messages/:threadId (2026-09-14, see DECISIONS.md). Same 404-for-
 // everything shape as the API routes: doesn't exist, isn't yours, or
@@ -72,12 +73,17 @@ export default async function ThreadPage({ params }: { params: { threadId: strin
       sender: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
     },
   });
-  const initialMessages = messages.map((m) => ({
+  // Private storage (task 2, 2026-09-23, see DECISIONS.md).
+  const [otherAvatarUrl, messageAvatarUrls] = await Promise.all([
+    resolveAvatarUrl(other.avatarUrl),
+    resolveAvatarUrls(messages.map((m) => m.sender.avatarUrl)),
+  ]);
+  const initialMessages = messages.map((m, i) => ({
     id: m.id,
     content: m.isDeleted ? "" : m.content,
     isDeleted: m.isDeleted,
     createdAt: m.createdAt.toISOString(),
-    sender: m.sender,
+    sender: { ...m.sender, avatarUrl: messageAvatarUrls[i] },
   }));
 
   return (
@@ -98,9 +104,9 @@ export default async function ThreadPage({ params }: { params: { threadId: strin
           </a>
           <a href={`/profile/${other.username}`} className="flex min-w-0 items-center gap-3">
             <div className="avatar h-9 w-9 shrink-0">
-              {other.avatarUrl ? (
+              {otherAvatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={other.avatarUrl} alt={other.displayName} className="h-full w-full object-cover" />
+                <img src={otherAvatarUrl} alt={other.displayName} className="h-full w-full object-cover" />
               ) : (
                 <div className="flex h-full w-full items-center justify-center bg-ob-surface text-sm">
                   {other.displayName.charAt(0).toUpperCase()}
