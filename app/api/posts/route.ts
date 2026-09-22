@@ -178,10 +178,16 @@ export async function POST(request: Request) {
     try {
       const path = photoUrl.slice(bucketPrefix.length);
       const admin = createAdminClient();
-      const check = await fetch(photoUrl);
-      const rawBytes = Buffer.from(await check.arrayBuffer());
-      const realType = check.ok ? detectImageSignature(rawBytes) : null;
-      if (!realType) {
+      // Reads via the service-role client's own download(), not a plain
+      // fetch(photoUrl) against the public endpoint (changed while
+      // scoping task 2, 2026-09-22, see DECISIONS.md) — a same-project
+      // server-to-Storage read has no reason to round-trip through the
+      // public CDN edge, and unlike a plain fetch, this keeps working
+      // completely unchanged if the bucket is ever switched to private.
+      const { data: downloaded, error: downloadError } = await admin.storage.from("post-photos").download(path);
+      const rawBytes = downloaded ? Buffer.from(await downloaded.arrayBuffer()) : null;
+      const realType = !downloadError && rawBytes ? detectImageSignature(rawBytes) : null;
+      if (!realType || !rawBytes) {
         await admin.storage.from("post-photos").remove([path]).catch(() => {});
         return NextResponse.json({ error: "This photo doesn't look like a valid image." }, { status: 422 });
       }
