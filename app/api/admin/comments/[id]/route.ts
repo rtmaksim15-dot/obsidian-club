@@ -38,3 +38,39 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
 
   return NextResponse.json({ ok: true });
 }
+
+// PATCH /api/admin/comments/:id — admin-only restore (task 1,
+// 2026-09-22, see DECISIONS.md). Mirrors the DELETE handler above:
+// clears isDeleted and the deletedAt/deletedById pair (a restored
+// comment shouldn't still carry "who removed it" once it's back), logs
+// its own ModerationAction — the removal's own log row is untouched,
+// so the full remove-then-restore history stays readable.
+export async function PATCH(_request: Request, { params }: { params: { id: string } }) {
+  const admin = await requireAdmin();
+  if (!admin) {
+    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  }
+
+  const comment = await prisma.comment.findUnique({ where: { id: params.id } });
+  if (!comment) {
+    return NextResponse.json({ error: "Comment not found." }, { status: 404 });
+  }
+  if (!comment.isDeleted) {
+    return NextResponse.json({ error: "This comment isn't removed." }, { status: 409 });
+  }
+
+  await prisma.comment.update({
+    where: { id: comment.id },
+    data: { isDeleted: false, deletedAt: null, deletedById: null },
+  });
+
+  await logModerationAction({
+    adminId: admin.id,
+    action: "comment.restored",
+    targetType: "comment",
+    targetId: comment.id,
+    note: `Restored comment on post ${comment.postId}.`,
+  });
+
+  return NextResponse.json({ ok: true });
+}

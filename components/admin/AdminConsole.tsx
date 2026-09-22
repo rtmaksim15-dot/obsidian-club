@@ -329,11 +329,16 @@ export default function AdminConsole({
     return a.status === "pending" || a.status === "held";
   });
   const visiblePeople = filter === "notAgeVerified" ? people.filter((p) => !p.ageVerified) : people;
-  // Every action on a report is terminal (the route 422s on a
-  // non-"open" report — it can never be re-acted on), so a resolved row
-  // simply drops out of view, same "filter hides it once decided"
-  // pattern Zone 1 uses for its own pending/held default.
-  const visibleReports = reports.filter((r) => r.status === "open");
+  // Every report action is terminal (the route 422s on a non-"open"
+  // report — it can never be re-acted on), so a resolved row normally
+  // drops out of view, same "filter hides it once decided" pattern
+  // Zone 1 uses for its own pending/held default. One exception (task
+  // 1, 2026-09-22, see DECISIONS.md): a resolved report whose target is
+  // still removed stays reachable, since ReportDetail's Restore control
+  // is the only surface that reaches a soft-deleted comment/message —
+  // once restored, r.target.isDeleted flips to false via onUpdate and
+  // the row drops out of view same as any other resolved report.
+  const visibleReports = reports.filter((r) => r.status === "open" || r.target.isDeleted);
 
   const currentList =
     zone === "applications"
@@ -512,6 +517,11 @@ export default function AdminConsole({
                     ) : r.isRedLine ? (
                       <p className="text-caption mt-1 font-semibold" style={{ color: "var(--color-error)" }}>
                         Red line
+                      </p>
+                    ) : null}
+                    {r.status !== "open" && r.target.isDeleted ? (
+                      <p className="text-caption mt-1" style={{ color: "var(--color-warning)" }}>
+                        Removed — restore available
                       </p>
                     ) : null}
                   </li>

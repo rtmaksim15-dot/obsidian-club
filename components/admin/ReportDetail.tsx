@@ -46,6 +46,7 @@ export default function ReportDetail({
   const r = report;
   const canPreserve = r.targetType === "post" && r.isRedLine;
   const canRemove = r.targetType === "comment" || r.targetType === "message";
+  const canRestore = canRemove && r.target.isDeleted;
 
   // Direct Messages (2026-09-14, see DECISIONS.md) — the only place in
   // the admin console a message's actual text ever appears. Fetched on
@@ -65,6 +66,31 @@ export default function ReportDetail({
       setDmError(e instanceof Error ? e.message : "Could not load.");
     } finally {
       setDmLoading(false);
+    }
+  }
+
+  // Restore (task 1, 2026-09-22, see DECISIONS.md) — a content-state
+  // action, not a report action: it doesn't touch the report's own
+  // status (already resolved by the time this is reachable — see
+  // AdminConsole.tsx#visibleReports), so it goes straight to the
+  // standalone admin comment/message routes rather than through
+  // PATCH /api/admin/reports/:id. Doesn't close the panel: the admin
+  // stays here to see the "Already removed" note flip away, same as
+  // any other detail field updating in place.
+  async function restore() {
+    if (!window.confirm("Restore this content? It will be visible to members again.")) return;
+    setPending(true);
+    setError(null);
+    try {
+      const path = r.targetType === "comment" ? `/api/admin/comments/${r.targetId}` : `/api/admin/messages/${r.targetId}`;
+      const res = await fetch(path, { method: "PATCH" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || "Something went wrong.");
+      onUpdate(r.id, { target: { ...r.target, isDeleted: false } });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong.");
+    } finally {
+      setPending(false);
     }
   }
 
@@ -194,20 +220,28 @@ export default function ReportDetail({
       </div>
 
       <div className="mt-6 flex flex-wrap gap-2 border-t border-ob-border pt-4">
-        <button type="button" className="btn-secondary" disabled={pending} onClick={() => act("dismiss")}>
-          Dismiss
-        </button>
-        <button type="button" className="btn-secondary" disabled={pending} onClick={() => act("review")}>
-          Mark Reviewed
-        </button>
-        {canRemove ? (
-          <button type="button" className="btn-secondary" disabled={pending} onClick={() => act("remove")}>
-            Remove Content
-          </button>
-        ) : null}
-        {canPreserve ? (
-          <button type="button" className="btn-primary" disabled={pending} onClick={() => act("preserve")}>
-            Preserve &amp; Unpublish
+        {r.status === "open" ? (
+          <>
+            <button type="button" className="btn-secondary" disabled={pending} onClick={() => act("dismiss")}>
+              Dismiss
+            </button>
+            <button type="button" className="btn-secondary" disabled={pending} onClick={() => act("review")}>
+              Mark Reviewed
+            </button>
+            {canRemove ? (
+              <button type="button" className="btn-secondary" disabled={pending} onClick={() => act("remove")}>
+                Remove Content
+              </button>
+            ) : null}
+            {canPreserve ? (
+              <button type="button" className="btn-primary" disabled={pending} onClick={() => act("preserve")}>
+                Preserve &amp; Unpublish
+              </button>
+            ) : null}
+          </>
+        ) : canRestore ? (
+          <button type="button" className="btn-primary" disabled={pending} onClick={restore}>
+            Restore
           </button>
         ) : null}
       </div>

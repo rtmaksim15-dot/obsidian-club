@@ -40,3 +40,38 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
 
   return NextResponse.json({ ok: true });
 }
+
+// PATCH /api/admin/messages/:id — admin-only restore (task 1,
+// 2026-09-22, see DECISIONS.md). Same shape as comments' own restore:
+// clears isDeleted and deletedAt/deletedById, logs its own
+// ModerationAction. Same Realtime caveat as the DELETE handler above —
+// a restore also won't push live, members see it on next fetch.
+export async function PATCH(_request: Request, { params }: { params: { id: string } }) {
+  const admin = await requireAdmin();
+  if (!admin) {
+    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  }
+
+  const message = await prisma.message.findUnique({ where: { id: params.id } });
+  if (!message) {
+    return NextResponse.json({ error: "Message not found." }, { status: 404 });
+  }
+  if (!message.isDeleted) {
+    return NextResponse.json({ error: "This message isn't removed." }, { status: 409 });
+  }
+
+  await prisma.message.update({
+    where: { id: message.id },
+    data: { isDeleted: false, deletedAt: null, deletedById: null },
+  });
+
+  await logModerationAction({
+    adminId: admin.id,
+    action: "message.restored",
+    targetType: "message",
+    targetId: message.id,
+    note: `Restored message in room ${message.roomId}.`,
+  });
+
+  return NextResponse.json({ ok: true });
+}
