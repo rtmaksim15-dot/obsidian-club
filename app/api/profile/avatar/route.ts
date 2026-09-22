@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import { createAdminClient } from "@/lib/auth/supabase-admin";
-import { isValidImageSignature } from "@/lib/utils/validateImageBytes";
+import { detectImageSignature } from "@/lib/utils/validateImageBytes";
+import { stripExifIfPresent } from "@/lib/utils/stripExif";
 
 // User Profiles task (2026-07-17): replaces the old UploadThing avatar
 // flow (never actually verifiable — UPLOADTHING_SECRET/APP_ID were
@@ -49,10 +50,19 @@ export async function POST(request: Request) {
   // the actual bytes. Check the real file signature before this reaches
   // Storage, so an SVG/HTML payload declared as "image/jpeg" can't get
   // through. See lib/utils/validateImageBytes.ts.
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  if (!isValidImageSignature(bytes)) {
+  const rawBytes = Buffer.from(await file.arrayBuffer());
+  const realType = detectImageSignature(rawBytes);
+  if (!realType) {
     return NextResponse.json({ error: "This file doesn't look like a valid image." }, { status: 422 });
   }
+
+  // Explicit, server-side EXIF/GPS removal (task 3, 2026-09-22, see
+  // DECISIONS.md) — stripped against the byte-sniffed real type, not
+  // the client-declared `file.type`, and unconditionally, so a caller
+  // that skips the client-side compressImage() step entirely still
+  // can't get raw EXIF (including GPS) into Storage. See
+  // lib/utils/stripExif.ts for exactly what is and isn't covered.
+  const bytes = stripExifIfPresent(rawBytes, realType);
 
   const admin = createAdminClient();
   await ensureBucket(admin);

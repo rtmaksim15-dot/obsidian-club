@@ -6,7 +6,8 @@ import { canCreatePostType } from "@/lib/rating/content-rights";
 import { grantAchievement } from "@/lib/utils/achievements";
 import { awardRep, awardRepWithDailyCap, REP_TABLE } from "@/lib/rating/rep-engine";
 import { track } from "@/lib/analytics/track";
-import { isValidImageSignature } from "@/lib/utils/validateImageBytes";
+import { detectImageSignature } from "@/lib/utils/validateImageBytes";
+import { stripExifIfPresent } from "@/lib/utils/stripExif";
 import { createAdminClient } from "@/lib/auth/supabase-admin";
 
 const PAGE_SIZE = 20;
@@ -162,18 +163,41 @@ export async function POST(request: Request) {
     // the declared Content-Type at upload time is unverified client
     // input just like `file.type` elsewhere. Verify the real bytes here
     // instead, the first point where the server can reach the uploaded
-    // object directly: a short ranged read is enough to check the
-    // signature without downloading the whole image.
+    // object directly.
+    //
+    // Full download, not a ranged read (changed from the original
+    // signature-only check, task 3, 2026-09-22, see DECISIONS.md): this
+    // is also the point where EXIF/GPS is explicitly, unconditionally
+    // stripped server-side — a caller that skips the client's
+    // compressImage() step entirely (the only place this previously
+    // happened, as a re-encode side effect) still can't get raw EXIF
+    // into a published post. A 16-byte range read was enough for a
+    // signature check but not to inspect or rewrite the file's actual
+    // segments, so the full object (bounded at 8MB by the bucket's own
+    // fileSizeLimit) is fetched once here regardless.
     try {
-      const check = await fetch(photoUrl, { headers: { Range: "bytes=0-15" } });
-      const bytes = new Uint8Array(await check.arrayBuffer());
-      if (!check.ok || !isValidImageSignature(bytes)) {
-        const path = photoUrl.slice(bucketPrefix.length);
-        await createAdminClient().storage.from("post-photos").remove([path]).catch(() => {});
+      const path = photoUrl.slice(bucketPrefix.length);
+      const admin = createAdminClient();
+      const check = await fetch(photoUrl);
+      const rawBytes = Buffer.from(await check.arrayBuffer());
+      const realType = check.ok ? detectImageSignature(rawBytes) : null;
+      if (!realType) {
+        await admin.storage.from("post-photos").remove([path]).catch(() => {});
         return NextResponse.json({ error: "This photo doesn't look like a valid image." }, { status: 422 });
       }
+
+      const stripped = stripExifIfPresent(rawBytes, realType);
+      if (!stripped.equals(rawBytes)) {
+        const { error: reuploadError } = await admin.storage
+          .from("post-photos")
+          .upload(path, stripped, { contentType: realType, upsert: true });
+        if (reuploadError) {
+          console.error("[posts] Failed to re-upload EXIF-stripped photo:", reuploadError);
+          return NextResponse.json({ error: "Could not process the photo. Try again shortly." }, { status: 503 });
+        }
+      }
     } catch (err) {
-      console.error("[posts] Failed to verify photo bytes:", err);
+      console.error("[posts] Failed to verify/process photo bytes:", err);
       return NextResponse.json({ error: "Could not verify the photo. Try again shortly." }, { status: 503 });
     }
   }

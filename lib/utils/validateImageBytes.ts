@@ -17,8 +17,20 @@ const SIGNATURES: { type: string; bytes: (number | null)[] }[] = [
   { type: "image/webp", bytes: [0x52, 0x49, 0x46, 0x46, null, null, null, null, 0x57, 0x45, 0x42, 0x50] },
 ];
 
-export function isValidImageSignature(bytes: Uint8Array): boolean {
-  return SIGNATURES.some(
+/**
+ * Same signature check as isValidImageSignature, but returns which of
+ * the four allowed types actually matched (task 3, 2026-09-22, see
+ * DECISIONS.md) — the real, byte-sniffed type, not a client-declared
+ * one, so the EXIF stripper below strips against reality regardless of
+ * what Content-Type a caller claimed.
+ */
+export function detectImageSignature(bytes: Uint8Array): string | null {
+  const match = SIGNATURES.find(
     (sig) => bytes.length >= sig.bytes.length && sig.bytes.every((b, i) => b === null || bytes[i] === b),
   );
+  return match?.type ?? null;
+}
+
+export function isValidImageSignature(bytes: Uint8Array): boolean {
+  return detectImageSignature(bytes) !== null;
 }
