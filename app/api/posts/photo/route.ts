@@ -38,11 +38,17 @@ const EXT_BY_TYPE: Record<string, string> = {
   "image/gif": "gif",
 };
 
+// Private storage (task 2, 2026-09-23, see DECISIONS.md) — a freshly
+// created bucket (a different environment, or this one recreated from
+// scratch) starts private, matching production's own bucket after the
+// staged rollout's final flip. Every read goes through a signed URL
+// (lib/storage/resolve-media.ts) regardless of this flag; uploads
+// always use a signed upload URL, unaffected by it either way.
 async function ensureBucket(admin: ReturnType<typeof createAdminClient>) {
   const { data: buckets } = await admin.storage.listBuckets();
   if (buckets?.some((b) => b.name === BUCKET)) return;
   await admin.storage.createBucket(BUCKET, {
-    public: true,
+    public: false,
     fileSizeLimit: MAX_BYTES,
     allowedMimeTypes: Array.from(ALLOWED_TYPES),
   });
