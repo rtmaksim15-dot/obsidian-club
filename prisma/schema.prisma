@@ -54,9 +54,17 @@ enum WaitlistStatus {
 // existing free-text `Waitlist.source` ("how you heard about us") below
 // — reusing that column would conflate two different meanings across
 // old and new rows. See DECISIONS.md.
+//
+// `email_capture` (2026-09-22, see DECISIONS.md): the third entry point
+// — a Waitlist row created lazily, the first time an admin acts
+// (Accept/Hold/Decline) on an EmailCapture row from the landing page's
+// #apply form. That form itself never writes a Waitlist row; this value
+// only appears once an admin has promoted one, so it's always a real
+// admin-initiated action, never a visitor's own submission.
 enum ApplicationOrigin {
   card
   site
+  email_capture
 }
 
 // Invitation Panel flow (2026-08-2x) — preset reasons for the Hold

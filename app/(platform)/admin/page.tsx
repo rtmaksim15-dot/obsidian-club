@@ -268,6 +268,30 @@ export default async function AdminConsolePage() {
   // Zone 2's batch: one query per concern across every listed member,
   // not one query per member — the same shape as the counts block
   // above, just at row-detail scale instead of dashboard-stat scale.
+  // Email captures — Accept/Hold/Decline (2026-09-22, see DECISIONS.md):
+  // a capture's "status" isn't its own column — it's whichever Waitlist
+  // row shares its email, looked up by email since that's the only link
+  // between the two tables (no FK; a capture only gets a Waitlist row
+  // lazily, the first time an admin acts on it — see
+  // /api/admin/email-captures/[id]). A capture with no such row yet
+  // reads as "new" below.
+  const captureEmails = emailCaptures.map((c) => c.email);
+  const linkedWaitlistRows = captureEmails.length
+    ? await prisma.waitlist.findMany({
+        where: { email: { in: captureEmails } },
+        select: {
+          id: true,
+          email: true,
+          status: true,
+          heldReason: true,
+          heldNote: true,
+          decisionEmailSentAt: true,
+          decisionEmailSendError: true,
+        },
+      })
+    : [];
+  const linkedWaitlistByEmail = new Map(linkedWaitlistRows.map((w) => [w.email, w]));
+
   const [postCounts, commentCounts, invitees, repHistoryRows, consentRows, adminActionRows, adminNoteRows] = await Promise.all([
     prisma.post.groupBy({
       by: ["authorId"],
@@ -518,7 +542,20 @@ export default async function AdminConsolePage() {
   return (
     <AdminConsole
       counts={counts}
-      emailCaptures={emailCaptures.map((c) => ({ id: c.id, email: c.email, createdAt: c.createdAt.toISOString() }))}
+      emailCaptures={emailCaptures.map((c) => {
+        const linked = linkedWaitlistByEmail.get(c.email);
+        return {
+          id: c.id,
+          email: c.email,
+          createdAt: c.createdAt.toISOString(),
+          waitlistId: linked?.id ?? null,
+          status: linked?.status ?? "new",
+          heldReason: linked?.heldReason ?? null,
+          heldNote: linked?.heldNote ?? null,
+          decisionEmailSentAt: linked?.decisionEmailSentAt?.toISOString() ?? null,
+          decisionEmailSendError: linked?.decisionEmailSendError ?? null,
+        };
+      })}
       emailCapturesTotal={emailCapturesTotal}
       securityEvents={securityEventRows.map((e) => ({
         id: e.id,
