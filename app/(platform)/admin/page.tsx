@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { prisma } from "@/lib/db/prisma";
 import { TOKEN_SELECT, shapeTokenRow, sortTokensFailedFirst } from "@/lib/admin/token-shape";
+import { isRitualComplete } from "@/lib/auth/ritual";
 import AdminConsole from "@/components/admin/AdminConsole";
 
 // Admin Console (2026-09-09, see DECISIONS.md) — Part B of the
@@ -147,7 +148,15 @@ export default async function AdminConsolePage() {
     await Promise.all([
     prisma.waitlist.findMany({
       where: {
-        OR: [{ status: { in: ["pending", "held"] } }, { decisionEmailSendError: { not: null } }],
+        // Accepted-but-not-joined (2026-09-23, see DECISIONS.md): an
+        // approved row now stays in this fetch too, not just
+        // pending/held/failed-send — otherwise it vanishes from the
+        // whole console the instant its decision email sends
+        // successfully, with nowhere left to see it until someone
+        // actually redeems the invite. Fully-joined approved rows are
+        // filtered back out below, after the registered/age-verified/
+        // onboarding check that can't be expressed in this `where`.
+        OR: [{ status: { in: ["pending", "held"] } }, { decisionEmailSendError: { not: null } }, { status: "approved" }],
       },
       orderBy: { createdAt: "asc" },
       take: 50,
@@ -173,6 +182,7 @@ export default async function AdminConsolePage() {
         applicationTokenId: true,
         decisionEmailSentAt: true,
         decisionEmailSendError: true,
+        applicationToken: { select: { redeemedAt: true, redeemedById: true } },
       },
     }),
     prisma.user.findMany({
@@ -262,6 +272,49 @@ export default async function AdminConsolePage() {
     const rank = (r: (typeof reports)[number]) => (r.category === "underage" ? 0 : r.isRedLine ? 1 : 2);
     return rank(a) - rank(b);
   });
+
+  // Accepted-but-not-joined (2026-09-23, see DECISIONS.md): "joined"
+  // means all three of registered (redeemed the invite → a real User
+  // row exists), age-verified (User.ageVerified — NOT copied from the
+  // Waitlist row's own ageVerified attestation at Accept time; that's a
+  // separate, later step an admin does in the People zone), and
+  // onboarding complete (isRitualComplete(), the same real check the
+  // platform itself gates access on). An approved row missing any of
+  // the three stays visible here instead of disappearing into the void
+  // the moment its decision email sends.
+  const redeemedByIds = applications
+    .map((a) => a.applicationToken?.redeemedById)
+    .filter((id): id is string => Boolean(id));
+  const redeemedUsers = redeemedByIds.length
+    ? await prisma.user.findMany({ where: { id: { in: redeemedByIds } } })
+    : [];
+  const redeemedUserById = new Map(redeemedUsers.map((u) => [u.id, u]));
+  const onboardingCompleteById = new Map(
+    await Promise.all(redeemedUsers.map(async (u) => [u.id, await isRitualComplete(u)] as const)),
+  );
+
+  const applicationsWithJoinStatus = applications.map((a) => {
+    if (a.status !== "approved") {
+      return { ...a, registered: null, memberAgeVerified: null, memberOnboardingComplete: null, fullyJoined: null };
+    }
+    const redeemedById = a.applicationToken?.redeemedById ?? null;
+    const registered = Boolean(a.applicationToken?.redeemedAt);
+    const member = redeemedById ? redeemedUserById.get(redeemedById) : undefined;
+    const memberAgeVerified = member ? member.ageVerified : false;
+    const memberOnboardingComplete = member ? (onboardingCompleteById.get(member.id) ?? false) : false;
+    return {
+      ...a,
+      registered,
+      memberAgeVerified,
+      memberOnboardingComplete,
+      fullyJoined: registered && memberAgeVerified && memberOnboardingComplete,
+    };
+  });
+  // Drop fully-joined approved rows here — they're real, complete
+  // members now (already counted in "Members"/StatusBar), not something
+  // this console needs to keep surfacing under Applications.
+  const applicationsToShow = applicationsWithJoinStatus.filter((a) => a.fullyJoined !== true);
+  const acceptedNotJoinedCount = applicationsToShow.filter((a) => a.status === "approved").length;
 
   const peopleIds = peopleBase.map((p) => p.id);
 
@@ -521,7 +574,7 @@ export default async function AdminConsolePage() {
   const nameLookupIds = Array.from(
     new Set(
       [
-        ...applications.map((a) => a.reviewedBy),
+        ...applicationsToShow.map((a) => a.reviewedBy),
         ...peopleBase.map((p) => p.invitedById),
         ...peopleBase.map((p) => p.partnerId),
         ...adminActionRows.map((m) => m.adminId),
@@ -541,7 +594,7 @@ export default async function AdminConsolePage() {
 
   return (
     <AdminConsole
-      counts={counts}
+      counts={{ ...counts, acceptedNotJoined: acceptedNotJoinedCount }}
       emailCaptures={emailCaptures.map((c) => {
         const linked = linkedWaitlistByEmail.get(c.email);
         return {
@@ -565,7 +618,7 @@ export default async function AdminConsolePage() {
         userAgent: e.userAgent,
         createdAt: e.createdAt.toISOString(),
       }))}
-      applications={applications.map((a) => ({
+      applications={applicationsToShow.map((a) => ({
         id: a.id,
         name: a.name,
         email: a.email,
@@ -587,6 +640,9 @@ export default async function AdminConsolePage() {
         hasToken: Boolean(a.applicationTokenId),
         decisionEmailSentAt: a.decisionEmailSentAt ? a.decisionEmailSentAt.toISOString() : null,
         decisionEmailSendError: a.decisionEmailSendError,
+        registered: a.registered,
+        memberAgeVerified: a.memberAgeVerified,
+        memberOnboardingComplete: a.memberOnboardingComplete,
       }))}
       people={peopleBase.map((p) => ({
         id: p.id,

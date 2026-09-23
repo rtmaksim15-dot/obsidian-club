@@ -3,16 +3,7 @@
 import { useState } from "react";
 import type { Person } from "./AdminConsole";
 import { levelName } from "@/lib/rating/levels";
-
-function formatDate(iso: string | null) {
-  if (!iso) return null;
-  return new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" });
-}
-
-function formatDay(iso: string | null) {
-  if (!iso) return null;
-  return new Date(iso).toLocaleDateString("en-US", { dateStyle: "medium", timeZone: "UTC" });
-}
+import { formatAdminDateTime as formatDate, formatAdminDateOnly as formatDay } from "@/lib/admin/format-date";
 
 // Zone 2 full depth (2026-09-11, see DECISIONS.md). Reuses the existing
 // PATCH /api/admin/members/[id] action route unchanged for the

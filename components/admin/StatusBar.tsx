@@ -9,6 +9,7 @@ export type Counts = {
   openReports: number;
   membersTotal: number;
   notAgeVerified: number;
+  acceptedNotJoined: number;
 };
 
 type Stat = { key: string; label: string; value: number; zone: Zone; filter: Filter; alert?: boolean };
@@ -43,6 +44,13 @@ export default function StatusBar({
       zone: "applications",
       filter: "failedSend",
       alert: true,
+    },
+    {
+      key: "acceptedNotJoined",
+      label: "Accepted, Not Joined",
+      value: counts.acceptedNotJoined,
+      zone: "applications",
+      filter: "acceptedNotJoined",
     },
     { key: "openReports", label: "Open Reports", value: counts.openReports, zone: "arbitration", filter: null },
     { key: "membersTotal", label: "Members", value: counts.membersTotal, zone: "people", filter: null },

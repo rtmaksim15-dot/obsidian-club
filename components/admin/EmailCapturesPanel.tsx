@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { formatAdminDateTime as formatDate } from "@/lib/admin/format-date";
 
 // Item 1 (2026-09-17): read-only, count + newest first, no actions.
 //
@@ -36,10 +37,6 @@ const HOLD_REASONS: { value: string; label: string }[] = [
 
 function holdReasonLabel(value: string | null) {
   return HOLD_REASONS.find((r) => r.value === value)?.label ?? value;
-}
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" });
 }
 
 const STATUS_LABEL: Record<string, string> = {

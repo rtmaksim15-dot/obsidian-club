@@ -2,6 +2,7 @@
 
 import { forwardRef, useImperativeHandle, useState } from "react";
 import type { Application } from "./AdminConsole";
+import { formatAdminDateTime as formatDate } from "@/lib/admin/format-date";
 
 export type ApplicationDetailHandle = {
   approve: () => void;
@@ -18,11 +19,6 @@ const HOLD_REASONS: { value: string; label: string }[] = [
 
 function holdReasonLabel(value: string | null) {
   return HOLD_REASONS.find((r) => r.value === value)?.label ?? value;
-}
-
-function formatDate(iso: string | null) {
-  if (!iso) return null;
-  return new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" });
 }
 
 const CONFIRM_MESSAGE: Record<"approve" | "decline", (name: string) => string> = {
@@ -172,6 +168,17 @@ const ApplicationDetail = forwardRef<ApplicationDetailHandle, {
           </p>
         ) : null}
       </div>
+
+      {a.status === "approved" ? (
+        <div className="mt-6 border-t border-ob-border pt-4">
+          <p className="text-label mb-2">Joining Progress</p>
+          <ul className="space-y-1">
+            <li className="text-caption">{a.registered ? "✓" : "○"} Registered</li>
+            <li className="text-caption">{a.memberAgeVerified ? "✓" : "○"} Age verified</li>
+            <li className="text-caption">{a.memberOnboardingComplete ? "✓" : "○"} Onboarding complete</li>
+          </ul>
+        </div>
+      ) : null}
 
       {(a.status === "approved" || a.decisionEmailSendError) && a.hasToken ? (
         <div className="mt-6 border-t border-ob-border pt-4">

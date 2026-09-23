@@ -11,9 +11,10 @@ import CreatePersonalInvite from "./CreatePersonalInvite";
 import CommandPalette from "./CommandPalette";
 import EmailCapturesPanel, { type EmailCaptureRow } from "./EmailCapturesPanel";
 import { levelName } from "@/lib/rating/levels";
+import { formatAdminDateTime } from "@/lib/admin/format-date";
 
 export type Zone = "applications" | "people" | "arbitration" | "invitations" | "security";
-export type Filter = "pending" | "held" | "failedSend" | "notAgeVerified" | null;
+export type Filter = "pending" | "held" | "failedSend" | "notAgeVerified" | "acceptedNotJoined" | null;
 
 const ZONES: { id: Zone; label: string }[] = [
   { id: "applications", label: "Applications" },
@@ -28,27 +29,22 @@ const FILTER_LABELS: Record<Exclude<Filter, null>, string> = {
   held: "On Hold",
   failedSend: "Failed Sends",
   notAgeVerified: "Not Age-Verified",
+  acceptedNotJoined: "Accepted, Not Joined",
 };
 
 // Security zone (item 4, 2026-09-22, see DECISIONS.md) — the raw
-// AdminAuthEventType enum values, labeled for display. Time shown in
-// America/New_York, same timezone as the two sign-in alert emails these
-// rows correspond to (lib/utils/email.ts) — one clock for the same
-// events, wherever they're read.
+// AdminAuthEventType enum values, labeled for display. Timestamp
+// formatting (2026-09-23, see DECISIONS.md) now goes through the same
+// shared lib/admin/format-date.ts every other admin zone uses — this
+// zone was already America/New_York, unlike the rest (each had its own
+// UTC formatter), which is exactly what made an Accept clicked at
+// 11:08 PM local read back elsewhere as "Sep 23, 3:08 AM."
 const SECURITY_EVENT_LABELS: Record<string, string> = {
   sign_in_success: "Password accepted",
   sign_in_failure: "Password rejected",
   mfa_challenge_success: "Code verified",
   mfa_challenge_failure: "Code rejected",
 };
-
-function formatSecurityEventTime(iso: string): string {
-  return new Date(iso).toLocaleString("en-US", {
-    timeZone: "America/New_York",
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
 
 // Zone 1 full depth (2026-09-10) — everything the review action route
 // (PATCH /api/admin/applications/[id]) reads or writes, plus what the
@@ -79,6 +75,16 @@ export type Application = {
   hasToken: boolean;
   decisionEmailSentAt: string | null;
   decisionEmailSendError: string | null;
+  // Accepted-but-not-joined (2026-09-23, see DECISIONS.md) — only
+  // meaningful once status is "approved"; null otherwise. `registered`
+  // is redeemedAt on the minted InviteToken; `memberAgeVerified`/
+  // `memberOnboardingComplete` read the resulting User row (once one
+  // exists) — distinct from this row's own `ageVerified` above, which
+  // is only the admin's Accept-time attestation and is never copied
+  // onto the member automatically.
+  registered: boolean | null;
+  memberAgeVerified: boolean | null;
+  memberOnboardingComplete: boolean | null;
 };
 // Zone 2 full depth (2026-09-11) — REP/level (+RepHistory), post/
 // comment counts, invited-by/invited-whom/partner, LegalConsent history
@@ -326,6 +332,7 @@ export default function AdminConsole({
     if (filter === "pending") return a.status === "pending";
     if (filter === "held") return a.status === "held";
     if (filter === "failedSend") return a.decisionEmailSendError !== null;
+    if (filter === "acceptedNotJoined") return a.status === "approved";
     return a.status === "pending" || a.status === "held";
   });
   const visiblePeople = filter === "notAgeVerified" ? people.filter((p) => !p.ageVerified) : people;
@@ -481,10 +488,21 @@ export default function AdminConsole({
                     <p className="text-data">{a.name || a.email}</p>
                     <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
                       {a.status}
+                      {a.status === "approved" && a.reviewedAt ? ` · accepted ${formatAdminDateTime(a.reviewedAt)}` : ""}
                     </p>
+                    {a.status === "approved" ? (
+                      <p className="text-caption mt-1" style={{ color: "var(--color-text-secondary)" }}>
+                        {a.registered ? "✓" : "○"} Registered · {a.memberAgeVerified ? "✓" : "○"} Age verified ·{" "}
+                        {a.memberOnboardingComplete ? "✓" : "○"} Onboarding
+                      </p>
+                    ) : null}
                     {a.decisionEmailSendError ? (
                       <p className="text-caption mt-1 font-semibold" style={{ color: "var(--color-error)" }}>
                         Send failed — {a.decisionEmailSendError}
+                      </p>
+                    ) : a.status === "approved" && a.decisionEmailSentAt ? (
+                      <p className="text-caption mt-1" style={{ color: "var(--color-text-secondary)" }}>
+                        Email sent {formatAdminDateTime(a.decisionEmailSentAt)}
                       </p>
                     ) : null}
                   </li>
@@ -532,7 +550,7 @@ export default function AdminConsole({
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-data">{SECURITY_EVENT_LABELS[e.type] ?? e.type}</p>
                       <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
-                        {formatSecurityEventTime(e.createdAt)}
+                        {formatAdminDateTime(e.createdAt)}
                       </p>
                     </div>
                     <p className="text-caption mt-1" style={{ color: "var(--color-text-secondary)" }}>

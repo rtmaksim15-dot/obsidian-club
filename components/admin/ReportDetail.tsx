@@ -3,11 +3,7 @@
 import { useState } from "react";
 import type { ReportRow } from "./AdminConsole";
 import { levelName } from "@/lib/rating/levels";
-
-function formatDate(iso: string | null) {
-  if (!iso) return null;
-  return new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" });
-}
+import { formatAdminDateTime as formatDate } from "@/lib/admin/format-date";
 
 type Action = "dismiss" | "review" | "preserve" | "remove";
 

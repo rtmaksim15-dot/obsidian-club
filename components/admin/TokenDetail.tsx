@@ -2,11 +2,7 @@
 
 import { useState } from "react";
 import type { TokenRow } from "./AdminConsole";
-
-function formatDate(iso: string | null) {
-  if (!iso) return null;
-  return new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" });
-}
+import { formatAdminDateTime as formatDate } from "@/lib/admin/format-date";
 
 const SOURCE_LABELS: Record<string, string> = {
   purchase_card: "Purchase Card",
