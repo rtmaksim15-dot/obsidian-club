@@ -301,6 +301,50 @@
   .star-empty {
     color: #2a2724;
   }
+
+  /* ==========================================================
+     CUSTOM CHECKBOX (Invitation form, 2026-09-23, see DECISIONS.md)
+     Native appearance replaced everywhere it's used — dark fill, a
+     light ("silver") 1px border, Blood accent fill + light checkmark
+     once checked. The underlying element stays a real
+     <input type="checkbox">, so keyboard, screen readers, and
+     label-click all work unmodified; only :focus-visible needs an
+     explicit ring back since appearance: none can suppress the
+     platform default in some browsers. -webkit-appearance is required
+     for iOS Safari specifically — appearance: none alone doesn't
+     reliably strip its native checkbox rendering.
+     ========================================================== */
+  .checkbox-custom {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-text-primary);
+    border-radius: 2px;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  .checkbox-custom:checked {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+  }
+  .checkbox-custom:checked::after {
+    content: "";
+    position: absolute;
+    left: 5px;
+    top: 1px;
+    width: 5px;
+    height: 10px;
+    border: solid var(--color-text-primary);
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+  .checkbox-custom:focus-visible {
+    outline: 2px solid var(--color-text-primary);
+    outline-offset: 2px;
+  }
 }
 
 /* ============================================================

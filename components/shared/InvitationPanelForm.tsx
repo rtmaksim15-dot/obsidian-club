@@ -111,7 +111,7 @@ export default function InvitationPanelForm() {
             required
             checked={ageAndTruthChecked}
             onChange={(e) => setAgeAndTruthChecked(e.target.checked)}
-            className="mt-1 shrink-0"
+            className="checkbox-custom mt-1 shrink-0"
           />
           <span>I am 18 or older, and everything I&apos;ve written here is true.</span>
         </label>
@@ -121,7 +121,7 @@ export default function InvitationPanelForm() {
             required
             checked={privacyChecked}
             onChange={(e) => setPrivacyChecked(e.target.checked)}
-            className="mt-1 shrink-0"
+            className="checkbox-custom mt-1 shrink-0"
           />
           <span>I understand this is a private community. What happens inside stays inside.</span>
         </label>
@@ -140,9 +140,6 @@ export default function InvitationPanelForm() {
           onChange={(e) => setAnswer(e.target.value)}
           className="input resize-y font-cormorant"
         />
-        <p className="text-caption mt-1.5" style={{ color: "var(--color-text-muted)" }}>
-          We read every answer.
-        </p>
       </div>
 
       {status === "error" && error ? (
@@ -150,6 +147,18 @@ export default function InvitationPanelForm() {
           {error}
         </p>
       ) : null}
+
+      <p className="text-caption text-center" style={{ color: "var(--color-text-muted)" }}>
+        By submitting, you agree to our{" "}
+        <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline hover:no-underline">
+          Terms of Service
+        </a>{" "}
+        and acknowledge our{" "}
+        <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:no-underline">
+          Privacy Policy
+        </a>
+        .
+      </p>
 
       <button
         type="submit"

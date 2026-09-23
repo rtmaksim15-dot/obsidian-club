@@ -24,17 +24,14 @@ export default function InvitationPage() {
       <Logo size={100} variant="dark" />
       <h1 className="text-h1 mt-8 text-center">Request Consideration</h1>
 
-      {/* Community description — copy pending, see A2. Clearly marked,
-          not written here. */}
-      <div
-        className="mt-6 w-full max-w-sm rounded-ob border border-dashed p-4 text-center"
-        style={{ borderColor: "var(--color-warning)" }}
-      >
-        <p className="text-caption" style={{ color: "var(--color-warning)" }}>
-          PLACEHOLDER — copy pending
+      {/* Community description — final copy (2026-09-23, see
+          DECISIONS.md), replacing the placeholder block. */}
+      <div className="mt-6 w-full max-w-sm text-center">
+        <p className="font-cormorant text-[1.05rem] leading-relaxed" style={{ color: "var(--color-text-primary)" }}>
+          A private community for those who value trust, restraint, and the quiet strength of chosen roles.
         </p>
-        <p className="text-caption mt-2" style={{ color: "var(--color-text-muted)" }}>
-          A short description of the community goes here before launch.
+        <p className="font-cormorant mt-5 text-[0.9375rem] leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
+          Tell us who you are. We read every request personally.
         </p>
       </div>
 
