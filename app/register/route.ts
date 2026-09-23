@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 
 // Closed Registration & Invite System (2026-07-17): the only way to
-// create an account is redeeming a real invite token at
-// /invite/[token] (app/api/invite/[token]/route.ts). This route exists
-// purely to answer "/register" (and any method on it) with an explicit
-// 403 rather than a generic 404, in case anything ever links here.
+// create an account is redeeming a real invite token at /join/[token]
+// (app/api/join/[token]/route.ts). The original /invite/[token] path
+// this comment used to point to was removed 2026-09-23 (security audit
+// fix — its Waitlist-column-trusting gate depended on RLS the audit
+// found could be bypassed; its one real outstanding link had already
+// been redeemed, so nothing legitimate was left using it). This route
+// exists purely to answer "/register" (and any method on it) with an
+// explicit 403 rather than a generic 404, in case anything ever links
+// here.
 //
 // This only covers our own app — it can't stop someone from calling
 // Supabase's own signup API directly with the public anon key. The

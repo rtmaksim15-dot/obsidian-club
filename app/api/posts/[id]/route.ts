@@ -10,6 +10,7 @@ const postSelect = {
   mediaUrls: true,
   type: true,
   minLevel: true,
+  isPublished: true,
   authorId: true,
   viewsCount: true,
   likesCount: true,
@@ -20,6 +21,19 @@ const postSelect = {
 };
 
 // GET /api/posts/:id
+//
+// Security fix (2026-09-23, see DECISIONS.md): this used to skip the
+// isPublished check every sibling route (the feed, GET /api/posts,
+// GET /api/posts/:id/comments, the /posts/:id page) already applies.
+// A red-line-reported post is preserved as moderation evidence by
+// setting isPublished:false (see Post.isPreserved's schema comment) —
+// the post's own id was live in the feed/notifications/a reporter's
+// link before that happened, so it's not a secret, and this route was
+// the one place still willing to hand back full content + author
+// identity for it to any member who had or found that id. Treated as a
+// 404, same as the minLevel/not-found cases — not confirming
+// existence — for everyone except an admin, who still needs to reach
+// this for legitimate moderation review.
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   const user = await getCurrentUser();
   if (!user) {
@@ -28,6 +42,9 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 
   const post = await prisma.post.findUnique({ where: { id: params.id }, select: postSelect });
   if (!post || !post.author) {
+    return NextResponse.json({ error: "Post not found." }, { status: 404 });
+  }
+  if (!post.isPublished && !user.isAdmin) {
     return NextResponse.json({ error: "Post not found." }, { status: 404 });
   }
   if (post.minLevel > user.level) {

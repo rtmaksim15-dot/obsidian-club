@@ -1,0 +1,17 @@
+-- Security audit fix (2026-09-23, see DECISIONS.md) — drops the
+-- `anon_insert_waitlist` policy (created 2026-07-13, back when
+-- `waitlist` was only a pre-launch email-capture list with no
+-- downstream trust placed in its `status`/`invite_token` columns).
+-- `WITH CHECK (true)` for role `anon` meant anyone could INSERT a row
+-- directly via Supabase's public REST API with an attacker-chosen
+-- `status: 'approved'` and `invite_token`, which
+-- app/api/invite/[token]/route.ts (now removed) trusted as its entire
+-- gate — a full, unauthenticated bypass of the closed-registration
+-- system. Confirmed via a read-only investigation (2026-09-23) that no
+-- real waitlist row shows signs of having been created this way, and
+-- confirmed no legitimate code path performs a client-side Supabase
+-- insert into this table (every real intake route goes through Prisma,
+-- which uses the `postgres` role and bypasses RLS entirely already).
+-- Dropping it restores the same deny-all-by-default posture every
+-- other policyless table in this schema already has.
+drop policy if exists "anon_insert_waitlist" on public.waitlist;
