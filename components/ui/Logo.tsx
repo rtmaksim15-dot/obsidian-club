@@ -29,7 +29,11 @@ export default function Logo({ size = 200, className }: LogoProps) {
       width={size}
       height={height}
       className={className}
-      style={{ objectFit: "contain" }}
+      style={{
+        objectFit: "contain",
+        maskImage: "radial-gradient(closest-side, black 60%, transparent 100%)",
+        WebkitMaskImage: "radial-gradient(closest-side, black 60%, transparent 100%)",
+      }}
     />
   );
 }
