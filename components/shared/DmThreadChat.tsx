@@ -40,9 +40,27 @@ export default function DmThreadChat({ threadId, currentUserId, initialMessages 
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  // Desktop thread layout (2026-09-22, see DECISIONS.md): starts true so
+  // opening the thread always lands on the latest message. Updated on
+  // every scroll of the message list (not state — this only needs to be
+  // read inside the messages-length effect below, so a ref avoids an
+  // extra render per scroll event) and checked there instead of always
+  // auto-scrolling on a new message, so a member reading back through
+  // history doesn't get yanked back to the bottom by an incoming message.
+  const pinnedToBottomRef = useRef(true);
+
+  function handleListScroll() {
+    const el = listRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    pinnedToBottomRef.current = distanceFromBottom < 80;
+  }
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: "end" });
+    if (pinnedToBottomRef.current) {
+      bottomRef.current?.scrollIntoView({ block: "end" });
+    }
   }, [messages.length]);
 
   useEffect(() => {
@@ -110,7 +128,7 @@ export default function DmThreadChat({ threadId, currentUserId, initialMessages 
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-ob-black text-ob-text">
-      <div className="flex-1 space-y-4 overflow-y-auto px-6 py-6">
+      <div ref={listRef} onScroll={handleListScroll} className="flex-1 space-y-4 overflow-y-auto px-6 py-6">
         {messages.length === 0 ? (
           <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
             No messages yet.

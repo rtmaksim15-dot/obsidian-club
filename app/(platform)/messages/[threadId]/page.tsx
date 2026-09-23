@@ -96,7 +96,20 @@ export default async function ThreadPage({ params }: { params: { threadId: strin
     // keyboard instead of above it. The bottom tab bar is hidden for
     // this same route in BottomNav.tsx (its own pathname check) rather
     // than here, so there's no fixed nav competing for the same space.
-    <div className="flex h-dvh flex-col overflow-hidden bg-ob-black text-ob-text">
+    //
+    // Desktop thread layout (2026-09-22, see DECISIONS.md): unlike
+    // BottomNav's space, PlatformShell's `sm:pt-20` (reserving room for
+    // the fixed DesktopNav) is NOT route-aware — it still applies here.
+    // A plain `h-dvh` box that's also pushed down 5rem by an ancestor's
+    // padding-top runs 5rem past the real viewport bottom, which is
+    // exactly what put the composer below the fold on desktop: the box
+    // becomes page-scrollable, and scrolling it drags this own header
+    // (the box's top) up past the fixed nav. `sm:h-[calc(100dvh-5rem)]`
+    // subtracts that same 5rem back out at the one breakpoint it's
+    // added, so top padding + box height together equal exactly 100dvh
+    // again — still fully dvh-derived, not a hardcoded pixel height.
+    // Mobile (no `sm:pt-20`, no fixed nav) is untouched.
+    <div className="flex h-dvh flex-col overflow-hidden bg-ob-black text-ob-text sm:h-[calc(100dvh-5rem)]">
       <header className="flex shrink-0 items-center justify-between border-b border-ob-border px-4 py-4 sm:px-6 sm:py-6">
         <div className="flex min-w-0 items-center gap-2">
           <a href="/messages" aria-label="Back to Messages" className="shrink-0 p-1 -ml-1">
