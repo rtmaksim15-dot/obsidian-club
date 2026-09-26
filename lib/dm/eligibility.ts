@@ -1,5 +1,5 @@
 import "server-only";
-import type { User, Prisma } from "@prisma/client";
+import type { User } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { isRitualComplete } from "@/lib/auth/ritual";
 import { isBlockedEitherWay } from "@/lib/moderation/block";
@@ -10,7 +10,11 @@ export const MAX_STRIKES = 2;
 
 export type EligibilityResult = { ok: true } | { ok: false; status: number; error: string };
 
-type Client = typeof prisma | Prisma.TransactionClient;
+// Derived from prisma.$transaction's own callback param type (rather than
+// the generated Prisma.TransactionClient directly) so this stays correct
+// under lib/db/prisma.ts's $extends wrapper, which mints its own
+// transaction-client type distinct from the unextended one.
+type Client = typeof prisma | Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 
 /**
  * Everything that must be true for `sender` to send a NEW conversation
