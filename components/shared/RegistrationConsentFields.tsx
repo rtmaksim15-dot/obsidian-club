@@ -1,5 +1,7 @@
 "use client";
 
+import { MIN_MEMBER_AGE } from "@/lib/legal/eligibility";
+
 // The three required registration checkboxes — exact wording from the
 // legal package's registration consent/clickwrap source (Block 4,
 // 2026-08-10). Shared between JoinRegistrationForm and
@@ -45,10 +47,10 @@ export default function RegistrationConsentFields({
           className="mt-1 shrink-0"
         />
         <span>
-          I am <strong>at least 18 years old</strong> (or the age of majority where I live, if higher). I
-          understand access requires <strong>age verification</strong>, and I agree to complete it. The
+          I am <strong>at least {MIN_MEMBER_AGE} years old</strong> (or the age of majority where I live, if
+          higher). I understand access requires <strong>age verification</strong>, and I agree to complete it. The
           information I provide about my age and identity is <strong>true</strong>. I understand that helping
-          anyone under 18 access Obsidian Club is a permanent, non-appealable violation.
+          anyone under {MIN_MEMBER_AGE} access Obsidian Club is a permanent, non-appealable violation.
         </span>
       </label>
 

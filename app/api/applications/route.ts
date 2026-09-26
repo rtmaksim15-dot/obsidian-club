@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { track } from "@/lib/analytics/track";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
+import { MIN_MEMBER_AGE } from "@/lib/legal/eligibility";
 
 // POST /api/applications — the invitation panel's intake (Invitation
 // Panel flow, A2/A3, 2026-08-2x, see DECISIONS.md). Writes to the same
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "A valid email is required." }, { status: 422 });
   }
   if (!body.ageConfirmed) {
-    return NextResponse.json({ error: "You must confirm you are at least 18 years old." }, { status: 422 });
+    return NextResponse.json({ error: `You must confirm you are at least ${MIN_MEMBER_AGE} years old.` }, { status: 422 });
   }
   if (!answer || answer.length < MIN_ANSWER_LENGTH) {
     return NextResponse.json({ error: `Please write at least ${MIN_ANSWER_LENGTH} characters.` }, { status: 422 });

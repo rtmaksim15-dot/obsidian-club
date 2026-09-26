@@ -1,4 +1,5 @@
 import Logo from "@/components/ui/Logo";
+import { MIN_MEMBER_AGE } from "@/lib/legal/eligibility";
 
 // /apply — real destination for a first-time OAuth sign-in with no
 // matching member account (see app/auth/callback/route.ts). The club is
@@ -26,7 +27,7 @@ export default function ApplyPage({
         Return home
       </a>
       <p className="mt-12 font-cormorant text-[0.8rem] italic text-ob-subtle">
-        Obsidian Club is a private community for adults 18+.
+        Obsidian Club is a private community for adults {MIN_MEMBER_AGE}+.
       </p>
     </main>
   );

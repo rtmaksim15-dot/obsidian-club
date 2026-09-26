@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { MIN_MEMBER_AGE } from "@/lib/legal/eligibility";
 
 type Status = "idle" | "submitting" | "success" | "error";
 
@@ -113,7 +114,9 @@ export default function InvitationPanelForm() {
             onChange={(e) => setAgeAndTruthChecked(e.target.checked)}
             className="checkbox-custom mt-1 shrink-0"
           />
-          <span>I am 18 or older, and everything I&apos;ve written here is true.</span>
+          <span>
+            I am {MIN_MEMBER_AGE} or older, and everything I&apos;ve written here is true.
+          </span>
         </label>
         <label className="flex items-start gap-3 text-left text-[0.8rem] leading-relaxed" style={{ color: "var(--color-text-secondary)" }}>
           <input

@@ -1,4 +1,5 @@
 import type { ReportCategory } from "@prisma/client";
+import { MIN_MEMBER_AGE } from "@/lib/legal/eligibility";
 
 // Member protection mechanics (pre-launch legal package, 2026-08-09).
 // The first three categories are "red line" — they raise priority and,
@@ -13,6 +14,12 @@ import type { ReportCategory } from "@prisma/client";
 // of the taxonomy. Reason codes (`value`) are unchanged.
 export const REPORT_CATEGORIES: { value: ReportCategory; label: string; description: string; isRedLine: boolean }[] = [
   { value: "underage", label: "Underage", description: "Involves someone under 18.", isRedLine: true },
+  {
+    value: "below_membership_age",
+    label: `Under ${MIN_MEMBER_AGE} (eligibility)`,
+    description: `Member appears to be under the club's minimum membership age (${MIN_MEMBER_AGE}) — not a child-safety concern.`,
+    isRedLine: false,
+  },
   {
     value: "non_consensual",
     label: "Non-consensual",

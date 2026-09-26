@@ -5,6 +5,7 @@ import { track } from "@/lib/analytics/track";
 import { generateInviteToken } from "@/lib/utils/codes";
 import { computeValidUntil, HARD_CAP_DAYS } from "@/lib/invites/lifecycle";
 import { sendApplicationAcceptedEmail, sendApplicationDeclinedEmail } from "@/lib/utils/email";
+import { MIN_MEMBER_AGE } from "@/lib/legal/eligibility";
 
 // Email captures — Accept/Hold/Decline (2026-09-22, see DECISIONS.md):
 // this is the approve/hold/decline/resend logic that PATCH
@@ -68,6 +69,7 @@ export async function approveWaitlistEntry(
       reviewedBy: adminId,
       ageVerified,
       ageVerifiedAt: ageVerified ? now : null,
+      ageVerifiedThreshold: ageVerified ? MIN_MEMBER_AGE : null,
       applicationTokenId: token.id,
     },
   });

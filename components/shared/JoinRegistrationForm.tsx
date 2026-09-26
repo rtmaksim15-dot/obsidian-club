@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import RegistrationConsentFields from "./RegistrationConsentFields";
+import { MIN_MEMBER_AGE } from "@/lib/legal/eligibility";
 
 type Props = { token: string };
 
@@ -158,7 +159,7 @@ export default function JoinRegistrationForm({ token }: Props) {
       </button>
 
       <p className="text-caption text-center" style={{ color: "var(--color-text-muted)" }}>
-        By creating an account you confirm you are 18+ and agree to the documents above.
+        By creating an account you confirm you are {MIN_MEMBER_AGE}+ and agree to the documents above.
       </p>
     </form>
   );

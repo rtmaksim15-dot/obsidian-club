@@ -118,6 +118,10 @@ export default function ReportDetail({
         <p className="text-data font-semibold" style={{ color: "var(--color-error)" }}>
           URGENT — Underage
         </p>
+      ) : r.category === "below_membership_age" ? (
+        <p className="text-data font-semibold" style={{ color: "var(--color-warning)" }}>
+          Under 21 — Eligibility (not a child-safety report)
+        </p>
       ) : r.isRedLine ? (
         <p className="text-data font-semibold" style={{ color: "var(--color-error)" }}>
           Red line
@@ -133,7 +137,9 @@ export default function ReportDetail({
           <p className="text-label mb-2">Reporter</p>
           <p className="text-data">{r.reporter.displayName}</p>
           <p className="text-caption mt-1" style={{ color: "var(--color-text-muted)" }}>
-            @{r.reporter.username} · {levelName(r.reporter.level)}
+            {/* Nullable username (2026-09-25, see DECISIONS.md) — same
+                admin-visible flag as PersonDetail.tsx. */}
+            {r.reporter.username ? `@${r.reporter.username}` : "— username not chosen"} · {levelName(r.reporter.level)}
           </p>
           <p className="text-caption mt-2" style={{ color: "var(--color-text-secondary)" }}>
             {r.reporter.reportsFiled} {r.reporter.reportsFiled === 1 ? "report" : "reports"} filed

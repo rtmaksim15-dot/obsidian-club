@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { logModerationAction } from "@/lib/moderation/log";
+import { MIN_MEMBER_AGE } from "@/lib/legal/eligibility";
 
 type Body = { ageVerified?: boolean };
 
@@ -48,6 +49,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     data: {
       ageVerified: body.ageVerified,
       ageVerifiedAt: body.ageVerified ? new Date() : null,
+      ageVerifiedThreshold: body.ageVerified ? MIN_MEMBER_AGE : null,
     },
   });
 

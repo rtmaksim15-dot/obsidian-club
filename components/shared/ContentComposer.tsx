@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import { ImagePlus, X } from "lucide-react";
 import { createClient } from "@/lib/auth/supabase-browser";
 import { compressImage } from "@/lib/utils/compressImage";
+import { MIN_MEMBER_AGE } from "@/lib/legal/eligibility";
 
 const MAX_BYTES = 8 * 1024 * 1024; // 8MB safety net, post-compression — must match app/api/posts/photo/route.ts
 
@@ -198,8 +199,8 @@ export default function ContentComposer({ houses = [] }: Props) {
               className="mt-0.5"
             />
             <span className="text-caption" style={{ color: "var(--color-text-secondary)" }}>
-              Everyone shown is a consenting adult (18+), and I have their specific, informed, revocable consent
-              to post this here.
+              Everyone shown is a consenting adult aged {MIN_MEMBER_AGE} or older, and I have their specific,
+              informed, revocable consent to post this here.
             </span>
           </label>
         </div>

@@ -3,6 +3,7 @@ import Image from "next/image";
 import LogoMark from "@/components/ui/LogoMark";
 import EmailCaptureForm from "@/components/shared/EmailCaptureForm";
 import { Reveal, RevealGroup, RevealItem } from "@/components/shared/Reveal";
+import { MIN_MEMBER_AGE } from "@/lib/legal/eligibility";
 import LaunchCountdown from "@/components/shared/LaunchCountdown";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getDoorsState } from "@/lib/config/doors";
@@ -349,7 +350,7 @@ export default async function LandingPage() {
           </nav>
         </div>
         <p className="mx-auto mt-[52px] max-w-[1180px] text-center font-cormorant text-[0.85rem] italic text-ob-subtle">
-          Obsidian Club is a private community for adults 18+.
+          Obsidian Club is a private community for adults {MIN_MEMBER_AGE}+.
         </p>
         <div className="mx-auto mt-5 flex max-w-[1180px] flex-wrap items-center justify-between gap-4 border-t pt-7" style={{ borderColor: "var(--color-border-subtle)" }}>
           <span className="text-ob-subtle font-inter text-[0.68rem] tracking-[0.14em]">
