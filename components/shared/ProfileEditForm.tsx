@@ -7,7 +7,10 @@ import AvatarUploadButton from "./AvatarUploadButton";
 type Props = {
   user: {
     displayName: string;
-    username: string;
+    // Nullable (2026-09-25, see DECISIONS.md) — registration no longer
+    // auto-generates a placeholder, so a brand-new member's username is
+    // genuinely absent, not just empty-looking.
+    username: string | null;
     bio: string;
     avatarUrl: string | null;
     locationCity: string;
@@ -22,7 +25,19 @@ type Props = {
 };
 
 type UsernameCheckState = "idle" | "checking" | "available" | "taken" | "invalid" | "own";
-const USERNAME_PATTERN = /^[a-z0-9_]{3,20}$/;
+
+// Onboarding fix (2026-09-25, see DECISIONS.md) — a specific reason per
+// failure mode, checked independently, instead of one combined message
+// that named every rule regardless of which one actually failed.
+function getUsernameFormatError(value: string): string | null {
+  if (value.length < 3 || value.length > 20) {
+    return "Must be 3 to 20 characters.";
+  }
+  if (!/^[a-z0-9_]+$/.test(value)) {
+    return "Only lowercase letters, numbers, and underscores.";
+  }
+  return null;
+}
 
 const ROLES = [
   { value: "", label: "Prefer not to say" },
@@ -36,7 +51,7 @@ const ROLES = [
 export default function ProfileEditForm({ user }: Props) {
   const router = useRouter();
   const [displayName, setDisplayName] = useState(user.displayName);
-  const [username, setUsername] = useState(user.username);
+  const [username, setUsername] = useState(user.username ?? "");
   const [bio, setBio] = useState(user.bio);
   const [locationCity, setLocationCity] = useState(user.locationCity);
   const [role, setRole] = useState(user.role ?? "");
@@ -45,6 +60,7 @@ export default function ProfileEditForm({ user }: Props) {
   const [saved, setSaved] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [usernameCheck, setUsernameCheck] = useState<UsernameCheckState>("idle");
+  const [usernameInvalidReason, setUsernameInvalidReason] = useState<string | null>(null);
   const usernameCheckSeq = useRef(0);
 
   // Live availability check (Username-in-the-Ritual, 2026-08-06),
@@ -52,12 +68,25 @@ export default function ProfileEditForm({ user }: Props) {
   // there's nothing to check for a field the user can't edit.
   useEffect(() => {
     if (user.usernameChangeUsed) return;
+    // Empty is its own calm, non-error state (2026-09-25, see
+    // DECISIONS.md) — a required field the member simply hasn't typed
+    // into yet is not the same as an invalid value; showing "invalid"
+    // red text before they've entered anything would misread as an
+    // error they caused.
+    if (username.length === 0) {
+      setUsernameCheck("idle");
+      return;
+    }
     if (username === user.username) {
       setUsernameCheck("own");
       return;
     }
-    if (!USERNAME_PATTERN.test(username)) {
-      setUsernameCheck(username.length > 0 ? "invalid" : "idle");
+    const formatError = getUsernameFormatError(username);
+    if (formatError) {
+      // Unreachable for length===0 (handled above), so this is always a
+      // real rule violation from this point on.
+      setUsernameCheck("invalid");
+      setUsernameInvalidReason(formatError);
       return;
     }
 
@@ -149,7 +178,7 @@ export default function ProfileEditForm({ user }: Props) {
 
         <div>
           <label htmlFor="username" className="input-label">
-            Username
+            Username <span style={{ color: "var(--color-error)" }}>*</span>
           </label>
           <input
             id="username"
@@ -160,6 +189,11 @@ export default function ProfileEditForm({ user }: Props) {
             placeholder="lowercase, numbers, underscores"
             disabled={user.usernameChangeUsed}
             required
+            style={
+              usernameCheck === "invalid" || usernameCheck === "taken"
+                ? { borderColor: "var(--color-error)" }
+                : undefined
+            }
           />
           {user.usernameChangeUsed ? (
             <p className="text-caption mt-1" style={{ color: "var(--color-text-muted)" }}>
@@ -167,6 +201,11 @@ export default function ProfileEditForm({ user }: Props) {
             </p>
           ) : (
             <>
+              {usernameCheck === "idle" ? (
+                <p className="text-caption mt-1" style={{ color: "var(--color-text-muted)" }}>
+                  Pick a username to continue.
+                </p>
+              ) : null}
               {usernameCheck === "checking" ? (
                 <p className="text-caption mt-1" style={{ color: "var(--color-text-muted)" }}>
                   Checking…
@@ -174,17 +213,17 @@ export default function ProfileEditForm({ user }: Props) {
               ) : null}
               {usernameCheck === "available" ? (
                 <p className="text-caption mt-1" style={{ color: "var(--color-success)" }}>
-                  Available.
+                  ✓ This username is available.
                 </p>
               ) : null}
               {usernameCheck === "taken" ? (
                 <p className="text-caption mt-1" style={{ color: "var(--color-error)" }}>
-                  That name is already taken.
+                  This username is taken.
                 </p>
               ) : null}
               {usernameCheck === "invalid" ? (
                 <p className="text-caption mt-1" style={{ color: "var(--color-error)" }}>
-                  3-20 characters: lowercase letters, numbers, underscores.
+                  {usernameInvalidReason}
                 </p>
               ) : null}
               <p className="text-caption mt-1 italic" style={{ color: "var(--color-text-secondary)" }}>
@@ -265,7 +304,9 @@ export default function ProfileEditForm({ user }: Props) {
         <button
           type="submit"
           className="btn-primary w-full"
-          disabled={submitting || usernameCheck === "taken" || usernameCheck === "invalid" || usernameCheck === "checking"}
+          disabled={
+            submitting || !username || usernameCheck === "taken" || usernameCheck === "invalid" || usernameCheck === "checking"
+          }
         >
           {submitting ? "Saving…" : "Save"}
         </button>

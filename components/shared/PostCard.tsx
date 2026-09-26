@@ -11,7 +11,7 @@ export type FeedPost = {
   mediaUrls: unknown;
   likesCount: number;
   createdAt: string | Date;
-  author: { id: string; username: string; displayName: string; avatarUrl: string | null; level: number; rep: number };
+  author: { id: string; username: string | null; displayName: string; avatarUrl: string | null; level: number; rep: number };
   house: { id: string; name: string; slug: string } | null;
   likes: { userId: string }[];
   _count: { comments: number };
@@ -72,10 +72,18 @@ export default function PostCard({
     <div className="min-w-0 flex-1">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          {compact ? null : (
+          {compact ? null : post.author.username ? (
             <a href={`/profile/${post.author.username}`} className="text-data">
               {post.author.displayName}
             </a>
+          ) : (
+            // Nullable username (2026-09-25, see DECISIONS.md) — an
+            // ordinary member can't have posted without one (the ritual
+            // gates on it), so this is only reachable for an admin
+            // account that hasn't picked a username yet. No profile
+            // exists to link to, so this renders as plain text instead
+            // of a link to a broken/empty URL.
+            <span className="text-data">{post.author.displayName}</span>
           )}
           <span className="text-caption" style={{ color: "var(--color-text-muted)" }}>
             {timestamp}
@@ -139,21 +147,26 @@ export default function PostCard({
     );
   }
 
+  const avatarClassName = `avatar h-9 w-9 shrink-0 ${LEVELS_UI_ENABLED ? `avatar-level-${post.author.level}` : ""}`;
+  const avatarInner = post.author.avatarUrl ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={post.author.avatarUrl} alt={post.author.displayName} loading="lazy" className="h-full w-full object-cover" />
+  ) : (
+    <div className="flex h-full w-full items-center justify-center bg-ob-surface text-sm">
+      {post.author.displayName.charAt(0).toUpperCase()}
+    </div>
+  );
+
   return (
     <article className="flex gap-3 py-4" style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
-      <a
-        href={`/profile/${post.author.username}`}
-        className={`avatar h-9 w-9 shrink-0 ${LEVELS_UI_ENABLED ? `avatar-level-${post.author.level}` : ""}`}
-      >
-        {post.author.avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={post.author.avatarUrl} alt={post.author.displayName} loading="lazy" className="h-full w-full object-cover" />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-ob-surface text-sm">
-            {post.author.displayName.charAt(0).toUpperCase()}
-          </div>
-        )}
-      </a>
+      {post.author.username ? (
+        <a href={`/profile/${post.author.username}`} className={avatarClassName}>
+          {avatarInner}
+        </a>
+      ) : (
+        // Same nullable-username reasoning as the name link above.
+        <div className={avatarClassName}>{avatarInner}</div>
+      )}
       {body}
     </article>
   );

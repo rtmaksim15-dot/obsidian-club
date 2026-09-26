@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-type Person = { id: string; username: string; displayName: string; avatarUrl: string | null };
+type Person = { id: string; username: string | null; displayName: string; avatarUrl: string | null };
 
 type ConversationRequestItem = {
   id: string;
@@ -104,14 +104,22 @@ export default function MessagesInbox({
                   <div className="flex items-start gap-3">
                     <Avatar person={r.sender} />
                     <div className="min-w-0 flex-1">
-                      <a
-                        href={`/profile/${r.sender.username}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-data"
-                      >
-                        {r.sender.displayName}
-                      </a>
+                      {/* Nullable username (2026-09-25, see DECISIONS.md)
+                          — a non-admin sender must already have one to
+                          have sent a request at all; only an admin
+                          without a username could hit this. */}
+                      {r.sender.username ? (
+                        <a
+                          href={`/profile/${r.sender.username}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-data"
+                        >
+                          {r.sender.displayName}
+                        </a>
+                      ) : (
+                        <span className="text-data">{r.sender.displayName}</span>
+                      )}
                       <p className="text-body mt-1 !text-base">{r.openingMessage}</p>
                     </div>
                   </div>

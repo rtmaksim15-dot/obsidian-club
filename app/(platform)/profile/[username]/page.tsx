@@ -200,21 +200,34 @@ export default async function ProfilePage({ params }: { params: { username: stri
           {followerCount} {followerCount === 1 ? "follower" : "followers"} · {followingCount} following
         </p>
 
+        {/* Nullable username (2026-09-25, see DECISIONS.md) — invitedBy/
+            partner are other members, who could in principle be an
+            admin without a username. No profile to link to in that
+            case, so this renders unlinked instead of a link to a
+            broken/empty URL. */}
         {user.invitedBy ? (
           <p className="text-caption mt-1" style={{ color: "var(--color-text-muted)" }}>
             Invited by{" "}
-            <a href={`/profile/${user.invitedBy.username}`} style={{ color: "var(--color-text-secondary)" }}>
-              {user.invitedBy.displayName}
-            </a>
+            {user.invitedBy.username ? (
+              <a href={`/profile/${user.invitedBy.username}`} style={{ color: "var(--color-text-secondary)" }}>
+                {user.invitedBy.displayName}
+              </a>
+            ) : (
+              <span style={{ color: "var(--color-text-secondary)" }}>{user.invitedBy.displayName}</span>
+            )}
           </p>
         ) : null}
 
         {partner ? (
           <p className="text-caption mt-1" style={{ color: "var(--color-text-muted)" }}>
             Partner of{" "}
-            <a href={`/profile/${partner.username}`} style={{ color: "var(--color-text-secondary)" }}>
-              {partner.displayName}
-            </a>
+            {partner.username ? (
+              <a href={`/profile/${partner.username}`} style={{ color: "var(--color-text-secondary)" }}>
+                {partner.displayName}
+              </a>
+            ) : (
+              <span style={{ color: "var(--color-text-secondary)" }}>{partner.displayName}</span>
+            )}
           </p>
         ) : null}
 

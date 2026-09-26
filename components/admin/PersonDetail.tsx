@@ -77,7 +77,10 @@ export default function PersonDetail({
       <p className="text-h2 !text-base">{person.displayName}</p>
       <p className="text-data mt-1">{person.email}</p>
       <p className="text-caption mt-1" style={{ color: "var(--color-text-muted)" }}>
-        @{person.username}
+        {/* Nullable username (2026-09-25, see DECISIONS.md) — flagged
+            distinctly here (not just left blank) since an admin needs
+            to notice a member stuck on the onboarding username step. */}
+        {person.username ? `@${person.username}` : "— username not chosen"}
         {person.joinedAt ? ` · Joined ${formatDay(person.joinedAt)}` : ""}
       </p>
 

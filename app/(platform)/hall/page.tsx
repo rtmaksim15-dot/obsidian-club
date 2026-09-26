@@ -165,8 +165,14 @@ export default async function HallPage() {
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
       <div className="mx-auto max-w-2xl">
+        {/* Nullable username (2026-09-25, see DECISIONS.md): the ritual
+            gate above means an ordinary member can't reach /hall
+            without one, but an isAdmin account bypasses that gate
+            entirely and could. Own-profile link goes to /profile/edit
+            instead of building a broken /profile/ URL out of an empty
+            value — never linking to a page that doesn't exist yet. */}
         <a
-          href={`/profile/${user.username}`}
+          href={user.username ? `/profile/${user.username}` : "/profile/edit"}
           className={`avatar h-16 w-16 block ${LEVELS_UI_ENABLED ? `avatar-level-${user.level}` : ""}`}
         >
           {ownAvatarUrl ? (
@@ -180,7 +186,7 @@ export default async function HallPage() {
         </a>
 
         <p className="text-body mt-4 italic">Welcome back,</p>
-        <a href={`/profile/${user.username}`}>
+        <a href={user.username ? `/profile/${user.username}` : "/profile/edit"}>
           <h1 className="text-h1 mt-1">{user.displayName}</h1>
         </a>
         {LEVELS_UI_ENABLED ? (

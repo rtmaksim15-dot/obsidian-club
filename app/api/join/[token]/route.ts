@@ -2,7 +2,7 @@ import { createServerClient, type CookieOptionsWithName } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { createAdminClient } from "@/lib/auth/supabase-admin";
-import { generateReferralCode, generateUsernameFromEmail } from "@/lib/utils/codes";
+import { generateReferralCode } from "@/lib/utils/codes";
 import { track } from "@/lib/analytics/track";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
 import { recordLegalConsent } from "@/lib/legal/record-consent";
@@ -163,7 +163,11 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
         data: {
           id: newUserId,
           email,
-          username: generateUsernameFromEmail(email),
+          // No auto-generated username (2026-09-25, see DECISIONS.md) —
+          // deriving one from the email leaked both the email and often
+          // the member's real name, unacceptable for a closed 18+ club.
+          // Starts null; the member picks their own in ProfileEditForm,
+          // required before the ritual's profile step can complete.
           displayName: name,
           level: 1,
           status: "active",

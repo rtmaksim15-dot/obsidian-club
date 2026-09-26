@@ -13,7 +13,7 @@ type Comment = {
   // replies to it still read coherently.
   isDeleted?: boolean;
   createdAt: string;
-  author: { id: string; username: string; displayName: string; avatarUrl: string | null; level: number };
+  author: { id: string; username: string | null; displayName: string; avatarUrl: string | null; level: number };
 };
 
 function formatTimestamp(iso: string) {
@@ -80,21 +80,39 @@ export default function CommentSection({
         <ul className="space-y-4">
           {comments.map((c) => (
             <li key={c.id} className="flex items-start gap-3">
-              <a href={`/profile/${c.author.username}`} className={`avatar avatar-level-${c.author.level} h-8 w-8 shrink-0`}>
-                {c.author.avatarUrl ? (
+              {(() => {
+                const avatarClassName = `avatar avatar-level-${c.author.level} h-8 w-8 shrink-0`;
+                const avatarInner = c.author.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={c.author.avatarUrl} alt={c.author.displayName} loading="lazy" className="h-full w-full object-cover" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center bg-ob-surface text-xs">
                     {c.author.displayName.charAt(0).toUpperCase()}
                   </div>
-                )}
-              </a>
+                );
+                // Nullable username (2026-09-25, see DECISIONS.md) — a
+                // non-admin author must already have one to have
+                // commented at all; only an admin without a username
+                // could hit this. No profile to link to, so this
+                // renders as plain, unlinked content instead of a link
+                // to a broken/empty URL.
+                return c.author.username ? (
+                  <a href={`/profile/${c.author.username}`} className={avatarClassName}>
+                    {avatarInner}
+                  </a>
+                ) : (
+                  <div className={avatarClassName}>{avatarInner}</div>
+                );
+              })()}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
-                  <a href={`/profile/${c.author.username}`} className="text-data !text-sm">
-                    {c.author.displayName}
-                  </a>
+                  {c.author.username ? (
+                    <a href={`/profile/${c.author.username}`} className="text-data !text-sm">
+                      {c.author.displayName}
+                    </a>
+                  ) : (
+                    <span className="text-data !text-sm">{c.author.displayName}</span>
+                  )}
                   {!c.isDeleted && c.author.id !== currentUserId ? (
                     <ContentMenu targetType="comment" targetId={c.id} preview={c.content} canReport />
                   ) : null}
