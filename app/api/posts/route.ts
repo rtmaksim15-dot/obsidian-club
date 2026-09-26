@@ -10,6 +10,7 @@ import { detectImageSignature } from "@/lib/utils/validateImageBytes";
 import { stripExifIfPresent } from "@/lib/utils/stripExif";
 import { createAdminClient } from "@/lib/auth/supabase-admin";
 import { resolveAvatarUrl, resolveAvatarUrls, resolvePostMediaUrls } from "@/lib/storage/resolve-media";
+import { getBlockedEitherWayUserIds } from "@/lib/moderation/block";
 
 const PAGE_SIZE = 20;
 const VALID_TYPES: PostType[] = ["post", "story", "article", "lecture", "manifesto", "course"];
@@ -52,10 +53,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Invalid type filter." }, { status: 422 });
   }
 
+  // Security fix (2026-09-23, see DECISIONS.md) — see lib/feed/query.ts's
+  // matching comment; blocking previously didn't apply here at all.
+  const blockedUserIds = await getBlockedEitherWayUserIds(user.id);
+
   const posts = await prisma.post.findMany({
     where: {
       isPublished: true,
       minLevel: { lte: user.level },
+      authorId: { notIn: blockedUserIds },
       ...(typeParam ? { type: typeParam as PostType } : {}),
     },
     orderBy: { publishedAt: "desc" },
@@ -175,6 +181,24 @@ export async function POST(request: Request) {
     // mediaUrls is resolved into a fresh signed URL on every read
     // (lib/storage/resolve-media.ts), never a stored permanent one.
     photoPath = photoUrl.slice(bucketPrefix.length);
+
+    // Security fix (2026-09-23, see DECISIONS.md) — the only check above
+    // was that photoUrl points somewhere inside the post-photos bucket;
+    // nothing confirmed the resulting path was ever issued to *this*
+    // caller. POST /api/posts/photo always mints signed-upload paths
+    // under `${user.id}/...` — a member who has seen another member's
+    // photo path (visible in that post's own signed URL, e.g. via
+    // devtools) could previously resubmit it here and have it attached,
+    // re-processed, and upserted onto their own post via the
+    // service-role client, with no ownership check at all. Since every
+    // legitimately-issued path is already prefixed with the uploader's
+    // own id, requiring that prefix here both rejects any other
+    // member's path outright and guarantees the strip+re-upload below
+    // can only ever touch an object already inside the caller's own
+    // namespace — never another member's.
+    if (!photoPath.startsWith(`${user.id}/`)) {
+      return NextResponse.json({ error: "Invalid photo." }, { status: 422 });
+    }
 
     // app/api/posts/photo/route.ts hands the browser a signed upload
     // URL and never sees the file's actual bytes (deliberately, to stay

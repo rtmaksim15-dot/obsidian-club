@@ -18,3 +18,24 @@ export async function isBlockedEitherWay(userIdA: string, userIdB: string): Prom
   });
   return block !== null;
 }
+
+// Security fix (2026-09-23, see DECISIONS.md) — the one-to-one check
+// above only ever covered a single known pair (profile view, DM). Every
+// place that lists or fetches content by a not-yet-known set of authors
+// (the feed, the posts list, a post's comments) needs the mutual set of
+// ids blocked either way with the viewer, so it can be applied directly
+// in the query's own `where` clause (`authorId: { notIn: ... }`) —
+// filtering at the database level rather than after the fact keeps any
+// existing `skip`/`take` pagination correct, since the count Prisma
+// paginates over is the already-filtered set.
+export async function getBlockedEitherWayUserIds(userId: string): Promise<string[]> {
+  const rows = await prisma.block.findMany({
+    where: { OR: [{ blockerId: userId }, { blockedId: userId }] },
+    select: { blockerId: true, blockedId: true },
+  });
+  const ids = new Set<string>();
+  for (const row of rows) {
+    ids.add(row.blockerId === userId ? row.blockedId : row.blockerId);
+  }
+  return Array.from(ids);
+}

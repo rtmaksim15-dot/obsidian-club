@@ -95,7 +95,7 @@ export type Application = {
 export type Person = {
   id: string;
   displayName: string;
-  username: string;
+  username: string | null;
   email: string;
   rep: number;
   level: number;
@@ -143,7 +143,7 @@ export type ReportRow = {
   reporter: {
     id: string;
     displayName: string;
-    username: string;
+    username: string | null;
     level: number;
     trustScore: number;
     ageVerified: boolean;
@@ -203,6 +203,16 @@ export type SecurityEventRow = {
   createdAt: string;
 };
 
+// Security fix (2026-09-23, see DECISIONS.md) — failed invite
+// short-code guesses (POST /api/join/resolve-code), same read-only
+// shape and same zone as the sign-in log above.
+export type ShortCodeFailureRow = {
+  id: string;
+  shortCode: string;
+  ip: string | null;
+  createdAt: string;
+};
+
 type Props = {
   counts: Counts;
   applications: Application[];
@@ -214,6 +224,7 @@ type Props = {
   emailCaptures: EmailCaptureRow[];
   emailCapturesTotal: number;
   securityEvents: SecurityEventRow[];
+  shortCodeFailures: ShortCodeFailureRow[];
 };
 
 // Admin Console shell (2026-09-09, see DECISIONS.md) — "one route, one
@@ -252,6 +263,7 @@ export default function AdminConsole({
   emailCaptures,
   emailCapturesTotal,
   securityEvents,
+  shortCodeFailures,
 }: Props) {
   const [applications, setApplications] = useState(initialApplications);
   const [people, setPeople] = useState(initialPeople);
@@ -472,7 +484,18 @@ export default function AdminConsole({
 
           {zone === "invitations" ? <CreatePersonalInvite onCreated={addToken} /> : null}
 
-          {currentList.length === 0 ? (
+          {/* Pre-existing bug, fixed in passing (2026-09-23, see
+              DECISIONS.md): currentList is hardcoded to [] for the
+              security zone ("read-only, nothing to select/open" —
+              true, but the emptiness check below was reading that same
+              [] to decide whether there's anything to SHOW, not just
+              nothing to click), so this always rendered "Nothing here."
+              for that zone regardless of real securityEvents/
+              shortCodeFailures content — the sign-in log has never
+              actually been visible since it shipped. Found while adding
+              shortCodeFailures here, which would have been equally
+              invisible without this fix. */}
+          {(zone === "security" ? securityEvents.length === 0 && shortCodeFailures.length === 0 : currentList.length === 0) ? (
             <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
               Nothing here.
             </p>
@@ -532,6 +555,10 @@ export default function AdminConsole({
                       <p className="text-caption mt-1 font-semibold" style={{ color: "var(--color-error)" }}>
                         URGENT — Underage
                       </p>
+                    ) : r.category === "below_membership_age" ? (
+                      <p className="text-caption mt-1 font-semibold" style={{ color: "var(--color-warning)" }}>
+                        Under 21 — Eligibility
+                      </p>
                     ) : r.isRedLine ? (
                       <p className="text-caption mt-1 font-semibold" style={{ color: "var(--color-error)" }}>
                         Red line
@@ -561,6 +588,25 @@ export default function AdminConsole({
                     </p>
                     <p className="text-caption mt-1 break-words" style={{ color: "var(--color-text-muted)" }}>
                       {e.userAgent ?? "(no user agent)"}
+                    </p>
+                  </li>
+                ))}
+              {zone === "security" && shortCodeFailures.length > 0 ? (
+                <li className="pt-2">
+                  <p className="text-label mb-2">Failed Invite Code Guesses</p>
+                </li>
+              ) : null}
+              {zone === "security" &&
+                shortCodeFailures.map((f) => (
+                  <li key={f.id} className="card">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-data">{f.shortCode}</p>
+                      <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
+                        {formatAdminDateTime(f.createdAt)}
+                      </p>
+                    </div>
+                    <p className="text-caption mt-1 break-all" style={{ color: "var(--color-text-muted)" }}>
+                      IP: {f.ip ?? "(unknown)"}
                     </p>
                   </li>
                 ))}

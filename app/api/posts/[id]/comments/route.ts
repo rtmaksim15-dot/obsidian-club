@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import { track } from "@/lib/analytics/track";
 import { resolveAvatarUrl, resolveAvatarUrls } from "@/lib/storage/resolve-media";
+import { isBlockedEitherWay, getBlockedEitherWayUserIds } from "@/lib/moderation/block";
 
 const commentSelect = {
   id: true,
@@ -33,9 +34,20 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   if (!post || !post.isPublished || post.minLevel > user.level) {
     return NextResponse.json({ error: "Post not found." }, { status: 404 });
   }
+  // Security fix (2026-09-23, see DECISIONS.md) — mirrors the block
+  // check /profile/[username] already does for the post's own author;
+  // a blocked-either-way author's post shouldn't be reachable through
+  // this route either, independent of whichever page is calling it.
+  if (await isBlockedEitherWay(user.id, post.authorId)) {
+    return NextResponse.json({ error: "Post not found." }, { status: 404 });
+  }
 
+  // Individual comments from a blocked-either-way author, on an
+  // otherwise-visible post, are filtered the same way — see
+  // lib/moderation/block.ts's getBlockedEitherWayUserIds comment.
+  const blockedUserIds = await getBlockedEitherWayUserIds(user.id);
   const comments = await prisma.comment.findMany({
-    where: { postId: post.id },
+    where: { postId: post.id, authorId: { notIn: blockedUserIds } },
     orderBy: { createdAt: "asc" },
     select: commentSelect,
   });

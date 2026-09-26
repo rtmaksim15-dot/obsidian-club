@@ -144,7 +144,7 @@ export default async function AdminConsolePage() {
     notFound();
   }
 
-  const [applications, peopleBase, reports, tokensPage, tokensTotal, counts, emailCaptures, emailCapturesTotal, securityEventRows] =
+  const [applications, peopleBase, reports, tokensPage, tokensTotal, counts, emailCaptures, emailCapturesTotal, securityEventRows, shortCodeFailureRows] =
     await Promise.all([
     prisma.waitlist.findMany({
       where: {
@@ -260,6 +260,15 @@ export default async function AdminConsolePage() {
       orderBy: { createdAt: "desc" },
       take: 100,
       select: { id: true, email: true, type: true, ip: true, userAgent: true, createdAt: true },
+    }),
+    // Security fix (2026-09-23, see DECISIONS.md) — failed invite
+    // short-code guesses, for the same Security zone. Read-only, newest
+    // first, same shape as the sign-in log above.
+    prisma.shortCodeAttempt.findMany({
+      where: { success: false },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      select: { id: true, shortCode: true, ip: true, createdAt: true },
     }),
   ]);
 
@@ -618,6 +627,12 @@ export default async function AdminConsolePage() {
         userAgent: e.userAgent,
         createdAt: e.createdAt.toISOString(),
       }))}
+      shortCodeFailures={shortCodeFailureRows.map((r) => ({
+        id: r.id,
+        shortCode: r.shortCode,
+        ip: r.ip,
+        createdAt: r.createdAt.toISOString(),
+      }))}
       applications={applicationsToShow.map((a) => ({
         id: a.id,
         name: a.name,
@@ -754,7 +769,12 @@ export default async function AdminConsolePage() {
             authorId = profile.id;
             authorName = profile.displayName;
             authorUsername = profile.username;
-            contextHref = `/profile/${profile.username}`;
+            // Nullable username (2026-09-25, see DECISIONS.md) — a
+            // profile-type report can target an admin account that
+            // hasn't picked a username yet. No page to link to in that
+            // case, so this stays null (ReportDetail.tsx already only
+            // renders "View in context" when contextHref is set).
+            contextHref = profile.username ? `/profile/${profile.username}` : null;
           }
         } else {
           // direct_message (2026-09-14, see DECISIONS.md) — label is

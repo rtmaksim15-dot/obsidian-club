@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Logo from "@/components/ui/Logo";
 import ShortCodeEntryForm from "@/components/shared/ShortCodeEntryForm";
 
@@ -5,6 +6,11 @@ import ShortCodeEntryForm from "@/components/shared/ShortCodeEntryForm";
 // a member who has a printed OBS-XXXX-XXXX code but can't scan the
 // card's QR. Distinct from /join/[token], the actual redemption
 // landing this hands off to once the code resolves.
+//
+// Security fix (2026-09-23, see DECISIONS.md) — ShortCodeEntryForm now
+// reads its error state from ?error= (the query param
+// POST /api/join/resolve-code redirects back with) via useSearchParams,
+// which requires a Suspense boundary in the App Router.
 export default function JoinIndexPage() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-ob-black px-6 py-24 text-ob-text">
@@ -13,7 +19,9 @@ export default function JoinIndexPage() {
       <p className="text-body mt-2 max-w-sm text-center italic">
         Enter the invitation code from your card.
       </p>
-      <ShortCodeEntryForm />
+      <Suspense>
+        <ShortCodeEntryForm />
+      </Suspense>
     </main>
   );
 }

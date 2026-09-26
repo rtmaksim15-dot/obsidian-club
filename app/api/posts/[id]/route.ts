@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import { resolveAvatarUrl, resolvePostMediaUrls } from "@/lib/storage/resolve-media";
+import { isBlockedEitherWay } from "@/lib/moderation/block";
 
 const postSelect = {
   id: true,
@@ -45,6 +46,14 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     return NextResponse.json({ error: "Post not found." }, { status: 404 });
   }
   if (!post.isPublished && !user.isAdmin) {
+    return NextResponse.json({ error: "Post not found." }, { status: 404 });
+  }
+  // Security fix (2026-09-23, see DECISIONS.md) — same block check
+  // every other post-reading route now applies. Unlike the isPublished
+  // check above (a moderation-review need), blocking is a plain
+  // member-to-member preference with no established admin exception
+  // anywhere else in the codebase, so this doesn't invent one either.
+  if (await isBlockedEitherWay(user.id, post.authorId)) {
     return NextResponse.json({ error: "Post not found." }, { status: 404 });
   }
   if (post.minLevel > user.level) {

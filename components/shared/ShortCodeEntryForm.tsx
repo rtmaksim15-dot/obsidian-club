@@ -1,52 +1,42 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 // Manual fallback for a member who has a printed short code but can't
 // scan the card's QR (batch generator v2, 2026-08-14) — resolves to
 // the real token, then hands off to the same /join/[token] flow.
-export default function ShortCodeEntryForm() {
-  const router = useRouter();
-  const [code, setCode] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+//
+// Security fix (2026-09-23, see DECISIONS.md) — this used to fetch()
+// POST /api/join/resolve-code, read the resolved token out of the JSON
+// response, and router.push() to it client-side. Now a plain HTML form
+// posts directly to that route; the server responds with a real HTTP
+// redirect (either straight to /join/:token, or back here with an
+// ?error= code) that the browser follows as a normal navigation. No
+// client-side code ever sees or handles the token — see that route's
+// own comment for the full reasoning.
+const ERROR_MESSAGES: Record<string, string> = {
+  not_found: "That code wasn't found.",
+  invalid: "Enter a code.",
+  rate_limited: "Too many attempts from this connection. Try again later.",
+  locked: "Code lookup is temporarily unavailable. Try again shortly.",
+};
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError(null);
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/join/resolve-code", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ shortCode: code.trim() }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(data?.error ?? "Could not look up that code.");
-        setSubmitting(false);
-        return;
-      }
-      router.push(`/join/${data.token}`);
-    } catch {
-      setError("Could not look up that code.");
-      setSubmitting(false);
-    }
-  }
+export default function ShortCodeEntryForm() {
+  const searchParams = useSearchParams();
+  const errorCode = searchParams.get("error");
+  const error = errorCode ? (ERROR_MESSAGES[errorCode] ?? "Could not look up that code.") : null;
 
   return (
-    <form onSubmit={handleSubmit} className="mt-10 w-full max-w-sm space-y-5" noValidate>
+    <form action="/api/join/resolve-code" method="POST" className="mt-10 w-full max-w-sm space-y-5" noValidate>
       <div>
         <label htmlFor="shortCode" className="input-label">
           Invitation code
         </label>
         <input
           id="shortCode"
+          name="shortCode"
           required
           className="input text-center uppercase tracking-[0.15em]"
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
           placeholder="OBS-XXXX-XXXX"
           autoComplete="off"
           autoCapitalize="characters"
@@ -59,8 +49,8 @@ export default function ShortCodeEntryForm() {
         </p>
       ) : null}
 
-      <button type="submit" className="btn-primary w-full" disabled={submitting || !code.trim()}>
-        {submitting ? "Looking up…" : "Continue"}
+      <button type="submit" className="btn-primary w-full">
+        Continue
       </button>
     </form>
   );

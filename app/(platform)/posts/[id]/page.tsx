@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import PostCard from "@/components/shared/PostCard";
 import CommentSection from "@/components/shared/CommentSection";
 import { resolveAvatarUrl, resolveAvatarUrls, resolvePostMediaUrls } from "@/lib/storage/resolve-media";
+import { isBlockedEitherWay, getBlockedEitherWayUserIds } from "@/lib/moderation/block";
 
 // Post detail (`/posts/[id]`) — Feed & Posts MVP, 2026-07-16. Same
 // gating as the feed itself (isPublished + minLevel); a post outside the
@@ -31,12 +32,18 @@ export default async function PostDetailPage({ params }: { params: { id: string 
     },
   });
   if (!post || !post.isPublished || post.minLevel > user.level) notFound();
+  // Security fix (2026-09-23, see DECISIONS.md) — same block check
+  // GET /api/posts/:id/comments and the profile page already apply.
+  if (await isBlockedEitherWay(user.id, post.author.id)) notFound();
 
   // Moderation gap 1 (2026-09-08, see DECISIONS.md): removed comments
   // stay in the thread as tombstones, not filtered out — see the
-  // matching comment on GET /api/posts/:id/comments for why.
+  // matching comment on GET /api/posts/:id/comments for why. Comments
+  // from a blocked-either-way author are filtered outright, same as
+  // that route.
+  const blockedUserIds = await getBlockedEitherWayUserIds(user.id);
   const rawComments = await prisma.comment.findMany({
-    where: { postId: post.id },
+    where: { postId: post.id, authorId: { notIn: blockedUserIds } },
     orderBy: { createdAt: "asc" },
     select: {
       id: true,

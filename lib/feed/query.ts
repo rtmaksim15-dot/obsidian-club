@@ -2,6 +2,7 @@ import "server-only";
 import type { PostType, User } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { resolveAvatarUrls, resolvePostMediaUrls } from "@/lib/storage/resolve-media";
+import { getBlockedEitherWayUserIds } from "@/lib/moderation/block";
 
 export const FEED_TYPES: PostType[] = ["post", "story"];
 export const FEED_PAGE_SIZE = 20;
@@ -28,17 +29,27 @@ export const feedPostSelect = {
  * ceiling on the whole feed).
  */
 export async function getFeedPosts(user: User, { skip = 0 }: { skip?: number } = {}) {
-  const memberships = await prisma.houseMembership.findMany({
-    where: { userId: user.id },
-    select: { house: { select: { id: true } } },
-  });
+  const [memberships, blockedUserIds] = await Promise.all([
+    prisma.houseMembership.findMany({
+      where: { userId: user.id },
+      select: { house: { select: { id: true } } },
+    }),
+    getBlockedEitherWayUserIds(user.id),
+  ]);
   const joinedHouseIds = memberships.map((m) => m.house.id);
 
+  // Security fix (2026-09-23, see DECISIONS.md) — blocking previously
+  // only worked on DMs and the profile page; the feed never checked it,
+  // so a blocked member's posts still showed up for the person who
+  // blocked them (and vice versa). Filtered in the `where` clause
+  // itself, not after the fact, so `skip`/`take`/`total` below stay
+  // correct against the already-filtered set.
   const where = {
     isPublished: true,
     minLevel: { lte: user.level },
     type: { in: FEED_TYPES },
     OR: [{ houseId: null }, { houseId: { in: joinedHouseIds } }],
+    authorId: { notIn: blockedUserIds },
   };
 
   const [posts, total] = await Promise.all([

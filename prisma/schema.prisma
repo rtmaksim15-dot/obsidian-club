@@ -182,7 +182,14 @@ enum MarketplaceType {
 model User {
   id                String      @id @default(uuid()) @db.Uuid
   email             String      @unique
-  username          String      @unique
+  // Nullable (2026-09-25, see DECISIONS.md): auto-generated
+  // email-derived usernames were removed at registration — deriving a
+  // handle from someone's email leaked both the email and often their
+  // real name, unacceptable for a closed 18+ club. A member now starts
+  // with no username at all and must pick one themselves in
+  // ProfileEditForm before the ritual's profile step can complete.
+  // Existing members' real usernames are untouched by this change.
+  username          String?     @unique
   // Username-in-the-Ritual (2026-08-06): null means "never deliberately
   // changed" — still allowed to set/change it once. Non-null means
   // they've used their one lifetime change (see
@@ -205,6 +212,15 @@ model User {
   // approval; not derived from the self-reported `age` above.
   ageVerified       Boolean     @default(false) @map("age_verified")
   ageVerifiedAt     DateTime?   @map("age_verified_at")
+  // Which numeric threshold this ageVerified flip was actually checked
+  // against (2026-09-24, membership eligibility raised to
+  // MIN_MEMBER_AGE — see lib/legal/eligibility.ts, DECISIONS.md). Null
+  // for every existing row: those were unattributed manual flips with
+  // no real check behind them at all, against any threshold — leaving
+  // this null rather than backfilling 18 keeps that history honest.
+  // Only a real verification event (manual or, eventually, a provider)
+  // should ever set this, alongside ageVerified/ageVerifiedAt.
+  ageVerifiedThreshold Int?     @map("age_verified_threshold")
   level             Int         @default(1) // 1-6
   reputation        Decimal     @default(0) @db.Decimal(3, 2) // 0.00 - 5.00, peer-review star average — independent of REP as of the 2026-07-05 CLAUDE.md migration (see ADR-0015)
   rep               Int         @default(0) // "REP" — a discrete point ledger (CLAUDE.md's earn/lose tables), replaces the old weighted `rating` score; see ADR-0015. Sum of RepHistory.delta
@@ -706,6 +722,9 @@ model Waitlist {
   // `age` field above.
   ageVerified       Boolean        @default(false) @map("age_verified")
   ageVerifiedAt     DateTime?      @map("age_verified_at")
+  // See User.ageVerifiedThreshold's comment — same reasoning, copied
+  // across at redemption alongside ageVerified/ageVerifiedAt.
+  ageVerifiedThreshold Int?        @map("age_verified_threshold")
   // Closed Registration & Invite System (2026-07-17): approving no
   // longer creates the account immediately — it generates this token,
   // shown to the admin to copy and send manually (see DECISIONS.md for
@@ -779,6 +798,28 @@ model RateLimitHit {
 
   @@index([key, createdAt])
   @@map("rate_limit_hits")
+}
+
+// Security fix (2026-09-23, see DECISIONS.md) — POST
+// /api/join/resolve-code's per-IP rate limit alone doesn't stop a
+// distributed guesser spreading attempts across many IPs. Every attempt
+// (success or failure, including one short-circuited by the lockout
+// below) is logged here — a global, rolling-window failure count over
+// this table is what the lockout actually keys off (see that route's
+// own comment for why a stateful "locked until" column isn't needed:
+// the window itself is the cooldown), and this also directly satisfies
+// "log failed attempts for the admin" — a real, queryable record,
+// distinct from the generic per-IP RateLimitHit above.
+model ShortCodeAttempt {
+  id        String   @id @default(uuid()) @db.Uuid
+  shortCode String   @map("short_code")
+  success   Boolean
+  ip        String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([shortCode, createdAt])
+  @@index([createdAt, success])
+  @@map("short_code_attempts")
 }
 
 // ============================================================
@@ -961,12 +1002,21 @@ enum ReportTargetType {
 
 // underage/non_consensual/threat are the "red line" categories (see
 // Report.isRedLine below) — everything else is a normal-priority report.
+//
+// below_membership_age (2026-09-24, membership eligibility raised to
+// MIN_MEMBER_AGE — see lib/legal/eligibility.ts, DECISIONS.md): a
+// deliberately different name and shape from `underage` — it's an
+// ordinary, non-red-line eligibility report ("this member appears to be
+// under the club's membership age"), never the child-safety flow. Kept
+// visually and lexically distinct from `underage` so the two are never
+// confused under pressure.
 enum ReportCategory {
   underage
   non_consensual
   threat
   doxxing
   commercial_solicitation
+  below_membership_age
   other
 }
 
