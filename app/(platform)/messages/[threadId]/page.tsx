@@ -9,6 +9,7 @@ import { needsDmRulesAcceptance } from "@/lib/legal/dm-rules";
 import DmThreadChat from "@/components/shared/DmThreadChat";
 import LeaveThreadButton from "@/components/shared/LeaveThreadButton";
 import ContentMenu from "@/components/shared/ContentMenu";
+import ChatShell from "@/components/shared/ChatShell";
 import { resolveAvatarUrl, resolveAvatarUrls } from "@/lib/storage/resolve-media";
 
 // /messages/:threadId (2026-09-14, see DECISIONS.md). Same 404-for-
@@ -87,62 +88,70 @@ export default async function ThreadPage({ params }: { params: { threadId: strin
   }));
 
   return (
-    // Mobile thread layout (item 1, 2026-09-22, see DECISIONS.md): a
-    // fixed h-dvh (dynamic viewport height, not min-h-screen's static
-    // 100vh) column, with only the message list scrolling — this is
-    // what actually keeps the composer above an open on-screen keyboard
-    // on iOS/Android: dvh shrinks with the keyboard, static vh doesn't,
-    // so a static-vh layout's flex-bottom composer sits behind the
-    // keyboard instead of above it. The bottom tab bar is hidden for
-    // this same route in BottomNav.tsx (its own pathname check) rather
-    // than here, so there's no fixed nav competing for the same space.
-    //
-    // Desktop thread layout (2026-09-22, see DECISIONS.md): unlike
-    // BottomNav's space, PlatformShell's `sm:pt-20` (reserving room for
-    // the fixed DesktopNav) is NOT route-aware — it still applies here.
-    // A plain `h-dvh` box that's also pushed down 5rem by an ancestor's
-    // padding-top runs 5rem past the real viewport bottom, which is
-    // exactly what put the composer below the fold on desktop: the box
-    // becomes page-scrollable, and scrolling it drags this own header
-    // (the box's top) up past the fixed nav. `sm:h-[calc(100dvh-5rem)]`
-    // subtracts that same 5rem back out at the one breakpoint it's
-    // added, so top padding + box height together equal exactly 100dvh
-    // again — still fully dvh-derived, not a hardcoded pixel height.
-    // Mobile (no `sm:pt-20`, no fixed nav) is untouched.
-    <div className="flex h-dvh flex-col overflow-hidden bg-ob-black text-ob-text sm:h-[calc(100dvh-5rem)]">
-      <header className="flex shrink-0 items-center justify-between border-b border-ob-border px-4 py-4 sm:px-6 sm:py-6">
-        <div className="flex min-w-0 items-center gap-2">
-          <a href="/messages" aria-label="Back to Messages" className="shrink-0 p-1 -ml-1">
-            <ArrowLeft size={20} strokeWidth={1.5} />
-          </a>
-          <a href={`/profile/${other.username}`} className="flex min-w-0 items-center gap-3">
-            <div className="avatar h-9 w-9 shrink-0">
-              {otherAvatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={otherAvatarUrl} alt={other.displayName} className="h-full w-full object-cover" />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center bg-ob-surface text-sm">
-                  {other.displayName.charAt(0).toUpperCase()}
+    // Mobile thread layout (item 1, 2026-09-22, see DECISIONS.md) +
+    // desktop thread layout (2026-09-22) + the shared-shell extraction
+    // (2026-09-24, see DECISIONS.md) — see ChatShell.tsx for the full
+    // reasoning. The bottom tab bar is hidden for this route in
+    // BottomNav.tsx (its own pathname check, isDmThreadRoute), so
+    // reserveBottomNavSpace is false here — no fixed nav competing for
+    // the same space, unlike Room chat's route.
+    <ChatShell
+      reserveBottomNavSpace={false}
+      header={
+        <header className="flex shrink-0 items-center justify-between border-b border-ob-border px-4 py-4 sm:px-6 sm:py-6">
+          <div className="flex min-w-0 items-center gap-2">
+            <a href="/messages" aria-label="Back to Messages" className="shrink-0 p-1 -ml-1">
+              <ArrowLeft size={20} strokeWidth={1.5} />
+            </a>
+            {/* Nullable username (2026-09-25, see DECISIONS.md) — the
+                other participant must already have one to have joined a
+                thread as a non-admin; only an admin without a username
+                could hit this. No profile to link to in that case. */}
+            {other.username ? (
+              <a href={`/profile/${other.username}`} className="flex min-w-0 items-center gap-3">
+                <div className="avatar h-9 w-9 shrink-0">
+                  {otherAvatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={otherAvatarUrl} alt={other.displayName} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-ob-surface text-sm">
+                      {other.displayName.charAt(0).toUpperCase()}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-            <p className="text-h1 !text-xl truncate">{other.displayName}</p>
-          </a>
-        </div>
-        <div className="flex shrink-0 items-center gap-4">
-          <LeaveThreadButton threadId={thread.id} />
-          <ContentMenu
-            targetType="profile"
-            targetId={other.id}
-            preview={other.displayName}
-            canReport
-            blockUserId={other.id}
-            blockInitialBlocked={blocked}
-          />
-        </div>
-      </header>
-
+                <p className="text-h1 !text-xl truncate">{other.displayName}</p>
+              </a>
+            ) : (
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="avatar h-9 w-9 shrink-0">
+                  {otherAvatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={otherAvatarUrl} alt={other.displayName} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-ob-surface text-sm">
+                      {other.displayName.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <p className="text-h1 !text-xl truncate">{other.displayName}</p>
+              </div>
+            )}
+          </div>
+          <div className="flex shrink-0 items-center gap-4">
+            <LeaveThreadButton threadId={thread.id} />
+            <ContentMenu
+              targetType="profile"
+              targetId={other.id}
+              preview={other.displayName}
+              canReport
+              blockUserId={other.id}
+              blockInitialBlocked={blocked}
+            />
+          </div>
+        </header>
+      }
+    >
       <DmThreadChat threadId={thread.id} currentUserId={user.id} initialMessages={initialMessages} />
-    </div>
+    </ChatShell>
   );
 }

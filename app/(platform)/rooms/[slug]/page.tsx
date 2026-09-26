@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { canAccessRoom } from "@/lib/rating/room-access";
 import RoomChat from "@/components/shared/RoomChat";
+import ChatShell from "@/components/shared/ChatShell";
 import { resolveAvatarUrls } from "@/lib/storage/resolve-media";
 
 export default async function RoomPage({ params }: { params: { slug: string } }) {
@@ -46,10 +47,28 @@ export default async function RoomPage({ params }: { params: { slug: string } })
   const messages = redacted.map((m, i) => ({ ...m, user: { ...m.user, avatarUrl: avatarUrls[i] } }));
 
   return (
-    <RoomChat
-      room={{ id: room.id, slug: room.slug, name: room.name, description: room.description }}
-      currentUserId={user.id}
-      initialMessages={messages.reverse().map((m) => ({ ...m, createdAt: m.createdAt.toISOString() }))}
-    />
+    // Desktop room layout (2026-09-24, see DECISIONS.md): the DM thread's
+    // full-height fix (2026-09-22) was applied only there, leaving Room
+    // chat's old `min-h-screen` main growing taller than the viewport —
+    // the composer sat below the fold and scrolling to reach it clipped
+    // this very header. Now shares ChatShell with the DM thread so the
+    // two layouts can't drift apart again.
+    <ChatShell
+      header={
+        <header className="shrink-0 border-b border-ob-border px-6 py-6">
+          <a href="/members" className="text-caption mb-2 inline-block text-ob-accent">
+            Members →
+          </a>
+          <p className="text-h1 !text-xl">{room.name}</p>
+          {room.description ? <p className="text-caption mt-1">{room.description}</p> : null}
+        </header>
+      }
+    >
+      <RoomChat
+        room={{ id: room.id, slug: room.slug }}
+        currentUserId={user.id}
+        initialMessages={messages.reverse().map((m) => ({ ...m, createdAt: m.createdAt.toISOString() }))}
+      />
+    </ChatShell>
   );
 }

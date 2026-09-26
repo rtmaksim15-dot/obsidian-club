@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/auth/supabase-browser";
+import { useStickToBottom } from "@/lib/hooks/useStickToBottom";
 import ContentMenu from "./ContentMenu";
 
 type Message = {
@@ -12,11 +13,11 @@ type Message = {
   isDeleted?: boolean;
   replyToId: string | null;
   createdAt: string;
-  user: { id: string; username: string; displayName: string; avatarUrl: string | null; level: number };
+  user: { id: string; username: string | null; displayName: string; avatarUrl: string | null; level: number };
 };
 
 type Props = {
-  room: { id: string; slug: string; name: string; description: string | null };
+  room: { id: string; slug: string };
   currentUserId: string;
   initialMessages: Message[];
 };
@@ -27,17 +28,19 @@ type Props = {
  * than merging the raw Realtime payload (which doesn't include joined
  * sender info) — simplest correct approach at this scale; see
  * TECH_DEBT.md for the optimization opportunity.
+ *
+ * The room header (name/description/"Members →") now lives in the page
+ * (app/(platform)/rooms/[slug]/page.tsx), passed into the shared
+ * ChatShell alongside this component — same split as DmThreadChat,
+ * so the two share one full-height layout (2026-09-24, see
+ * DECISIONS.md; ChatShell.tsx has the full reasoning).
  */
 export default function RoomChat({ room, currentUserId, initialMessages }: Props) {
   const [messages, setMessages] = useState(initialMessages);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: "end" });
-  }, [messages.length]);
+  const { listRef, bottomRef, handleListScroll } = useStickToBottom(messages.length);
 
   useEffect(() => {
     const supabase = createClient();
@@ -137,16 +140,8 @@ export default function RoomChat({ room, currentUserId, initialMessages }: Props
   }
 
   return (
-    <main className="flex min-h-screen flex-col bg-ob-black text-ob-text">
-      <header className="border-b border-ob-border px-6 py-6">
-        <a href="/members" className="text-caption mb-2 inline-block text-ob-accent">
-          Members →
-        </a>
-        <p className="text-h1 !text-xl">{room.name}</p>
-        {room.description ? <p className="text-caption mt-1">{room.description}</p> : null}
-      </header>
-
-      <div className="flex-1 space-y-4 overflow-y-auto px-6 py-6">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-ob-black text-ob-text">
+      <div ref={listRef} onScroll={handleListScroll} className="flex-1 space-y-4 overflow-y-auto px-6 py-6">
         {messages.length === 0 ? (
           <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
             No messages yet. Be the first.
@@ -154,26 +149,50 @@ export default function RoomChat({ room, currentUserId, initialMessages }: Props
         ) : (
           messages.map((m) => (
             <div key={m.id} className="flex items-start gap-3">
-              <a href={`/profile/${m.user.username}`} className={`avatar avatar-level-${m.user.level} h-9 w-9 shrink-0`}>
-                {m.user.avatarUrl ? (
+              {(() => {
+                const avatarClassName = `avatar avatar-level-${m.user.level} h-9 w-9 shrink-0`;
+                const avatarInner = m.user.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={m.user.avatarUrl} alt={m.user.displayName} loading="lazy" className="h-full w-full object-cover" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center bg-ob-surface text-sm">
                     {m.user.displayName.charAt(0).toUpperCase()}
                   </div>
-                )}
-              </a>
+                );
+                // Nullable username (2026-09-25, see DECISIONS.md) — a
+                // non-admin poster must already have one to have posted
+                // at all; only an admin without a username could hit
+                // this. No profile to link to, so plain unlinked
+                // content instead of a link to a broken/empty URL.
+                return m.user.username ? (
+                  <a href={`/profile/${m.user.username}`} className={avatarClassName}>
+                    {avatarInner}
+                  </a>
+                ) : (
+                  <div className={avatarClassName}>{avatarInner}</div>
+                );
+              })()}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
-                  <a href={`/profile/${m.user.username}`} className="text-data">
-                    {m.user.displayName}
-                    {m.user.id === currentUserId ? (
-                      <span className="text-caption ml-2" style={{ color: "var(--color-text-muted)" }}>
-                        you
-                      </span>
-                    ) : null}
-                  </a>
+                  {m.user.username ? (
+                    <a href={`/profile/${m.user.username}`} className="text-data">
+                      {m.user.displayName}
+                      {m.user.id === currentUserId ? (
+                        <span className="text-caption ml-2" style={{ color: "var(--color-text-muted)" }}>
+                          you
+                        </span>
+                      ) : null}
+                    </a>
+                  ) : (
+                    <span className="text-data">
+                      {m.user.displayName}
+                      {m.user.id === currentUserId ? (
+                        <span className="text-caption ml-2" style={{ color: "var(--color-text-muted)" }}>
+                          you
+                        </span>
+                      ) : null}
+                    </span>
+                  )}
                   {!m.isDeleted && m.user.id !== currentUserId ? (
                     <ContentMenu targetType="message" targetId={m.id} preview={m.content} canReport />
                   ) : null}
@@ -192,7 +211,16 @@ export default function RoomChat({ room, currentUserId, initialMessages }: Props
         <div ref={bottomRef} />
       </div>
 
-      <form onSubmit={handleSend} className="border-t border-ob-border px-6 py-4">
+      {/* shrink-0 + safe-area padding, matching DmThreadChat's composer
+          exactly (2026-09-24, see DECISIONS.md) — this is what keeps the
+          composer full-size and above the iPhone home-indicator inset
+          rather than an unrelated divergence now that both share the
+          same h-dvh-constrained ancestor. */}
+      <form
+        onSubmit={handleSend}
+        className="shrink-0 border-t border-ob-border px-6 pt-4"
+        style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
+      >
         {error ? (
           <p className="text-caption mb-2" style={{ color: "var(--color-error)" }}>
             {error}
@@ -211,6 +239,6 @@ export default function RoomChat({ room, currentUserId, initialMessages }: Props
           </button>
         </div>
       </form>
-    </main>
+    </div>
   );
 }

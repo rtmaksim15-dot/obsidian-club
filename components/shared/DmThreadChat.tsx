@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/auth/supabase-browser";
+import { useStickToBottom } from "@/lib/hooks/useStickToBottom";
 import ContentMenu from "./ContentMenu";
 
 type Message = {
@@ -9,7 +10,7 @@ type Message = {
   content: string;
   isDeleted?: boolean;
   createdAt: string;
-  sender: { id: string; username: string; displayName: string; avatarUrl: string | null };
+  sender: { id: string; username: string | null; displayName: string; avatarUrl: string | null };
 };
 
 type Props = {
@@ -39,29 +40,10 @@ export default function DmThreadChat({ threadId, currentUserId, initialMessages 
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
-  // Desktop thread layout (2026-09-22, see DECISIONS.md): starts true so
-  // opening the thread always lands on the latest message. Updated on
-  // every scroll of the message list (not state — this only needs to be
-  // read inside the messages-length effect below, so a ref avoids an
-  // extra render per scroll event) and checked there instead of always
-  // auto-scrolling on a new message, so a member reading back through
-  // history doesn't get yanked back to the bottom by an incoming message.
-  const pinnedToBottomRef = useRef(true);
-
-  function handleListScroll() {
-    const el = listRef.current;
-    if (!el) return;
-    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    pinnedToBottomRef.current = distanceFromBottom < 80;
-  }
-
-  useEffect(() => {
-    if (pinnedToBottomRef.current) {
-      bottomRef.current?.scrollIntoView({ block: "end" });
-    }
-  }, [messages.length]);
+  // Desktop thread layout (2026-09-22, see DECISIONS.md), shared with
+  // Room chat via useStickToBottom (2026-09-24, see DECISIONS.md) — see
+  // that hook for the "pinned unless scrolled up" reasoning.
+  const { listRef, bottomRef, handleListScroll } = useStickToBottom(messages.length);
 
   useEffect(() => {
     const supabase = createClient();
@@ -136,8 +118,8 @@ export default function DmThreadChat({ threadId, currentUserId, initialMessages 
         ) : (
           messages.map((m) => (
             <div key={m.id} className="flex items-start gap-3">
-              <a href={`/profile/${m.sender.username}`} className="avatar h-9 w-9 shrink-0">
-                {m.sender.avatarUrl ? (
+              {(() => {
+                const avatarInner = m.sender.avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={m.sender.avatarUrl}
@@ -149,18 +131,41 @@ export default function DmThreadChat({ threadId, currentUserId, initialMessages 
                   <div className="flex h-full w-full items-center justify-center bg-ob-surface text-sm">
                     {m.sender.displayName.charAt(0).toUpperCase()}
                   </div>
-                )}
-              </a>
+                );
+                // Nullable username (2026-09-25, see DECISIONS.md) — a
+                // non-admin sender must already have one to have sent a
+                // DM at all; only an admin without a username could hit
+                // this. No profile to link to, so plain unlinked content
+                // instead of a link to a broken/empty URL.
+                return m.sender.username ? (
+                  <a href={`/profile/${m.sender.username}`} className="avatar h-9 w-9 shrink-0">
+                    {avatarInner}
+                  </a>
+                ) : (
+                  <div className="avatar h-9 w-9 shrink-0">{avatarInner}</div>
+                );
+              })()}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
-                  <a href={`/profile/${m.sender.username}`} className="text-data">
-                    {m.sender.displayName}
-                    {m.sender.id === currentUserId ? (
-                      <span className="text-caption ml-2" style={{ color: "var(--color-text-muted)" }}>
-                        you
-                      </span>
-                    ) : null}
-                  </a>
+                  {m.sender.username ? (
+                    <a href={`/profile/${m.sender.username}`} className="text-data">
+                      {m.sender.displayName}
+                      {m.sender.id === currentUserId ? (
+                        <span className="text-caption ml-2" style={{ color: "var(--color-text-muted)" }}>
+                          you
+                        </span>
+                      ) : null}
+                    </a>
+                  ) : (
+                    <span className="text-data">
+                      {m.sender.displayName}
+                      {m.sender.id === currentUserId ? (
+                        <span className="text-caption ml-2" style={{ color: "var(--color-text-muted)" }}>
+                          you
+                        </span>
+                      ) : null}
+                    </span>
+                  )}
                   {!m.isDeleted && m.sender.id !== currentUserId ? (
                     <ContentMenu targetType="direct_message" targetId={m.id} preview={m.content} canReport />
                   ) : null}
