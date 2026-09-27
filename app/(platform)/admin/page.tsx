@@ -15,10 +15,12 @@ import AdminConsole from "@/components/admin/AdminConsole";
 // until Zone 4 lands" — Zone 4 landed 2026-09-11 and neither was
 // redirected, on purpose): invite-batches is a read-only historical
 // record of the old purchase-card generator (see that page's own
-// comment) with nothing left for Zone 4 to supersede, and /admin/rep
-// 404s for everyone, admins included, while REP_UI_ENABLED is false —
-// linking to a page that always 404s would be worse than not linking
-// it at all.
+// comment) with nothing left for Zone 4 to supersede. /admin/rep used
+// to 404 unconditionally while REP_UI_ENABLED was false; now that the
+// REP number has shipped (REP_NUMBER_ENABLED, 2026-09-27, see
+// feature-flags.ts) it's reachable for admins again — still not linked
+// from here, simply because nothing in this Zone's design ever added a
+// link for it, not because it's gated off.
 //
 // Step 1 (2026-09-09 commit): shell, zone switching, and panel
 // open/close mechanics. Step 2 (2026-09-10, see DECISIONS.md): the

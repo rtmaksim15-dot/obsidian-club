@@ -1,7 +1,8 @@
 import type { PostType } from "@prisma/client";
 import LikeButton from "./LikeButton";
 import ContentMenu from "./ContentMenu";
-import { REP_UI_ENABLED, HOUSES_UI_ENABLED, LEVELS_UI_ENABLED } from "@/lib/config/feature-flags";
+import { HOUSES_UI_ENABLED, LEVELS_UI_ENABLED } from "@/lib/config/feature-flags";
+import { isFounder } from "@/lib/config/founder";
 
 export type FeedPost = {
   id: string;
@@ -88,11 +89,6 @@ export default function PostCard({
           <span className="text-caption" style={{ color: "var(--color-text-muted)" }}>
             {timestamp}
           </span>
-          {REP_UI_ENABLED ? (
-            <span className="text-caption" style={{ color: "var(--color-gold)" }}>
-              {post.author.rep} REP
-            </span>
-          ) : null}
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
@@ -147,7 +143,7 @@ export default function PostCard({
     );
   }
 
-  const avatarClassName = `avatar h-9 w-9 shrink-0 ${LEVELS_UI_ENABLED ? `avatar-level-${post.author.level}` : ""}`;
+  const avatarClassName = `avatar h-9 w-9 shrink-0 ${LEVELS_UI_ENABLED && !isFounder(post.author.id) ? `avatar-level-${post.author.level}` : ""}`;
   const avatarInner = post.author.avatarUrl ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img src={post.author.avatarUrl} alt={post.author.displayName} loading="lazy" className="h-full w-full object-cover" />

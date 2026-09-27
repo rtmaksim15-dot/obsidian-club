@@ -11,7 +11,8 @@ import { isRitualComplete } from "@/lib/auth/ritual";
 import { getMessageButtonState } from "@/lib/dm/relationship";
 import { resolveAvatarUrl, resolveAvatarUrls, resolvePostMediaUrls } from "@/lib/storage/resolve-media";
 import { LEVEL_NAMES } from "@/lib/rating/levels";
-import { REP_UI_ENABLED, HOUSES_UI_ENABLED, LEVELS_UI_ENABLED } from "@/lib/config/feature-flags";
+import { REP_NUMBER_ENABLED, REVIEWS_UI_ENABLED, HOUSES_UI_ENABLED, LEVELS_UI_ENABLED } from "@/lib/config/feature-flags";
+import { isFounder } from "@/lib/config/founder";
 
 /**
  * Member profile — looked up by `username` (User Profiles task,
@@ -26,11 +27,13 @@ import { REP_UI_ENABLED, HOUSES_UI_ENABLED, LEVELS_UI_ENABLED } from "@/lib/conf
  * stays club-wide chronological for v1 — following doesn't filter it
  * yet (see BACKLOG.md).
  *
- * Reviews (list + submission form) moved behind REP_UI_ENABLED this
- * same pass — Max's design for the Members→profile tap-through was
- * explicit: "No REP, no reviews (already flagged off)." Previously
- * only the REP number/stars were gated; the reviews themselves weren't
- * (see TECH_DEBT.md, 2026-07-29's open question — now resolved).
+ * Reviews (list + submission form) moved behind REP_UI_ENABLED at the
+ * time (2026-07-29), split into REVIEWS_UI_ENABLED (2026-09-27, see
+ * feature-flags.ts) when the REP number itself shipped separately —
+ * Max's design for the Members→profile tap-through was explicit: "No
+ * REP, no reviews (already flagged off)." Previously only the REP
+ * number/stars were gated; the reviews themselves weren't (see
+ * TECH_DEBT.md, 2026-07-29's open question — now resolved).
  *
  * "Invited by [name]" / "Partner of [name]" (Invitation & Partner
  * system v1, 2026-08-01) — quiet lines, shown whenever set, for anyone
@@ -81,7 +84,7 @@ export default async function ProfilePage({ params }: { params: { username: stri
 
   const [reviews, repHistory, memberships, posts, followerCount, followingCount, isFollowing] =
     await Promise.all([
-      REP_UI_ENABLED
+      REVIEWS_UI_ENABLED
         ? prisma.review.findMany({
             where: { reviewedId: user.id, isVisible: true },
             orderBy: { createdAt: "desc" },
@@ -93,7 +96,7 @@ export default async function ProfilePage({ params }: { params: { username: stri
       // is public, above) — shown only to the profile's owner, same
       // reasoning as the review form only showing for other people's
       // profiles, just inverted.
-      isOwnProfile && REP_UI_ENABLED
+      isOwnProfile && REP_NUMBER_ENABLED
         ? prisma.repHistory.findMany({
             where: { userId: user.id },
             orderBy: { createdAt: "desc" },
@@ -155,7 +158,7 @@ export default async function ProfilePage({ params }: { params: { username: stri
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
       <div className="mx-auto max-w-2xl">
-        <div className={`avatar h-24 w-24 ${LEVELS_UI_ENABLED ? `avatar-level-${user.level}` : ""}`}>
+        <div className={`avatar h-24 w-24 ${LEVELS_UI_ENABLED && !isFounder(user.id) ? `avatar-level-${user.level}` : ""}`}>
           {profileAvatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={profileAvatarUrl} alt={user.displayName} className="h-full w-full object-cover" />
@@ -170,24 +173,28 @@ export default async function ProfilePage({ params }: { params: { username: stri
         <p className="text-data" style={{ color: "var(--color-text-secondary)" }}>
           @{user.username}
         </p>
-        {LEVELS_UI_ENABLED ? (
+        {LEVELS_UI_ENABLED && !isFounder(user.id) ? (
           <p className="font-cinzel uppercase tracking-brand text-ob-gold mt-1 text-sm">
             {LEVEL_NAMES[user.level] ?? `Level ${user.level}`}
           </p>
         ) : null}
 
-        {REP_UI_ENABLED ? (
+        {REVIEWS_UI_ENABLED || REP_NUMBER_ENABLED ? (
           <div className="mt-3 flex items-center gap-4">
-            <p aria-label={`${stars} out of 5 stars`}>
-              {Array.from({ length: 5 }, (_, i) => (
-                <span key={i} className={i < stars ? "star-filled" : "star-empty"}>
-                  ★
-                </span>
-              ))}
-            </p>
-            <p className="text-data" style={{ color: "var(--color-text-secondary)" }}>
-              {user.rep} REP
-            </p>
+            {REVIEWS_UI_ENABLED ? (
+              <p aria-label={`${stars} out of 5 stars`}>
+                {Array.from({ length: 5 }, (_, i) => (
+                  <span key={i} className={i < stars ? "star-filled" : "star-empty"}>
+                    ★
+                  </span>
+                ))}
+              </p>
+            ) : null}
+            {REP_NUMBER_ENABLED ? (
+              <p className="text-data" style={{ color: "var(--color-text-secondary)" }}>
+                {isFounder(user.id) ? "∞" : user.rep} REP
+              </p>
+            ) : null}
           </div>
         ) : null}
 
@@ -289,14 +296,14 @@ export default async function ProfilePage({ params }: { params: { username: stri
           </section>
         ) : null}
 
-        {viewer && !isOwnProfile && REP_UI_ENABLED ? (
+        {viewer && !isOwnProfile && REVIEWS_UI_ENABLED ? (
           <section className="mt-10">
             <p className="text-label mb-3">Leave a Review</p>
             <ReviewForm reviewedId={user.id} />
           </section>
         ) : null}
 
-        {isOwnProfile && REP_UI_ENABLED ? (
+        {isOwnProfile && REP_NUMBER_ENABLED ? (
           <section className="mt-10">
             <p className="text-label mb-3">REP History</p>
             {repHistory.length === 0 ? (
@@ -326,7 +333,7 @@ export default async function ProfilePage({ params }: { params: { username: stri
           </section>
         ) : null}
 
-        {REP_UI_ENABLED ? (
+        {REVIEWS_UI_ENABLED ? (
           <section className="mt-10">
             <p className="text-label mb-3">Reviews</p>
             {reviews.length === 0 ? (

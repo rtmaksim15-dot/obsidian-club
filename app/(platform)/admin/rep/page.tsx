@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import RepAdjustmentForm from "@/components/shared/RepAdjustmentForm";
-import { REP_UI_ENABLED } from "@/lib/config/feature-flags";
+import { REP_NUMBER_ENABLED } from "@/lib/config/feature-flags";
 
 // Admin REP adjustment (REP system + Vault task, Part A #3). Same
 // not-discoverable pattern as /admin/applications: 404, not a redirect,
@@ -11,7 +11,7 @@ import { REP_UI_ENABLED } from "@/lib/config/feature-flags";
 // app/(platform)/admin/page.tsx's own comment) — a link to a page that
 // always 404s would be worse than no link.
 export default async function AdminRepPage() {
-  if (!REP_UI_ENABLED) {
+  if (!REP_NUMBER_ENABLED) {
     notFound();
   }
 

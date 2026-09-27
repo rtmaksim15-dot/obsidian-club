@@ -3,7 +3,7 @@ import { Lock, Gem } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { track } from "@/lib/analytics/track";
-import { REP_UI_ENABLED } from "@/lib/config/feature-flags";
+import { VAULT_UI_ENABLED } from "@/lib/config/feature-flags";
 
 /**
  * The Vault (`/vault`) — real access mechanic, replacing the
@@ -31,7 +31,7 @@ export default async function VaultPage() {
   // thresholds, no items. A minimal teaser instead of the real grid,
   // not a 404 — unlike /admin/rep, this is a real member-facing nav
   // destination, not an internal panel that should stay undiscoverable.
-  if (!REP_UI_ENABLED) {
+  if (!VAULT_UI_ENABLED) {
     return (
       <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
         <div className="mx-auto max-w-3xl">

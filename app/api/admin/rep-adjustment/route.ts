@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { awardRep } from "@/lib/rating/rep-engine";
-import { REP_UI_ENABLED } from "@/lib/config/feature-flags";
+import { REP_NUMBER_ENABLED } from "@/lib/config/feature-flags";
 import { logModerationAction } from "@/lib/moderation/log";
 
 type Body = { email?: string; delta?: number | string; reason?: string };
@@ -26,7 +26,7 @@ type Body = { email?: string; delta?: number | string; reason?: string };
 // false, so it went unnoticed), fixed the same way Gap 4 fixed the
 // others.
 export async function POST(request: Request) {
-  if (!REP_UI_ENABLED) {
+  if (!REP_NUMBER_ENABLED) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 

@@ -1,19 +1,48 @@
-// v1 is feed-first (OBSIDIAN_ROADMAP_v3.0_The_Feed_First.md, 2026-07-27):
-// REP-facing UI — badges, /vault unlocks, /hall & /profile REP history,
-// admin REP adjustments — is deferred out of v1, not deleted. The
-// earning/ledger logic in lib/rating/rep-engine.ts (REP_TABLE, awardRep,
-// every award call site) keeps running untouched; this only gates what's
-// rendered. Flip to true when REP surfaces are ready to ship.
+// REP number split (2026-09-27, see DECISIONS.md) — this used to be one
+// flag (`REP_UI_ENABLED`) covering the REP number, the reputation-stars
+// average, Trust Score, and the reviews form/list all at once. Turning
+// REP on for real surfaced that these are independent product
+// decisions — reviews aren't ready yet, but the REP number and level
+// are. Split into REP_NUMBER_ENABLED (this), REVIEWS_UI_ENABLED, and
+// TRUST_SCORE_UI_ENABLED below so each can flip independently.
 //
-// Extended 2026-07-29: also gates the Reputation-stars (`User.reputation`)
-// and Trust Score stats on /hall — Max's own framing was "this is REP/
-// reputation UI that must be behind the disabled flags," i.e. these were
-// a gap in this flag's original coverage (it only checked `User.rep`,
-// the discrete point ledger) rather than a separate concept needing its
-// own flag. The underlying reputation average / Trust Score fields and
-// their recalculation (lib/rating/rating-engine.ts,
-// referral-lifecycle.ts) keep updating silently either way.
-export const REP_UI_ENABLED = false;
+// Gates: the REP number on /hall and /profile/[username] (both), the
+// "Recent REP Changes" / "REP History" list (own profile only, both
+// pages), and /admin/rep + POST /api/admin/rep-adjustment (an admin
+// tool to hand-correct a number that's now actually visible). Does NOT
+// gate the REP badge on feed post cards (components/shared/PostCard.tsx)
+// — deliberately removed from there entirely, not flagged: "the feed is
+// about content, not the author's score" (Max, 2026-09-27) reads as a
+// permanent product stance, not a "later" toggle. The earning/ledger
+// logic in lib/rating/rep-engine.ts (REP_TABLE, awardRep, every award
+// call site) keeps running untouched regardless of this flag — it only
+// gates what's rendered.
+export const REP_NUMBER_ENABLED = true;
+
+// Reputation-stars (`User.reputation`, the peer-review average) + the
+// "Leave a Review" form + the "Reviews" list — a separate mechanic from
+// REP_NUMBER_ENABLED above, launching later (2026-09-27 split). Gates
+// the stars/REP line's star half on /profile/[username], the review
+// form, and the reviews list. The underlying `Review` rows and
+// `reputation` field recalculation keep working either way — nothing
+// writes them yet since the form that would create one is hidden.
+export const REVIEWS_UI_ENABLED = false;
+
+// Trust Score (`User.trustScore`) on /hall's status card — was bundled
+// into the old REP_UI_ENABLED (2026-07-29 extension) with no product
+// decision behind showing it specifically; splitting REP out (2026-09-27)
+// is a chance to gate it on its own rather than defaulting it on by
+// association. lib/rating/referral-lifecycle.ts's Trust Score
+// recalculation keeps running untouched regardless.
+export const TRUST_SCORE_UI_ENABLED = false;
+
+// The Vault (`/vault`) — real REP-spending mechanic, was gated on the
+// old REP_UI_ENABLED purely because nothing else existed to gate it on.
+// Kept off on its own flag now that REP display has shipped (2026-09-27,
+// explicit call: "не трогаем") — turning the REP number on doesn't
+// imply turning Vault on. /vault shows its existing "Under construction"
+// teaser while this is false, same as before.
+export const VAULT_UI_ENABLED = false;
 
 // Roadmap §V: "the word 'Houses' is temporarily removed from the
 // interface." Gates browse (/houses, /houses/[slug]), join (button +
@@ -29,18 +58,33 @@ export const REP_UI_ENABLED = false;
 export const HOUSES_UI_ENABLED = false;
 
 // Roadmap §V: "Gold, достижения, уровни" (levels) — a separate system
-// from REP_UI_ENABLED, gated by User.reputation (peer-review stars),
-// not User.rep (see DECISIONS.md, 2026-07-25). Gates the level-name
-// label (Initiate/Keeper/.../Council) and the "Your Next Level"
-// progress section on /hall and /profile/[username], plus the
-// avatar-level-N border styling everywhere an avatar renders — falls
-// back to the base .avatar border with no level distinction. Does NOT
-// touch canCreatePostType's level-gating of post types (article/
-// lecture/course) — that's a permission check, not a displayed
-// "levels" concept, and keeps working silently either way. Achievement
-// grants (lib/utils/achievements.ts) were never displayed anywhere in
-// the UI to begin with — nothing to gate there.
-export const LEVELS_UI_ENABLED = false;
+// from REP, gated by User.reputation (peer-review stars), not User.rep
+// (see DECISIONS.md, 2026-07-25). Gates the level-name label
+// (Initiate/Keeper/.../Council) and the avatar-level-N border styling
+// everywhere an avatar renders (falls back to the base .avatar border
+// with no level distinction) — on /hall, /profile/[username], and
+// PostCard. Does NOT touch canCreatePostType's level-gating of post
+// types (article/lecture/course) — that's a permission check, not a
+// displayed "levels" concept, and keeps working silently either way.
+// Achievement grants (lib/utils/achievements.ts) were never displayed
+// anywhere in the UI to begin with — nothing to gate there.
+//
+// The "Your Next Level" progress section used to live under this same
+// flag; split out to LEVEL_PROGRESS_UI_ENABLED below (2026-09-27) — see
+// that flag's comment for why.
+export const LEVELS_UI_ENABLED = true;
+
+// "Your Next Level" progress bar on /hall — split off LEVELS_UI_ENABLED
+// (2026-09-27, explicit call: turning the level name/avatar ring on
+// doesn't mean the progress checklist should turn on too). With every
+// real member currently at Level 1, `referralCount` at 0 across the
+// board, and no Review rows yet to move `reputation` off 0, the
+// checklist would render zero met criteria for literally everyone —
+// "looks like a broken promise," not an honest empty state. Revisit
+// once at least one of those numbers moves. getLevelProgress() itself
+// (lib/rating/level-progress.ts) and checkLevelUp() keep running
+// regardless — this only gates the rendered checklist on /hall.
+export const LEVEL_PROGRESS_UI_ENABLED = false;
 
 // Roadmap §III/§IV: v1 is feed-first — "building now" names the feed,
 // post creation, comments, and people search; Library (articles/

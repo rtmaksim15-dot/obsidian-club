@@ -13,7 +13,15 @@ import CreateMemberInviteButton from "@/components/shared/CreateMemberInviteButt
 import CreatePartnerButton from "@/components/shared/CreatePartnerButton";
 import CopyShareLink from "@/components/shared/CopyShareLink";
 import SignOutButton from "@/components/shared/SignOutButton";
-import { REP_UI_ENABLED, LEVELS_UI_ENABLED, REFERRALS_UI_ENABLED } from "@/lib/config/feature-flags";
+import {
+  REP_NUMBER_ENABLED,
+  REVIEWS_UI_ENABLED,
+  TRUST_SCORE_UI_ENABLED,
+  LEVELS_UI_ENABLED,
+  LEVEL_PROGRESS_UI_ENABLED,
+  REFERRALS_UI_ENABLED,
+} from "@/lib/config/feature-flags";
+import { isFounder } from "@/lib/config/founder";
 import { resolveAvatarUrl, resolveAvatarUrls, resolvePostMediaUrls } from "@/lib/storage/resolve-media";
 
 /**
@@ -95,11 +103,11 @@ export default async function HallPage() {
       }),
       // Only feeds the "Your Invitation" block below — skipped while
       // that's hidden, same "don't run otherwise-unused queries" pattern
-      // as REP_UI_ENABLED/HOUSES_UI_ENABLED.
+      // as REP_NUMBER_ENABLED/HOUSES_UI_ENABLED.
       REFERRALS_UI_ENABLED
         ? prisma.referral.count({ where: { inviterId: user.id, status: { in: ["joined", "active"] } } })
         : Promise.resolve(0),
-      REP_UI_ENABLED
+      REP_NUMBER_ENABLED
         ? prisma.repHistory.findMany({
             where: { userId: user.id },
             orderBy: { createdAt: "desc" },
@@ -173,7 +181,7 @@ export default async function HallPage() {
             value — never linking to a page that doesn't exist yet. */}
         <a
           href={user.username ? `/profile/${user.username}` : "/profile/edit"}
-          className={`avatar h-16 w-16 block ${LEVELS_UI_ENABLED ? `avatar-level-${user.level}` : ""}`}
+          className={`avatar h-16 w-16 block ${LEVELS_UI_ENABLED && !isFounder(user.id) ? `avatar-level-${user.level}` : ""}`}
         >
           {ownAvatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -189,7 +197,7 @@ export default async function HallPage() {
         <a href={user.username ? `/profile/${user.username}` : "/profile/edit"}>
           <h1 className="text-h1 mt-1">{user.displayName}</h1>
         </a>
-        {LEVELS_UI_ENABLED ? (
+        {LEVELS_UI_ENABLED && !isFounder(user.id) ? (
           <p className="font-cinzel uppercase tracking-brand text-ob-gold mt-2 text-sm">
             {LEVEL_NAMES[user.level] ?? `Level ${user.level}`}
           </p>
@@ -199,26 +207,47 @@ export default async function HallPage() {
           Edit profile
         </a>
 
-        {/* Status */}
-        {REP_UI_ENABLED ? (
-          <div className="card-profile mt-10 grid grid-cols-3 gap-6">
-            <div>
-              <p className="text-label">Reputation</p>
-              <p className="text-data mt-1">{Number(user.reputation).toFixed(1)} ★</p>
-            </div>
-            <div>
-              <p className="text-label">REP</p>
-              <p className="text-data mt-1">{user.rep}</p>
-            </div>
-            <div>
-              <p className="text-label">Trust Score</p>
-              <p className="text-data mt-1">{user.trustScore}</p>
-            </div>
+        {/* Status — column count matches however many of REP/Reputation/
+            Trust Score are actually on (see feature-flags.ts's 2026-09-27
+            REP split); only REP_NUMBER_ENABLED is on right now, so this
+            renders a single column, not three with two empty. */}
+        {REP_NUMBER_ENABLED || REVIEWS_UI_ENABLED || TRUST_SCORE_UI_ENABLED ? (
+          <div
+            className={`card-profile mt-10 grid gap-6 ${
+              [REVIEWS_UI_ENABLED, REP_NUMBER_ENABLED, TRUST_SCORE_UI_ENABLED].filter(Boolean).length === 1
+                ? "grid-cols-1"
+                : [REVIEWS_UI_ENABLED, REP_NUMBER_ENABLED, TRUST_SCORE_UI_ENABLED].filter(Boolean).length === 2
+                  ? "grid-cols-2"
+                  : "grid-cols-3"
+            }`}
+          >
+            {REVIEWS_UI_ENABLED ? (
+              <div>
+                <p className="text-label">Reputation</p>
+                <p className="text-data mt-1">{Number(user.reputation).toFixed(1)} ★</p>
+              </div>
+            ) : null}
+            {REP_NUMBER_ENABLED ? (
+              <div>
+                <p className="text-label">REP</p>
+                <p className="text-data mt-1">{isFounder(user.id) ? "∞" : user.rep}</p>
+              </div>
+            ) : null}
+            {TRUST_SCORE_UI_ENABLED ? (
+              <div>
+                <p className="text-label">Trust Score</p>
+                <p className="text-data mt-1">{user.trustScore}</p>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
-        {/* Progress */}
-        {LEVELS_UI_ENABLED ? (
+        {/* Progress — split from LEVELS_UI_ENABLED (2026-09-27): with
+            every real member at Level 1 and referralCount/reputation
+            both at 0 across the board, this checklist would show zero
+            met criteria for everyone right now. See that flag's comment
+            in feature-flags.ts. */}
+        {LEVEL_PROGRESS_UI_ENABLED && !isFounder(user.id) ? (
           <section className="mt-10">
             <p className="text-label mb-3">Your Next Level</p>
             {progress.isManualAppointment ? (
@@ -360,7 +389,7 @@ export default async function HallPage() {
         </section>
 
         {/* REP history */}
-        {REP_UI_ENABLED ? (
+        {REP_NUMBER_ENABLED ? (
           <section className="mt-10">
             <p className="text-label mb-3">Recent REP Changes</p>
             {repHistory.length === 0 ? (
