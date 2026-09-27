@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { Home, Users, Plus, Archive, User, MessageCircle } from "lucide-react";
 import SignOutButton from "./SignOutButton";
+import { COMMUNITY_UI_ENABLED } from "@/lib/config/feature-flags";
 
 // Desktop navigation (2026-09-12) — same 5 destinations as BottomNav
 // (see that file's comment for why each href was chosen), plus sign-out,
@@ -20,7 +21,7 @@ import SignOutButton from "./SignOutButton";
 // the only destination with an unread dot, which none of the others need.
 const ITEMS = [
   { href: "/feed", label: "Feed", icon: Home },
-  { href: "/rooms", label: "Community", icon: Users },
+  ...(COMMUNITY_UI_ENABLED ? [{ href: "/rooms", label: "Community", icon: Users }] : []),
   { href: "/compose", label: "Create Post", icon: Plus },
   { href: "/vault", label: "Vault", icon: Archive },
   { href: "/hall", label: "Profile", icon: User },

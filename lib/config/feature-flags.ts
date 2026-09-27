@@ -67,3 +67,14 @@ export const LIBRARY_UI_ENABLED = false;
 // untouched; there's just nothing left in the UI pointing a member at
 // their own referral link/count while this is off.
 export const REFERRALS_UI_ENABLED = false;
+
+// Community tab hidden for v1 (2026-09-27): with only Newcomers active,
+// /rooms is an empty-feeling single-room list for anyone past the
+// ritual — worse than not showing a nav destination at all. Gates only
+// the BottomNav/DesktopNav tab; the /rooms and /rooms/[slug] routes,
+// the Newcomers room itself, and the Initiation Ritual's "Go to the
+// Newcomers room" step (app/(platform)/ritual/page.tsx, which links
+// straight to /rooms/newcomers, not through this nav) are untouched.
+// Flip back to true once there's enough membership for Community to
+// carry its own weight.
+export const COMMUNITY_UI_ENABLED = false;

@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { Home, Users, Plus, Archive, User, MessageCircle } from "lucide-react";
 import { isDmThreadRoute } from "@/lib/config/nav";
+import { COMMUNITY_UI_ENABLED } from "@/lib/config/feature-flags";
 
 // Mobile bottom navigation — Threads-style redesign (OBSIDIAN_ROADMAP_v3.0,
 // 2026-07-29), small text labels added under each icon (item 1, 2026-09-22,
@@ -25,7 +26,7 @@ import { isDmThreadRoute } from "@/lib/config/nav";
 // destination (DMs, not community content) to earn its own icon.
 const ITEMS = [
   { href: "/feed", label: "Feed", icon: Home },
-  { href: "/rooms", label: "Community", icon: Users },
+  ...(COMMUNITY_UI_ENABLED ? [{ href: "/rooms", label: "Community", icon: Users }] : []),
   { href: "/compose", label: "Post", icon: Plus },
   { href: "/vault", label: "Vault", icon: Archive },
   { href: "/hall", label: "Profile", icon: User },
