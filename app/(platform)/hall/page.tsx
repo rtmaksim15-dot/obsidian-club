@@ -287,12 +287,26 @@ export default async function HallPage() {
           </section>
         ) : null}
 
-        {/* My Invitation — Invitation & Partner system v1, 2026-08-01 */}
+        {/* My Invitation — Invitation & Partner system v1, 2026-08-01.
+            Card titles/copy reworked 2026-09-27: the two mechanics look
+            identical at a glance ("Member invites" / "Partner") even
+            though they're not — a member invite brings in anyone and
+            can chain further (inviteAllowance), a partner invite is a
+            mutual, one-time bond (User.partnerId is @unique). Renamed
+            so the difference reads without an explanation: "Invite to
+            the Club" (bring a friend, they can invite too) vs "Invite
+            your partner" (one bond, held by both sides). No mechanic
+            changed — CreateMemberInviteButton/CreatePartnerButton and
+            their eligibility checks (app/api/invites/member,
+            app/api/invites/partner) are untouched. */}
         <section className="mt-10">
           <p className="text-label mb-3">My Invitation</p>
 
           <div className="card mb-4">
-            <p className="text-data !text-sm">Member invites</p>
+            <p className="text-data !text-sm">Invite to the Club</p>
+            <p className="text-caption mt-1" style={{ color: "var(--color-text-secondary)" }}>
+              A friend of your choosing — once inside, they may invite in turn.
+            </p>
             <p className="text-caption mt-1 mb-3" style={{ color: "var(--color-text-secondary)" }}>
               {user.inviteAllowance} remaining
             </p>
@@ -328,7 +342,10 @@ export default async function HallPage() {
           </div>
 
           <div className="card">
-            <p className="text-data !text-sm mb-3">Partner</p>
+            <p className="text-data !text-sm">Invite your partner</p>
+            <p className="text-caption mt-1 mb-3" style={{ color: "var(--color-text-secondary)" }}>
+              A bond made once, held by both of you.
+            </p>
             {resolvedPartner ? (
               <p className="text-caption" style={{ color: "var(--color-success)" }}>
                 Partner of {resolvedPartner.displayName}
