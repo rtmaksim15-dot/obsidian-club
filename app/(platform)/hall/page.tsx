@@ -15,8 +15,6 @@ import CopyShareLink from "@/components/shared/CopyShareLink";
 import SignOutButton from "@/components/shared/SignOutButton";
 import {
   REP_NUMBER_ENABLED,
-  REVIEWS_UI_ENABLED,
-  TRUST_SCORE_UI_ENABLED,
   LEVELS_UI_ENABLED,
   LEVEL_PROGRESS_UI_ENABLED,
   REFERRALS_UI_ENABLED,
@@ -197,50 +195,28 @@ export default async function HallPage() {
         <a href={user.username ? `/profile/${user.username}` : "/profile/edit"}>
           <h1 className="text-h1 mt-1">{user.displayName}</h1>
         </a>
-        {LEVELS_UI_ENABLED && !isFounder(user.id) ? (
-          <p className="font-cinzel uppercase tracking-brand text-ob-gold mt-2 text-sm">
-            {LEVEL_NAMES[user.level] ?? `Level ${user.level}`}
+        {/* Level + REP, one muted line under the name (2026-09-27) —
+            replaces the old full-width "Status" card (red top border,
+            large digits): too heavy for a single number, and red reads
+            as an alert color here, not a place for it. Reputation
+            stars / Trust Score used to share that card too; both are
+            off (REVIEWS_UI_ENABLED / TRUST_SCORE_UI_ENABLED) and have
+            no designed home now that the card is gone — a fresh
+            decision for whenever either ships, not assumed here. */}
+        {(LEVELS_UI_ENABLED && !isFounder(user.id)) || REP_NUMBER_ENABLED ? (
+          <p
+            className="font-cinzel uppercase tracking-brand mt-2 text-sm"
+            style={{ color: "var(--color-text-secondary)" }}
+          >
+            {LEVELS_UI_ENABLED && !isFounder(user.id) ? LEVEL_NAMES[user.level] ?? `Level ${user.level}` : null}
+            {LEVELS_UI_ENABLED && !isFounder(user.id) && REP_NUMBER_ENABLED ? " · " : null}
+            {REP_NUMBER_ENABLED ? `${isFounder(user.id) ? "∞" : user.rep} REP` : null}
           </p>
         ) : null}
 
         <a href="/profile/edit" className="btn-ghost mt-4 inline-block">
           Edit profile
         </a>
-
-        {/* Status — column count matches however many of REP/Reputation/
-            Trust Score are actually on (see feature-flags.ts's 2026-09-27
-            REP split); only REP_NUMBER_ENABLED is on right now, so this
-            renders a single column, not three with two empty. */}
-        {REP_NUMBER_ENABLED || REVIEWS_UI_ENABLED || TRUST_SCORE_UI_ENABLED ? (
-          <div
-            className={`card-profile mt-10 grid gap-6 ${
-              [REVIEWS_UI_ENABLED, REP_NUMBER_ENABLED, TRUST_SCORE_UI_ENABLED].filter(Boolean).length === 1
-                ? "grid-cols-1"
-                : [REVIEWS_UI_ENABLED, REP_NUMBER_ENABLED, TRUST_SCORE_UI_ENABLED].filter(Boolean).length === 2
-                  ? "grid-cols-2"
-                  : "grid-cols-3"
-            }`}
-          >
-            {REVIEWS_UI_ENABLED ? (
-              <div>
-                <p className="text-label">Reputation</p>
-                <p className="text-data mt-1">{Number(user.reputation).toFixed(1)} ★</p>
-              </div>
-            ) : null}
-            {REP_NUMBER_ENABLED ? (
-              <div>
-                <p className="text-label">REP</p>
-                <p className="text-data mt-1">{isFounder(user.id) ? "∞" : user.rep}</p>
-              </div>
-            ) : null}
-            {TRUST_SCORE_UI_ENABLED ? (
-              <div>
-                <p className="text-label">Trust Score</p>
-                <p className="text-data mt-1">{user.trustScore}</p>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
 
         {/* Progress — split from LEVELS_UI_ENABLED (2026-09-27): with
             every real member at Level 1 and referralCount/reputation

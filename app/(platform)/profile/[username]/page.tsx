@@ -173,28 +173,30 @@ export default async function ProfilePage({ params }: { params: { username: stri
         <p className="text-data" style={{ color: "var(--color-text-secondary)" }}>
           @{user.username}
         </p>
-        {LEVELS_UI_ENABLED && !isFounder(user.id) ? (
-          <p className="font-cinzel uppercase tracking-brand text-ob-gold mt-1 text-sm">
-            {LEVEL_NAMES[user.level] ?? `Level ${user.level}`}
+        {/* Level + REP, one muted line under the name — same treatment
+            as /hall (see that page's 2026-09-27 comment): no card, no
+            separate "REP" label, sized like the old level line, not
+            larger than the name. */}
+        {(LEVELS_UI_ENABLED && !isFounder(user.id)) || REP_NUMBER_ENABLED ? (
+          <p
+            className="font-cinzel uppercase tracking-brand mt-1 text-sm"
+            style={{ color: "var(--color-text-secondary)" }}
+          >
+            {LEVELS_UI_ENABLED && !isFounder(user.id) ? LEVEL_NAMES[user.level] ?? `Level ${user.level}` : null}
+            {LEVELS_UI_ENABLED && !isFounder(user.id) && REP_NUMBER_ENABLED ? " · " : null}
+            {REP_NUMBER_ENABLED ? `${isFounder(user.id) ? "∞" : user.rep} REP` : null}
           </p>
         ) : null}
 
-        {REVIEWS_UI_ENABLED || REP_NUMBER_ENABLED ? (
+        {REVIEWS_UI_ENABLED ? (
           <div className="mt-3 flex items-center gap-4">
-            {REVIEWS_UI_ENABLED ? (
-              <p aria-label={`${stars} out of 5 stars`}>
-                {Array.from({ length: 5 }, (_, i) => (
-                  <span key={i} className={i < stars ? "star-filled" : "star-empty"}>
-                    ★
-                  </span>
-                ))}
-              </p>
-            ) : null}
-            {REP_NUMBER_ENABLED ? (
-              <p className="text-data" style={{ color: "var(--color-text-secondary)" }}>
-                {isFounder(user.id) ? "∞" : user.rep} REP
-              </p>
-            ) : null}
+            <p aria-label={`${stars} out of 5 stars`}>
+              {Array.from({ length: 5 }, (_, i) => (
+                <span key={i} className={i < stars ? "star-filled" : "star-empty"}>
+                  ★
+                </span>
+              ))}
+            </p>
           </div>
         ) : null}
 
