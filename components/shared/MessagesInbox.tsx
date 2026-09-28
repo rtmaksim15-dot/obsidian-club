@@ -108,18 +108,27 @@ export default function MessagesInbox({
                           — a non-admin sender must already have one to
                           have sent a request at all; only an admin
                           without a username could hit this. */}
-                      {r.sender.username ? (
-                        <a
-                          href={`/profile/${r.sender.username}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-data"
-                        >
-                          {r.sender.displayName}
-                        </a>
-                      ) : (
-                        <span className="text-data">{r.sender.displayName}</span>
-                      )}
+                      <div className="flex items-baseline justify-between gap-3">
+                        {r.sender.username ? (
+                          <a
+                            href={`/profile/${r.sender.username}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-data"
+                          >
+                            {r.sender.displayName}
+                          </a>
+                        ) : (
+                          <span className="text-data">{r.sender.displayName}</span>
+                        )}
+                        <span className="text-caption shrink-0" style={{ color: "var(--color-text-muted)" }}>
+                          {new Date(r.createdAt).toLocaleString("en-US", {
+                            dateStyle: "medium",
+                            timeStyle: "short",
+                            timeZone: "UTC",
+                          })}
+                        </span>
+                      </div>
                       <p className="text-body mt-1 !text-base">{r.openingMessage}</p>
                     </div>
                   </div>

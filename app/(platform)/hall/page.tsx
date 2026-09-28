@@ -95,7 +95,17 @@ export default async function HallPage() {
   const [notifications, referralCount, repHistory, posts, memberInviteTokens, partnerToken, withPartner] =
     await Promise.all([
       prisma.notification.findMany({
-        where: { userId: user.id, isRead: false },
+        // dm.request_* moved to /messages (2026-09-28, see DECISIONS.md)
+        // — that page reads live from ConversationRequest, not from this
+        // notification, and now has its own accept/decline UI and its
+        // own unread indicator on the nav. Excluded here so the same
+        // three events don't also show up as a dead-end card with no
+        // link and no read-state API.
+        where: {
+          userId: user.id,
+          isRead: false,
+          type: { notIn: ["dm.request_received", "dm.request_accepted", "dm.request_declined"] },
+        },
         orderBy: { createdAt: "desc" },
         take: 5,
       }),
