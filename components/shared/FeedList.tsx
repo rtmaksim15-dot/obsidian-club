@@ -38,9 +38,22 @@ export default function FeedList({ initialPosts, initialHasMore, viewerId, viewe
     }
   }
 
+  // Instant removal on delete (2026-09-29, see DECISIONS.md) — `posts`
+  // lives in this component's own state (`useState(initialPosts)`
+  // above), so ContentMenu's `router.refresh()` fallback silently no-ops
+  // here: refresh() re-renders this component with a fresh
+  // `initialPosts` prop, but `useState`'s initializer only runs on first
+  // mount, so the deleted post stayed on screen until a hard reload.
+  // Splicing it out of local state the moment the DELETE actually
+  // succeeds (not before — ContentMenu only calls this after `res.ok`)
+  // fixes that without needing a rollback path.
+  function handlePostDeleted(postId: string) {
+    setPosts((prev) => prev.filter((p) => p.id !== postId));
+  }
+
   return (
     <div>
-      <PostList posts={posts} viewerId={viewerId} viewerIsAdmin={viewerIsAdmin} />
+      <PostList posts={posts} viewerId={viewerId} viewerIsAdmin={viewerIsAdmin} onPostDeleted={handlePostDeleted} />
       {hasMore ? (
         <div className="mt-6 flex flex-col items-center gap-2">
           <button type="button" className="btn-secondary" onClick={loadMore} disabled={loading}>

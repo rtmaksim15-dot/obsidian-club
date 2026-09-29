@@ -16,6 +16,19 @@ type Props = {
   // menu, item 4/6, 2026-09-20, see DECISIONS.md).
   deletePostId?: string;
   deleteRedirectTo?: string;
+  // Instant-removal escape hatch (2026-09-29, see DECISIONS.md) — a
+  // caller that keeps its own client-side list (FeedList's
+  // `useState(initialPosts)`) passes this to splice the post out the
+  // moment the DELETE actually succeeds, instead of relying on
+  // `router.refresh()` alone: refresh() re-renders the server tree with
+  // fresh props, but a child's `useState(initialProp)` only reads that
+  // initializer on first mount, so the new prop value is silently
+  // ignored and the deleted post stays on screen until a hard reload.
+  // Callers with no such local list (e.g. /hall's PostList, a plain
+  // function component with no state of its own) don't pass this —
+  // `router.refresh()` is already correct there, since there's no
+  // client array to go stale in the first place.
+  onDeleted?: () => void;
   // Profile-only: same reasoning — BlockButton's toggle logic, folded
   // in here instead of a second inline control (item 2).
   blockUserId?: string;
@@ -37,6 +50,7 @@ export default function ContentMenu({
   canReport,
   deletePostId,
   deleteRedirectTo,
+  onDeleted,
   blockUserId,
   blockInitialBlocked,
 }: Props) {
@@ -72,6 +86,7 @@ export default function ContentMenu({
     setBusy(false);
     if (!res.ok) return;
     if (deleteRedirectTo) router.push(deleteRedirectTo);
+    else if (onDeleted) onDeleted();
     else router.refresh();
   }
 

@@ -37,6 +37,10 @@ type Props = {
   // /posts/[id] needs this — deleting the post you're currently viewing
   // in full leaves nothing to refresh back to.
   deleteRedirectTo?: string;
+  // Threaded down from a caller with its own client-side list (FeedList)
+  // so a successful delete removes this card instantly instead of
+  // waiting on router.refresh() — see ContentMenu's onDeleted comment.
+  onDeleted?: () => void;
 };
 
 /** Shared post-card rendering for /feed, /hall, /profile/[username], and
@@ -55,6 +59,7 @@ export default function PostCard({
   viewerId,
   viewerIsAdmin = false,
   deleteRedirectTo,
+  onDeleted,
 }: Props) {
   const photo = firstPhoto(post.mediaUrls);
   const isOwn = viewerId != null && post.author.id === viewerId;
@@ -108,6 +113,7 @@ export default function PostCard({
             canReport={canReport}
             deletePostId={canDelete ? post.id : undefined}
             deleteRedirectTo={deleteRedirectTo}
+            onDeleted={onDeleted}
           />
         </div>
       </div>
