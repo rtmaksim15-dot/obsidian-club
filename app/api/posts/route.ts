@@ -132,18 +132,23 @@ export async function POST(request: Request) {
     );
   }
 
-  const content = body.content?.trim();
+  const content = body.content?.trim() || null;
   const title = body.title?.trim();
-  if (!content) {
-    return NextResponse.json({ error: "Content can't be empty." }, { status: 422 });
+  // Photo-only posts (2026-09-29, see DECISIONS.md) — a photo is a
+  // complete post on its own; text is only required when there isn't
+  // one. Mirrors the same either/or gate ContentComposer.tsx enforces
+  // client-side, re-checked here since the UI gate is trivially
+  // bypassable by anyone calling this route directly.
+  if (!content && !body.photoUrl?.trim()) {
+    return NextResponse.json({ error: "Post can't be empty." }, { status: 422 });
   }
-  if (content.length > 20000) {
+  if (content && content.length > 20000) {
     return NextResponse.json({ error: "Content is too long." }, { status: 422 });
   }
   // CLAUDE.md (2026-07-05): "No external links in posts (keeps content
   // inside OC ecosystem)" — a literal, specified rule, not a fabricated
   // one. Simple URL detection, not link-preview parsing.
-  if (EXTERNAL_LINK_PATTERN.test(content) || (title && EXTERNAL_LINK_PATTERN.test(title))) {
+  if ((content && EXTERNAL_LINK_PATTERN.test(content)) || (title && EXTERNAL_LINK_PATTERN.test(title))) {
     return NextResponse.json({ error: "External links aren't allowed in posts." }, { status: 422 });
   }
 

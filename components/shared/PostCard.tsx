@@ -119,7 +119,10 @@ export default function PostCard({
       </div>
 
       {post.title ? <p className="text-h2 !text-lg mt-1">{post.title}</p> : null}
-      <p className="text-body mt-1 whitespace-pre-wrap">{post.content}</p>
+      {/* Photo-only posts (2026-09-29, see DECISIONS.md) can have no
+          content at all — an unconditional <p> here rendered an empty,
+          margin-only paragraph between the header and the photo. */}
+      {post.content ? <p className="text-body mt-1 whitespace-pre-wrap">{post.content}</p> : null}
 
       {photo ? (
         // eslint-disable-next-line @next/next/no-img-element

@@ -112,7 +112,10 @@ export default function ContentComposer({ houses = [] }: Props) {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const trimmed = content.trim();
-    if (!trimmed) return;
+    // Photo-only posts (2026-09-29, see DECISIONS.md) — a photo is a
+    // complete post on its own; text is only required when there isn't
+    // one.
+    if (!trimmed && !photo) return;
     if (photo && !imageConsent) return;
 
     setSubmitting(true);
@@ -198,9 +201,12 @@ export default function ContentComposer({ houses = [] }: Props) {
               onChange={(e) => setImageConsent(e.target.checked)}
               className="mt-0.5"
             />
+            {/* Shortened 2026-09-29 (see DECISIONS.md) from the original
+                two-line legal-package wording — same meaning (everyone
+                shown is a consenting adult, consent is specific to this
+                post), pending Max's sign-off on the exact phrasing. */}
             <span className="text-caption" style={{ color: "var(--color-text-secondary)" }}>
-              Everyone shown is a consenting adult aged {MIN_MEMBER_AGE} or older, and I have their specific,
-              informed, revocable consent to post this here.
+              Everyone shown is a consenting adult ({MIN_MEMBER_AGE}+) who agreed specifically to this post.
             </span>
           </label>
         </div>
@@ -241,7 +247,7 @@ export default function ContentComposer({ houses = [] }: Props) {
       <button
         type="submit"
         className="btn-primary"
-        disabled={submitting || compressing || !content.trim() || (Boolean(photo) && !imageConsent)}
+        disabled={submitting || compressing || (!content.trim() && !photo) || (Boolean(photo) && !imageConsent)}
       >
         {submitting ? "Publishing…" : "Publish"}
       </button>
