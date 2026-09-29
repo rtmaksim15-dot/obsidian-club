@@ -15,6 +15,7 @@ import CopyShareLink from "@/components/shared/CopyShareLink";
 import SignOutButton from "@/components/shared/SignOutButton";
 import {
   REP_NUMBER_ENABLED,
+  REP_HISTORY_UI_ENABLED,
   LEVELS_UI_ENABLED,
   LEVEL_PROGRESS_UI_ENABLED,
   REFERRALS_UI_ENABLED,
@@ -115,7 +116,7 @@ export default async function HallPage() {
       REFERRALS_UI_ENABLED
         ? prisma.referral.count({ where: { inviterId: user.id, status: { in: ["joined", "active"] } } })
         : Promise.resolve(0),
-      REP_NUMBER_ENABLED
+      REP_HISTORY_UI_ENABLED
         ? prisma.repHistory.findMany({
             where: { userId: user.id },
             orderBy: { createdAt: "desc" },
@@ -392,7 +393,7 @@ export default async function HallPage() {
         </section>
 
         {/* REP history */}
-        {REP_NUMBER_ENABLED ? (
+        {REP_HISTORY_UI_ENABLED ? (
           <section className="mt-10">
             <p className="text-label mb-3">Recent REP Changes</p>
             {repHistory.length === 0 ? (
@@ -420,12 +421,13 @@ export default async function HallPage() {
           <PostList posts={resolvedPosts as FeedPost[]} compact viewerId={user.id} viewerIsAdmin={user.isAdmin} />
         </section>
 
-        {/* Desktop now gets Sign Out from DesktopNav (app/(platform)/layout.tsx,
-            2026-09-12) — Hall is only ever reachable under that same
-            full-access condition, so keeping this one too would stack two
-            sign-outs on desktop. Mobile still needs it: BottomNav has no
-            sign-out at all. */}
-        <div className="mt-10 sm:hidden">
+        {/* Sign out (2026-09-29, see DECISIONS.md) — moved off DesktopNav
+            entirely, down here, so it's mobile and desktop alike: no
+            destination on the nav bar itself should read as destructive.
+            Hall is only ever reachable under the same full-access gate
+            DesktopNav/BottomNav are, so there's exactly one sign-out
+            control regardless of viewport. */}
+        <div className="mt-10">
           <SignOutButton />
         </div>
       </div>

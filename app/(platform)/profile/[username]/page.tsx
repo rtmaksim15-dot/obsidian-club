@@ -11,7 +11,13 @@ import { isRitualComplete } from "@/lib/auth/ritual";
 import { getMessageButtonState } from "@/lib/dm/relationship";
 import { resolveAvatarUrl, resolveAvatarUrls, resolvePostMediaUrls } from "@/lib/storage/resolve-media";
 import { LEVEL_NAMES } from "@/lib/rating/levels";
-import { REP_NUMBER_ENABLED, REVIEWS_UI_ENABLED, HOUSES_UI_ENABLED, LEVELS_UI_ENABLED } from "@/lib/config/feature-flags";
+import {
+  REP_NUMBER_ENABLED,
+  REP_HISTORY_UI_ENABLED,
+  REVIEWS_UI_ENABLED,
+  HOUSES_UI_ENABLED,
+  LEVELS_UI_ENABLED,
+} from "@/lib/config/feature-flags";
 import { isFounder } from "@/lib/config/founder";
 
 /**
@@ -96,7 +102,7 @@ export default async function ProfilePage({ params }: { params: { username: stri
       // is public, above) — shown only to the profile's owner, same
       // reasoning as the review form only showing for other people's
       // profiles, just inverted.
-      isOwnProfile && REP_NUMBER_ENABLED
+      isOwnProfile && REP_HISTORY_UI_ENABLED
         ? prisma.repHistory.findMany({
             where: { userId: user.id },
             orderBy: { createdAt: "desc" },
@@ -305,7 +311,7 @@ export default async function ProfilePage({ params }: { params: { username: stri
           </section>
         ) : null}
 
-        {isOwnProfile && REP_NUMBER_ENABLED ? (
+        {isOwnProfile && REP_HISTORY_UI_ENABLED ? (
           <section className="mt-10">
             <p className="text-label mb-3">REP History</p>
             {repHistory.length === 0 ? (

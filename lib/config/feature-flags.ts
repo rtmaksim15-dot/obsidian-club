@@ -19,6 +19,17 @@
 // gates what's rendered.
 export const REP_NUMBER_ENABLED = true;
 
+// "Recent REP Changes" / "REP History" list on /hall and
+// /profile/[username] (own profile only, both pages) — split off
+// REP_NUMBER_ENABLED (2026-09-29, explicit call: showing exactly what
+// earns REP — "Daily login +5", "7-day login streak +50" — cheapens the
+// number itself into a reward for opening the app, not a reputation
+// score). The REP number stays visible under REP_NUMBER_ENABLED alone;
+// this only hides the itemized ledger under it. RepHistory rows and
+// every awardRep() call site keep writing exactly as before — nothing
+// here touches earning, only what's rendered.
+export const REP_HISTORY_UI_ENABLED = false;
+
 // Reputation-stars (`User.reputation`, the peer-review average) + the
 // "Leave a Review" form + the "Reviews" list — a separate mechanic from
 // REP_NUMBER_ENABLED above, launching later (2026-09-27 split). Gates

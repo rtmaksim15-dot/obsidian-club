@@ -2,28 +2,32 @@
 
 import { usePathname } from "next/navigation";
 import { Home, Users, Plus, Archive, User, MessageCircle } from "lucide-react";
-import SignOutButton from "./SignOutButton";
 import { COMMUNITY_UI_ENABLED } from "@/lib/config/feature-flags";
 
-// Desktop navigation (2026-09-12) — same 5 destinations as BottomNav
-// (see that file's comment for why each href was chosen), plus sign-out,
-// for the sm-and-up viewport BottomNav (`sm:hidden`) never covers.
-// Rendered only by app/(platform)/layout.tsx's `fullAccess` gate: a
-// member mid-ritual or waiting at the antechamber sees none of these
-// destinations, since every one of them (Feed/Compose/Members/Hall
-// directly, Community/Vault indirectly) would just bounce them back to
-// /ritual or /antechamber — those two already have their own persistent
-// sign-out (ritual/layout.tsx, antechamber/page.tsx) for exactly that
-// state, so this bar doesn't stack a second one there.
+// Desktop navigation (2026-09-12) — same destinations as BottomNav (see
+// that file's comment for why each href was chosen), for the sm-and-up
+// viewport BottomNav (`sm:hidden`) never covers. Rendered only by
+// app/(platform)/layout.tsx's `fullAccess` gate: a member mid-ritual or
+// waiting at the antechamber sees none of these destinations, since
+// every one of them (Feed/Compose/Members/Hall directly, Community/Vault
+// indirectly) would just bounce them back to /ritual or /antechamber —
+// those two already have their own persistent sign-out (ritual/layout.tsx,
+// antechamber/page.tsx) for exactly that state.
 //
-// Messages (item 3, 2026-09-18, see DECISIONS.md) — placed last, between
-// Profile and Sign out, as specified. Not in this same ITEMS list: it's
-// the only destination with an unread dot, which none of the others need.
+// Sign out (2026-09-29, see DECISIONS.md) — moved off this bar entirely,
+// down to the bottom of /hall, matching where BottomNav has always sent
+// mobile members for the same action; no destination here should look
+// like a destructive one sitting next to Feed/Vault/etc.
+//
+// Order: Feed · [Community] · Create Post · Vault · Messages · Profile
+// (2026-09-29, explicit call) — Messages right before Profile, Profile
+// last. Messages carries the unread dot none of the others need.
 const ITEMS = [
   { href: "/feed", label: "Feed", icon: Home },
   ...(COMMUNITY_UI_ENABLED ? [{ href: "/rooms", label: "Community", icon: Users }] : []),
   { href: "/compose", label: "Create Post", icon: Plus },
   { href: "/vault", label: "Vault", icon: Archive },
+  { href: "/messages", label: "Messages", icon: MessageCircle },
   { href: "/hall", label: "Profile", icon: User },
 ];
 
@@ -45,32 +49,21 @@ export default function DesktopNav({ unreadDm = false }: { unreadDm?: boolean })
             <a
               key={label}
               href={href}
-              className="flex items-center gap-2 whitespace-nowrap text-caption"
+              className="relative flex items-center gap-2 whitespace-nowrap text-caption"
               style={{ color: active ? "var(--color-accent)" : "var(--color-text-muted)" }}
             >
               <Icon size={16} strokeWidth={1.5} />
               {label}
+              {href === "/messages" && unreadDm ? (
+                <span
+                  aria-label="Unread messages"
+                  className="absolute -right-2 -top-1 h-2 w-2 rounded-full"
+                  style={{ backgroundColor: "var(--color-accent)" }}
+                />
+              ) : null}
             </a>
           );
         })}
-        <a
-          href="/messages"
-          className="relative flex items-center gap-2 whitespace-nowrap text-caption"
-          style={{ color: pathname.startsWith("/messages") ? "var(--color-accent)" : "var(--color-text-muted)" }}
-        >
-          <MessageCircle size={16} strokeWidth={1.5} />
-          Messages
-          {unreadDm ? (
-            <span
-              aria-label="Unread messages"
-              className="absolute -right-2 -top-1 h-2 w-2 rounded-full"
-              style={{ backgroundColor: "var(--color-accent)" }}
-            />
-          ) : null}
-        </a>
-        <span className="whitespace-nowrap">
-          <SignOutButton />
-        </span>
       </div>
     </nav>
   );

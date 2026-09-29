@@ -7,11 +7,12 @@ import { COMMUNITY_UI_ENABLED } from "@/lib/config/feature-flags";
 
 // Mobile bottom navigation — Threads-style redesign (OBSIDIAN_ROADMAP_v3.0,
 // 2026-07-29), small text labels added under each icon (item 1, 2026-09-22,
-// see DECISIONS.md). Order: Feed, Community, Post (center), Vault, Profile.
-// Library's tab is gone (the route and its teaser still exist, just not
-// linked from here — see app/(platform)/library/page.tsx). "Community"
-// points at /rooms (Rooms is what's actually built; groups/people-
-// discovery/events-as-filter aren't — see /rooms's Events link and
+// see DECISIONS.md). Order (2026-09-29, explicit call): Feed, Community,
+// Post (center), Vault, Messages, Profile — Profile last, Messages right
+// before it. Library's tab is gone (the route and its teaser still exist,
+// just not linked from here — see app/(platform)/library/page.tsx).
+// "Community" points at /rooms (Rooms is what's actually built; groups/
+// people-discovery/events-as-filter aren't — see /rooms's Events link and
 // TECH_DEBT.md). "Profile" points at /hall (the self-view dashboard —
 // "The Hall" stays the in-app/brand name). "Post" links to /compose, its
 // own screen (see ContentComposer.tsx) rather than a modal — no dialog/
@@ -19,18 +20,13 @@ import { COMMUNITY_UI_ENABLED } from "@/lib/config/feature-flags";
 // route matches how /ritual's steps are already built. Desktop keeps the
 // platform usable without this (pages are still directly reachable by
 // URL).
-//
-// Messages (item 3, 2026-09-18, see DECISIONS.md) — added as a sixth tab,
-// right after Profile, rather than replacing one of the five: none of the
-// existing five is a natural fit to drop, and Messages is a distinct enough
-// destination (DMs, not community content) to earn its own icon.
 const ITEMS = [
   { href: "/feed", label: "Feed", icon: Home },
   ...(COMMUNITY_UI_ENABLED ? [{ href: "/rooms", label: "Community", icon: Users }] : []),
   { href: "/compose", label: "Post", icon: Plus },
   { href: "/vault", label: "Vault", icon: Archive },
-  { href: "/hall", label: "Profile", icon: User },
   { href: "/messages", label: "Messages", icon: MessageCircle },
+  { href: "/hall", label: "Profile", icon: User },
 ];
 
 export default function BottomNav({ unreadDm = false }: { unreadDm?: boolean }) {
