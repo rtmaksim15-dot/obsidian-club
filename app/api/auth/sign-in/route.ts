@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptionsWithName } from "@supabase/ssr";
+import { SUPABASE_COOKIE_OPTIONS } from "@/lib/auth/cookie-options";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
 import { logAdminAuthEvent, resolveAdminByEmail } from "@/lib/security/admin-auth-log";
 import { sendAdminPasswordAcceptedAlert } from "@/lib/utils/email";
@@ -54,6 +55,7 @@ export async function POST(request: NextRequest) {
           cookiesToSet = cookies;
         },
       },
+      cookieOptions: SUPABASE_COOKIE_OPTIONS,
     },
   );
 

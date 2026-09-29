@@ -11,8 +11,13 @@ import { stripExifIfPresent } from "@/lib/utils/stripExif";
 import { createAdminClient } from "@/lib/auth/supabase-admin";
 import { resolveAvatarUrl, resolveAvatarUrls, resolvePostMediaUrls } from "@/lib/storage/resolve-media";
 import { getBlockedEitherWayUserIds } from "@/lib/moderation/block";
+import { checkRateLimit } from "@/lib/security/rate-limit";
 
 const PAGE_SIZE = 20;
+// Fix 10 (2026-09-29, see DECISIONS.md) — 20/hour per author. Generous
+// for a real member (this club's posts are one-at-a-time, not a batch
+// upload flow), a real ceiling against a script.
+const POST_CREATE_LIMIT = { max: 20, windowMs: 60 * 60 * 1000 };
 const VALID_TYPES: PostType[] = ["post", "story", "article", "lecture", "manifesto", "course"];
 const EXTERNAL_LINK_PATTERN = /(https?:\/\/|www\.)\S+/i;
 
@@ -98,6 +103,14 @@ export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 403 });
+  }
+
+  const rateLimit = await checkRateLimit(`post:${user.id}`, POST_CREATE_LIMIT);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: "Too many posts. Try again later." },
+      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } },
+    );
   }
 
   let body: Body;

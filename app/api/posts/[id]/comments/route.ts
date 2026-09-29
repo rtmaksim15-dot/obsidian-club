@@ -4,6 +4,12 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { track } from "@/lib/analytics/track";
 import { resolveAvatarUrl, resolveAvatarUrls } from "@/lib/storage/resolve-media";
 import { isBlockedEitherWay, getBlockedEitherWayUserIds } from "@/lib/moderation/block";
+import { checkRateLimit } from "@/lib/security/rate-limit";
+
+// Fix 10 (2026-09-29, see DECISIONS.md) — 30/hour per author, higher
+// than posts since back-and-forth commenting is naturally more frequent
+// than posting, still well above anything a real conversation needs.
+const COMMENT_CREATE_LIMIT = { max: 30, windowMs: 60 * 60 * 1000 };
 
 const commentSelect = {
   id: true,
@@ -68,6 +74,14 @@ export async function POST(request: Request, { params }: { params: { id: string 
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 403 });
+  }
+
+  const rateLimit = await checkRateLimit(`comment:${user.id}`, COMMENT_CREATE_LIMIT);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: "Too many comments. Try again later." },
+      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } },
+    );
   }
 
   const post = await prisma.post.findUnique({ where: { id: params.id } });

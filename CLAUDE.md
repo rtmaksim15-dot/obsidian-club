@@ -38,6 +38,7 @@
 - **Database**: Supabase (PostgreSQL) — проект: obsidian-club, регион: East US/Ohio
 - **ORM**: Prisma (схема задеплоена через `prisma db push`)
 - **Auth**: Supabase Auth (email/password + Google OAuth)
+  - Кука сессии умышленно доступна из JS (`httpOnly: false`) — браузерный клиент Supabase (вход, Realtime-чат, загрузка в Storage) пишет и читает её напрямую; защита от кражи через XSS — на стороне CSP, а не флага куки (Fix 9, 2026-09-29, см. DECISIONS.md)
 - **Стиль**: Tailwind CSS
 - **Деплой**: Vercel (планируется)
 - **GitHub**: github.com/rtmaksim15 — репозиторий obsidian-club (private)

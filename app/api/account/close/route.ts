@@ -2,6 +2,7 @@ import { createServerClient, type CookieOptionsWithName } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
+import { SUPABASE_COOKIE_OPTIONS } from "@/lib/auth/cookie-options";
 
 // POST /api/account/close — immediate, self-service account closure, no
 // explanation or third-party approval required (member protection
@@ -39,6 +40,7 @@ export async function POST(request: NextRequest) {
           cookiesToSet = cookies;
         },
       },
+      cookieOptions: SUPABASE_COOKIE_OPTIONS,
     },
   );
 

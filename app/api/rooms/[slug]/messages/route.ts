@@ -3,8 +3,13 @@ import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import { canAccessRoom } from "@/lib/rating/room-access";
 import { resolveAvatarUrl, resolveAvatarUrls } from "@/lib/storage/resolve-media";
+import { checkRateLimit } from "@/lib/security/rate-limit";
 
 const PAGE_SIZE = 50;
+// Fix 10 (2026-09-29, see DECISIONS.md) — 60/hour per sender, per room.
+// A real conversation, even an active one, doesn't sustain a message a
+// minute for a full hour; a flood script does.
+const ROOM_MESSAGE_LIMIT = { max: 60, windowMs: 60 * 60 * 1000 };
 
 async function loadRoomForAccess(slug: string) {
   return prisma.room.findUnique({ where: { slug } });
@@ -71,6 +76,14 @@ export async function POST(request: Request, { params }: { params: { slug: strin
   }
   if (!(await canAccessRoom(user, room))) {
     return NextResponse.json({ error: "This room isn't open to you yet." }, { status: 403 });
+  }
+
+  const rateLimit = await checkRateLimit(`room-message:${params.slug}:${user.id}`, ROOM_MESSAGE_LIMIT);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: "Too many messages. Try again later." },
+      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } },
+    );
   }
 
   let body: Body;

@@ -4,6 +4,14 @@ import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import { REPORT_CATEGORIES, isRedLineCategory } from "@/lib/moderation/report";
 import { sendReportAlert } from "@/lib/utils/email";
+import { checkRateLimit } from "@/lib/security/rate-limit";
+
+// Fix 10 (2026-09-29, see DECISIONS.md) — a real red-line report should
+// never be rate-limited away, but nothing stopped a flood of frivolous
+// ones from burying admin/reports or spamming sendReportAlert. 10/hour
+// per reporter: a real member filing a real report a few times a day
+// never notices this; a script can't.
+const REPORT_LIMIT = { max: 10, windowMs: 60 * 60 * 1000 };
 
 // Moderation gap 2 (2026-09-08, see DECISIONS.md): comment/message
 // added — live conversation previously had no reporting path at all.
@@ -24,6 +32,14 @@ export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 403 });
+  }
+
+  const rateLimit = await checkRateLimit(`report:${user.id}`, REPORT_LIMIT);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: "Too many reports. Try again later." },
+      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } },
+    );
   }
 
   let body: Body;

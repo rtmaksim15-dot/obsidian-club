@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { track } from "@/lib/analytics/track";
 import { isAdminId } from "@/lib/auth/admin-allowlist";
+import { SUPABASE_COOKIE_OPTIONS } from "@/lib/auth/cookie-options";
 import { logAdminAuthEvent } from "@/lib/security/admin-auth-log";
 import { getClientIp } from "@/lib/security/rate-limit";
 import { sendAdminPasswordAcceptedAlert } from "@/lib/utils/email";
@@ -63,6 +64,7 @@ export async function GET(request: NextRequest) {
             cookiesToSet = cookies;
           },
         },
+        cookieOptions: SUPABASE_COOKIE_OPTIONS,
       },
     );
 

@@ -2,6 +2,7 @@ import { createServerClient, type CookieOptionsWithName } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { createAdminClient } from "@/lib/auth/supabase-admin";
+import { SUPABASE_COOKIE_OPTIONS } from "@/lib/auth/cookie-options";
 import { generateReferralCode } from "@/lib/utils/codes";
 import { track } from "@/lib/analytics/track";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
@@ -249,6 +250,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
         cookiesToSet = cookies;
       },
     },
+    cookieOptions: SUPABASE_COOKIE_OPTIONS,
   });
   const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
   if (signInError) {

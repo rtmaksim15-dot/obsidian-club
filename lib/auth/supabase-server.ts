@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { SUPABASE_COOKIE_OPTIONS } from "./cookie-options";
 
 // Supabase client for Server Components, Route Handlers, and Server
 // Actions (ADR-0010). Reads/writes the session via Next.js cookies().
@@ -25,6 +26,7 @@ export async function createClient() {
           }
         },
       },
+      cookieOptions: SUPABASE_COOKIE_OPTIONS,
     }
   );
 }

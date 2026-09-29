@@ -3,9 +3,14 @@ import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import { isBlockedEitherWay } from "@/lib/moderation/block";
 import { resolveAvatarUrl, resolveAvatarUrls } from "@/lib/storage/resolve-media";
+import { checkRateLimit } from "@/lib/security/rate-limit";
 
 const PAGE_SIZE = 100;
 const MAX_MESSAGE_LENGTH = 2000;
+// Fix 10 (2026-09-29, see DECISIONS.md) — 60/hour per sender, per
+// thread. Same reasoning as the room-message limit: generous for a real
+// back-and-forth DM, a real ceiling against a script.
+const DM_MESSAGE_LIMIT = { max: 60, windowMs: 60 * 60 * 1000 };
 
 const messageSelect = {
   id: true,
@@ -68,6 +73,14 @@ export async function POST(request: Request, { params }: { params: { id: string 
 
   if (!(await requireActiveParticipant(params.id, user.id))) {
     return NextResponse.json({ error: "Conversation not found." }, { status: 404 });
+  }
+
+  const rateLimit = await checkRateLimit(`dm-message:${params.id}:${user.id}`, DM_MESSAGE_LIMIT);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: "Too many messages. Try again later." },
+      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } },
+    );
   }
 
   let body: Body;

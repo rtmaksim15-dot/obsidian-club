@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptionsWithName } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { SUPABASE_COOKIE_OPTIONS } from "@/lib/auth/cookie-options";
 
 // POST /api/auth/sign-out — full server-side sign-out (Sign Out, /hall,
 // 2026-08-08). Builds its own Supabase client here rather than reusing
@@ -30,6 +31,7 @@ export async function POST(request: NextRequest) {
           cookiesToSet = cookies;
         },
       },
+      cookieOptions: SUPABASE_COOKIE_OPTIONS,
     },
   );
 

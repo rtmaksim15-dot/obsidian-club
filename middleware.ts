@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { SUPABASE_COOKIE_OPTIONS } from "./lib/auth/cookie-options";
 
 // Refreshes the Supabase session on every request and gates the
 // authenticated Platform routes (ADR-0010). Fine-grained checks (e.g.
@@ -63,6 +64,7 @@ export async function middleware(request: NextRequest) {
           );
         },
       },
+      cookieOptions: SUPABASE_COOKIE_OPTIONS,
     }
   );
 
