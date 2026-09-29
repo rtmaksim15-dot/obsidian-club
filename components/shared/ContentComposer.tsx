@@ -227,6 +227,17 @@ export default function ContentComposer({ houses = [] }: Props) {
         </p>
       ) : null}
 
+      {/* Publish is disabled, not merely inert, while the consent box is
+          unchecked — before the button itself had any :disabled styling
+          (see globals.css, 2026-09-29), that state was indistinguishable
+          from a working button that silently did nothing on click. This
+          spells out why, on top of the visual fix. */}
+      {photo && !imageConsent ? (
+        <p className="text-caption" style={{ color: "var(--color-text-secondary)" }}>
+          Check the consent box above to publish.
+        </p>
+      ) : null}
+
       <button
         type="submit"
         className="btn-primary"

@@ -6,12 +6,21 @@ import CommentSection from "@/components/shared/CommentSection";
 import { resolveAvatarUrl, resolveAvatarUrls, resolvePostMediaUrls } from "@/lib/storage/resolve-media";
 import { isBlockedEitherWay, getBlockedEitherWayUserIds } from "@/lib/moderation/block";
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // Post detail (`/posts/[id]`) — Feed & Posts MVP, 2026-07-16. Same
 // gating as the feed itself (isPublished + minLevel); a post outside the
 // caller's reach 404s rather than teasing it, matching /api/posts.
 export default async function PostDetailPage({ params }: { params: { id: string } }) {
   const user = await getCurrentUser();
   if (!user) redirect(`/login?next=/posts/${params.id}`);
+
+  // Photo-bug investigation (2026-09-29, see DECISIONS.md): `id` is a
+  // `@db.Uuid` column — a non-UUID segment (e.g. a stray `/posts/new`)
+  // used to throw out of Prisma's own type coercion before the
+  // `!post` check below ever got a chance to run, turning what should
+  // be an ordinary 404 into an unhandled 500.
+  if (!UUID_PATTERN.test(params.id)) notFound();
 
   const post = await prisma.post.findUnique({
     where: { id: params.id },
