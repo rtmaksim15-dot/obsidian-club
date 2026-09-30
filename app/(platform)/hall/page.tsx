@@ -13,6 +13,7 @@ import CreateMemberInviteButton from "@/components/shared/CreateMemberInviteButt
 import CreatePartnerButton from "@/components/shared/CreatePartnerButton";
 import CopyShareLink from "@/components/shared/CopyShareLink";
 import SignOutButton from "@/components/shared/SignOutButton";
+import ZoomableAvatar from "@/components/shared/ZoomableAvatar";
 import {
   REP_NUMBER_ENABLED,
   REP_HISTORY_UI_ENABLED,
@@ -188,19 +189,14 @@ export default async function HallPage() {
             entirely and could. Own-profile link goes to /profile/edit
             instead of building a broken /profile/ URL out of an empty
             value — never linking to a page that doesn't exist yet. */}
-        <a
-          href={user.username ? `/profile/${user.username}` : "/profile/edit"}
+        {/* Opens the fullscreen viewer instead of navigating (2026-09-30,
+            see DECISIONS.md) — the name below still links to the same
+            profile URL, so that way to get there is unchanged. */}
+        <ZoomableAvatar
+          avatarUrl={ownAvatarUrl}
+          displayName={user.displayName}
           className={`avatar h-16 w-16 block ${LEVELS_UI_ENABLED && !isFounder(user.id) ? `avatar-level-${user.level}` : ""}`}
-        >
-          {ownAvatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={ownAvatarUrl} alt={user.displayName} className="h-full w-full object-cover" />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center bg-ob-surface text-xl">
-              {user.displayName.charAt(0).toUpperCase()}
-            </div>
-          )}
-        </a>
+        />
 
         <p className="text-body mt-4 italic">Welcome back,</p>
         <a href={user.username ? `/profile/${user.username}` : "/profile/edit"}>

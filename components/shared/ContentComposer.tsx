@@ -201,12 +201,10 @@ export default function ContentComposer({ houses = [] }: Props) {
               onChange={(e) => setImageConsent(e.target.checked)}
               className="mt-0.5"
             />
-            {/* Shortened 2026-09-29 (see DECISIONS.md) from the original
-                two-line legal-package wording — same meaning (everyone
-                shown is a consenting adult, consent is specific to this
-                post), pending Max's sign-off on the exact phrasing. */}
+            {/* Final wording approved 2026-09-30 (see DECISIONS.md) —
+                replaces the shortened draft from the previous pass. */}
             <span className="text-caption" style={{ color: "var(--color-text-secondary)" }}>
-              Everyone shown is a consenting adult ({MIN_MEMBER_AGE}+) who agreed specifically to this post.
+              Everyone shown is an adult ({MIN_MEMBER_AGE}+) and has consented to this post being shared.
             </span>
           </label>
         </div>

@@ -6,6 +6,7 @@ import FollowButton from "@/components/shared/FollowButton";
 import ContentMenu from "@/components/shared/ContentMenu";
 import PostCard, { type FeedPost } from "@/components/shared/PostCard";
 import MessageButton from "@/components/shared/MessageButton";
+import ZoomableAvatar from "@/components/shared/ZoomableAvatar";
 import { isBlockedEitherWay } from "@/lib/moderation/block";
 import { isRitualComplete } from "@/lib/auth/ritual";
 import { getMessageButtonState } from "@/lib/dm/relationship";
@@ -164,16 +165,11 @@ export default async function ProfilePage({ params }: { params: { username: stri
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
       <div className="mx-auto max-w-2xl">
-        <div className={`avatar h-24 w-24 ${LEVELS_UI_ENABLED && !isFounder(user.id) ? `avatar-level-${user.level}` : ""}`}>
-          {profileAvatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={profileAvatarUrl} alt={user.displayName} className="h-full w-full object-cover" />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center bg-ob-surface text-2xl">
-              {user.displayName.charAt(0).toUpperCase()}
-            </div>
-          )}
-        </div>
+        <ZoomableAvatar
+          avatarUrl={profileAvatarUrl}
+          displayName={user.displayName}
+          className={`avatar h-24 w-24 ${LEVELS_UI_ENABLED && !isFounder(user.id) ? `avatar-level-${user.level}` : ""}`}
+        />
 
         <h1 className="text-h1 mt-6">{user.displayName}</h1>
         <p className="text-data" style={{ color: "var(--color-text-secondary)" }}>

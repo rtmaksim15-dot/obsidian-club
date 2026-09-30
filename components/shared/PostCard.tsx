@@ -1,6 +1,7 @@
 import type { PostType } from "@prisma/client";
 import LikeButton from "./LikeButton";
 import ContentMenu from "./ContentMenu";
+import ZoomableImage from "./ZoomableImage";
 import { HOUSES_UI_ENABLED, LEVELS_UI_ENABLED } from "@/lib/config/feature-flags";
 import { isFounder } from "@/lib/config/founder";
 
@@ -125,8 +126,7 @@ export default function PostCard({
       {post.content ? <p className="text-body mt-1 whitespace-pre-wrap">{post.content}</p> : null}
 
       {photo ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={photo} alt="" loading="lazy" className="mt-3 max-h-[480px] w-full rounded-ob object-cover" />
+        <ZoomableImage src={photo} alt="" className="mt-3 max-h-[480px] w-full rounded-ob object-cover" />
       ) : null}
 
       <div className="mt-3 flex items-center gap-5">
