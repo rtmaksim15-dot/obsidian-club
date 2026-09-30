@@ -23,13 +23,24 @@
      --color-error (раньше оба #8B1A1A, отсюда обычная и опасная кнопка
      выглядели одинаково). --color-accent сам не тронут и продолжает
      питать все не-кнопочные акценты (nav, лайк, чекбокс, вкладки
-     админки) — эта правка ограничена именно кнопками, как и просили. */
-  --color-btn-primary-bg: #4a1420; /* Dark Cherry / Burgundy — обычное действие */
-  --color-btn-primary-bg-hover: #5c1a29;
-  --color-btn-primary-border: #a9713d; /* Red-Gold / Bronze — кант */
+     админки) — эта правка ограничена именно кнопками, как и просили.
+     Второй проход того же дня — заливку убрали совсем (владелец
+     сравнил "Add Photo" без заливки и залитый "Publish" на /compose и
+     выбрал стиль без заливки для всех): все три кнопки теперь
+     прозрачные, различаются только кантом/текстом. --color-btn-primary-bg
+     и --color-btn-primary-bg-hover больше нигде не используются, но
+     оставлены — вдруг заливку вернут для одного из вариантов. */
+  --color-btn-primary-bg: #4a1420; /* не используется с 2026-09-29 (см. выше) */
+  --color-btn-primary-bg-hover: #5c1a29; /* не используется с 2026-09-29 (см. выше) */
+  --color-btn-primary-border: #a9713d; /* Red-Gold / Bronze, яркий — главное действие */
   --color-btn-primary-border-hover: #c08a4f;
-  --color-btn-danger-bg: #8b1a1a; /* чистый Blood — только необратимое/опасное */
-  --color-btn-danger-bg-hover: #a01f1f;
+  --color-btn-secondary-border: #93693c; /* та же бронза, приглушённая — второстепенное действие */
+  --color-btn-secondary-border-hover: #b98a52;
+  --color-btn-danger-bg: #8b1a1a; /* не используется как заливка с 2026-09-29 — см. --color-btn-danger-border */
+  --color-btn-danger-bg-hover: #a01f1f; /* не используется с 2026-09-29 (см. выше) */
+  --color-btn-danger-border: #c23333; /* чистый красный, светлее Blood — иначе как текст/кант на тёмном фоне читается плохо (контраст ~2.1:1 у исходного #8B1A1A против ~3.6:1 здесь) */
+  --color-btn-danger-border-hover: #d94a4a;
+  --color-btn-disabled-border: #4a453f; /* приглушённый нейтральный кант — одинаковый для всех трёх, явно "не работает" */
 
   /* Текст */
   --color-text-primary: #edeae4; /* основной текст (светлый тёплый) */
@@ -154,23 +165,31 @@
   /* ==========================================================
      BUTTONS (DESIGN.md §5)
      ========================================================== */
+  /* Outline-only, no fill (2026-09-29, see DECISIONS.md) — the founder
+     compared "Add Photo" (outline, highlights on hover) against a
+     filled "Publish" side by side on /compose and picked the outline
+     style for everything: a flat color plate on this dark a background
+     read as cheap. Hierarchy between primary and secondary is now
+     carried entirely by the border — 2px, brighter bronze for the
+     primary/default action; 1px, dimmer bronze for the secondary one —
+     never by a fill, since neither has one anymore. */
   .btn-primary {
-    background: var(--color-btn-primary-bg);
-    color: var(--color-text-primary);
+    background: transparent;
+    color: var(--color-btn-primary-border);
     font-family: var(--font-cinzel), "Cinzel", serif;
     font-size: 0.8125rem;
     font-weight: 600;
     letter-spacing: 0.15em;
     text-transform: uppercase;
     padding: 0.875rem 2rem;
-    border: 1px solid var(--color-btn-primary-border);
+    border: 2px solid var(--color-btn-primary-border);
     border-radius: 2px;
     cursor: pointer;
-    transition: background 0.2s, border-color 0.2s, transform 0.1s;
+    transition: border-color 0.2s, color 0.2s, transform 0.1s;
   }
   .btn-primary:hover {
-    background: var(--color-btn-primary-bg-hover);
     border-color: var(--color-btn-primary-border-hover);
+    color: var(--color-btn-primary-border-hover);
   }
   .btn-primary:active {
     transform: scale(0.98);
@@ -180,7 +199,11 @@
      composer's Publish button before the required photo-consent box is
      checked) looked fully clickable and silently did nothing when
      clicked (2026-09-29, see DECISIONS.md). Covers all button classes
-     at once since every one of them shared the same gap. */
+     at once since every one of them shared the same gap. Extended the
+     same day: disabled now flattens every variant's border/text to the
+     same neutral, muted tone regardless of which button it is — colored
+     for a disabled control would still read as "an available action in
+     a quiet state," which isn't what disabled means here. */
   .btn-primary:disabled,
   .btn-secondary:disabled,
   .btn-ghost:disabled,
@@ -188,62 +211,68 @@
     opacity: 0.45;
     cursor: not-allowed;
   }
-  .btn-primary:disabled:hover {
-    background: var(--color-btn-primary-bg);
-    border-color: var(--color-btn-primary-border);
+  .btn-primary:disabled,
+  .btn-secondary:disabled,
+  .btn-danger:disabled {
+    border-color: var(--color-btn-disabled-border);
+    color: var(--color-text-muted);
+  }
+  .btn-primary:disabled:hover,
+  .btn-secondary:disabled:hover,
+  .btn-danger:disabled:hover {
+    border-color: var(--color-btn-disabled-border);
+    color: var(--color-text-muted);
   }
 
   /* Opposite end of the same palette (2026-09-29, see DECISIONS.md) —
      reserved for genuinely irreversible/dangerous actions (delete,
      block, decline, revoke, sign out), so it reads as a real warning
-     instead of the everyday CTA color. Same shape as .btn-primary
-     (size/font/padding identical) so swapping the class never shifts
-     layout — only the color changes. */
+     instead of the everyday CTA color. Same shape/weight as .btn-primary
+     (size/font/padding/border-width identical) so swapping the class
+     never shifts layout — only the color changes, on purpose: the
+     dangerous one should differ by color, not by a filled plate. */
   .btn-danger {
-    background: var(--color-btn-danger-bg);
-    color: var(--color-text-primary);
+    background: transparent;
+    color: var(--color-btn-danger-border);
     font-family: var(--font-cinzel), "Cinzel", serif;
     font-size: 0.8125rem;
     font-weight: 600;
     letter-spacing: 0.15em;
     text-transform: uppercase;
     padding: 0.875rem 2rem;
-    border: none;
+    border: 2px solid var(--color-btn-danger-border);
     border-radius: 2px;
     cursor: pointer;
-    transition: background 0.2s, transform 0.1s;
+    transition: border-color 0.2s, color 0.2s, transform 0.1s;
   }
   .btn-danger:hover {
-    background: var(--color-btn-danger-bg-hover);
+    border-color: var(--color-btn-danger-border-hover);
+    color: var(--color-btn-danger-border-hover);
   }
   .btn-danger:active {
     transform: scale(0.98);
   }
-  .btn-danger:disabled:hover {
-    background: var(--color-btn-danger-bg);
-  }
 
   .btn-secondary {
     background: transparent;
-    color: var(--color-text-primary);
+    color: var(--color-btn-secondary-border);
     font-family: var(--font-cinzel), "Cinzel", serif;
     font-size: 0.8125rem;
     font-weight: 600;
     letter-spacing: 0.15em;
     text-transform: uppercase;
     padding: 0.875rem 2rem;
-    border: 1px solid var(--color-border);
+    border: 1px solid var(--color-btn-secondary-border);
     border-radius: 2px;
     cursor: pointer;
-    transition: border-color 0.2s, color 0.2s;
+    transition: border-color 0.2s, color 0.2s, transform 0.1s;
   }
   .btn-secondary:hover {
-    border-color: var(--color-accent);
-    color: var(--color-accent);
+    border-color: var(--color-btn-secondary-border-hover);
+    color: var(--color-btn-secondary-border-hover);
   }
-  .btn-secondary:disabled:hover {
-    border-color: var(--color-border);
-    color: var(--color-text-primary);
+  .btn-secondary:active {
+    transform: scale(0.98);
   }
 
   .btn-ghost {
