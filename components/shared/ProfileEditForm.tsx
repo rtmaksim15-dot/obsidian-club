@@ -68,6 +68,22 @@ export default function ProfileEditForm({ user }: Props) {
   // there's nothing to check for a field the user can't edit.
   useEffect(() => {
     if (user.usernameChangeUsed) return;
+    // Bumped unconditionally, on every value change, not only when a
+    // fetch is actually about to fire (2026-09-29, see DECISIONS.md) —
+    // this is what a stale response is checked against below. Bumping
+    // it only inside the "checking" branch (the previous bug) left a
+    // real race open: type a free, valid name (a fetch goes in flight),
+    // then immediately type something format-invalid — the invalid
+    // state renders correctly, synchronously, but the still-in-flight
+    // fetch for the *previous* value was never invalidated, since
+    // nothing reaching an early-return branch ever touched the
+    // sequence number. When that stale response landed a few hundred ms
+    // later, it passed the (unchanged) sequence check and silently
+    // overwrote the correct "invalid" message with a stale
+    // "available"/"taken" — reproduced live on production by typing a
+    // free name then backspacing to one character before the in-flight
+    // check for the longer name had resolved.
+    const seq = ++usernameCheckSeq.current;
     // Empty is its own calm, non-error state (2026-09-25, see
     // DECISIONS.md) — a required field the member simply hasn't typed
     // into yet is not the same as an invalid value; showing "invalid"
@@ -91,12 +107,11 @@ export default function ProfileEditForm({ user }: Props) {
     }
 
     setUsernameCheck("checking");
-    const seq = ++usernameCheckSeq.current;
     const timeout = setTimeout(async () => {
       try {
         const res = await fetch(`/api/profile/username-check?username=${encodeURIComponent(username)}`);
         const body = await res.json().catch(() => ({}));
-        if (seq !== usernameCheckSeq.current) return; // a newer keystroke already superseded this check
+        if (seq !== usernameCheckSeq.current) return; // a newer value already superseded this check
         setUsernameCheck(body.available ? "available" : "taken");
       } catch {
         if (seq === usernameCheckSeq.current) setUsernameCheck("idle");
