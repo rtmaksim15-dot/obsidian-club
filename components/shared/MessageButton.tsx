@@ -109,7 +109,7 @@ export default function MessageButton({
           <button type="button" className="btn-primary" disabled={busy} onClick={() => respond("accept")}>
             Accept
           </button>
-          <button type="button" className="btn-ghost" disabled={busy} onClick={() => respond("decline")}>
+          <button type="button" className="btn-danger" disabled={busy} onClick={() => respond("decline")}>
             Decline
           </button>
         </div>

@@ -137,7 +137,7 @@ export default function ContentMenu({
               onClick={handleBlockToggle}
               disabled={busy}
               className="block w-full px-3 py-2 text-left text-caption"
-              style={{ color: "var(--color-text-secondary)" }}
+              style={{ color: blocked ? "var(--color-text-secondary)" : "var(--color-btn-danger-bg)" }}
             >
               {blocked ? "Unblock" : "Block"}
             </button>
@@ -149,7 +149,7 @@ export default function ContentMenu({
               onClick={handleDelete}
               disabled={busy}
               className="block w-full px-3 py-2 text-left text-caption"
-              style={{ color: "var(--color-text-secondary)" }}
+              style={{ color: "var(--color-btn-danger-bg)" }}
             >
               Delete
             </button>

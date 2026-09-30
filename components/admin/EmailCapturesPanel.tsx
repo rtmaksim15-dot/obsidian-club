@@ -146,7 +146,7 @@ function CaptureRow({ capture, onUpdate }: { capture: EmailCaptureRow; onUpdate:
             <button type="button" className="btn-secondary" disabled={pending} onClick={() => setHolding(true)}>
               Hold
             </button>
-            <button type="button" className="btn-secondary" disabled={pending} onClick={() => review("decline")}>
+            <button type="button" className="btn-danger" disabled={pending} onClick={() => review("decline")}>
               Decline
             </button>
             <button type="button" className="btn-primary" disabled={pending} onClick={() => review("approve")}>

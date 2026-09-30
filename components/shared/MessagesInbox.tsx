@@ -143,7 +143,7 @@ export default function MessagesInbox({
                     </button>
                     <button
                       type="button"
-                      className="btn-secondary"
+                      className="btn-danger"
                       disabled={pending === r.id}
                       onClick={() => respond(r.id, "decline")}
                     >

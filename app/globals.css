@@ -14,10 +14,22 @@
   --color-bg-surface: #221f1c; /* поверхности, инпуты */
 
   /* Акцент */
-  --color-accent: #8b1a1a; /* Dark Red — главный акцент */
+  --color-accent: #8b1a1a; /* Dark Red — главный акцент (nav/like/checkbox/etc — не кнопки, см. ниже) */
   --color-accent-hover: #a01f1f; /* hover состояние */
   --color-accent-muted: #5c1111; /* приглушённый акцент */
   --color-accent-glow: rgba(139, 26, 26, 0.15); /* свечение */
+
+  /* Кнопки (2026-09-29, см. DECISIONS.md) — разведены от --color-accent/
+     --color-error (раньше оба #8B1A1A, отсюда обычная и опасная кнопка
+     выглядели одинаково). --color-accent сам не тронут и продолжает
+     питать все не-кнопочные акценты (nav, лайк, чекбокс, вкладки
+     админки) — эта правка ограничена именно кнопками, как и просили. */
+  --color-btn-primary-bg: #4a1420; /* Dark Cherry / Burgundy — обычное действие */
+  --color-btn-primary-bg-hover: #5c1a29;
+  --color-btn-primary-border: #a9713d; /* Red-Gold / Bronze — кант */
+  --color-btn-primary-border-hover: #c08a4f;
+  --color-btn-danger-bg: #8b1a1a; /* чистый Blood — только необратимое/опасное */
+  --color-btn-danger-bg-hover: #a01f1f;
 
   /* Текст */
   --color-text-primary: #edeae4; /* основной текст (светлый тёплый) */
@@ -143,7 +155,52 @@
      BUTTONS (DESIGN.md §5)
      ========================================================== */
   .btn-primary {
-    background: var(--color-accent);
+    background: var(--color-btn-primary-bg);
+    color: var(--color-text-primary);
+    font-family: var(--font-cinzel), "Cinzel", serif;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 0.875rem 2rem;
+    border: 1px solid var(--color-btn-primary-border);
+    border-radius: 2px;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, transform 0.1s;
+  }
+  .btn-primary:hover {
+    background: var(--color-btn-primary-bg-hover);
+    border-color: var(--color-btn-primary-border-hover);
+  }
+  .btn-primary:active {
+    transform: scale(0.98);
+  }
+  /* A disabled button previously looked identical to an enabled one —
+     no opacity, cursor, or color change — so a gated action (e.g. the
+     composer's Publish button before the required photo-consent box is
+     checked) looked fully clickable and silently did nothing when
+     clicked (2026-09-29, see DECISIONS.md). Covers all button classes
+     at once since every one of them shared the same gap. */
+  .btn-primary:disabled,
+  .btn-secondary:disabled,
+  .btn-ghost:disabled,
+  .btn-danger:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .btn-primary:disabled:hover {
+    background: var(--color-btn-primary-bg);
+    border-color: var(--color-btn-primary-border);
+  }
+
+  /* Opposite end of the same palette (2026-09-29, see DECISIONS.md) —
+     reserved for genuinely irreversible/dangerous actions (delete,
+     block, decline, revoke, sign out), so it reads as a real warning
+     instead of the everyday CTA color. Same shape as .btn-primary
+     (size/font/padding identical) so swapping the class never shifts
+     layout — only the color changes. */
+  .btn-danger {
+    background: var(--color-btn-danger-bg);
     color: var(--color-text-primary);
     font-family: var(--font-cinzel), "Cinzel", serif;
     font-size: 0.8125rem;
@@ -156,26 +213,14 @@
     cursor: pointer;
     transition: background 0.2s, transform 0.1s;
   }
-  .btn-primary:hover {
-    background: var(--color-accent-hover);
+  .btn-danger:hover {
+    background: var(--color-btn-danger-bg-hover);
   }
-  .btn-primary:active {
+  .btn-danger:active {
     transform: scale(0.98);
   }
-  /* A disabled button previously looked identical to an enabled one —
-     no opacity, cursor, or color change — so a gated action (e.g. the
-     composer's Publish button before the required photo-consent box is
-     checked) looked fully clickable and silently did nothing when
-     clicked (2026-09-29, see DECISIONS.md). Covers all three button
-     classes at once since every one of them shared the same gap. */
-  .btn-primary:disabled,
-  .btn-secondary:disabled,
-  .btn-ghost:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-  }
-  .btn-primary:disabled:hover {
-    background: var(--color-accent);
+  .btn-danger:disabled:hover {
+    background: var(--color-btn-danger-bg);
   }
 
   .btn-secondary {

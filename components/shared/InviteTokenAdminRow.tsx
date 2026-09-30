@@ -101,13 +101,7 @@ export default function InviteTokenAdminRow({ tokenId, status, source, canRevoke
         </button>
       ) : null}
       {canRevoke ? (
-        <button
-          type="button"
-          onClick={handleRevoke}
-          disabled={busy !== null}
-          className="btn-secondary py-1 text-caption"
-          style={{ color: "var(--color-error)" }}
-        >
+        <button type="button" onClick={handleRevoke} disabled={busy !== null} className="btn-danger py-1 text-caption">
           {busy === "revoke" ? "Revoking…" : "Revoke"}
         </button>
       ) : null}

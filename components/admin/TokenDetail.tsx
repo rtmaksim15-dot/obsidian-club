@@ -126,7 +126,7 @@ export default function TokenDetail({
           <button type="button" className="btn-secondary" disabled={pending} onClick={arm}>
             Arm
           </button>
-          <button type="button" className="btn-secondary" disabled={pending} onClick={revoke}>
+          <button type="button" className="btn-danger" disabled={pending} onClick={revoke}>
             Revoke
           </button>
         </div>

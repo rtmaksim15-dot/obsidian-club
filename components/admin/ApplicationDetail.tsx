@@ -212,7 +212,7 @@ const ApplicationDetail = forwardRef<ApplicationDetailHandle, {
             <button className="btn-secondary" disabled={pending} onClick={() => setHolding(true)}>
               Hold
             </button>
-            <button className="btn-secondary" disabled={pending} onClick={() => review("decline")}>
+            <button className="btn-danger" disabled={pending} onClick={() => review("decline")}>
               Decline
             </button>
             <button className="btn-primary" disabled={pending} onClick={() => review("approve")}>
