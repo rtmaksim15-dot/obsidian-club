@@ -37,7 +37,7 @@ export default function FollowButton({ userId, initialFollowing }: Props) {
       type="button"
       onClick={toggle}
       disabled={busy}
-      className={following ? "btn-ghost" : "btn-primary"}
+      className={following ? "btn-secondary" : "btn-primary"}
     >
       {following ? "Following" : "Follow"}
     </button>

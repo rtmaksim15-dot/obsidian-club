@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import ConfirmDialog from "./ConfirmDialog";
 
 type Props = {
   tokenId: string;
@@ -20,9 +21,12 @@ export default function InviteTokenAdminRow({ tokenId, status, source, canRevoke
   const router = useRouter();
   const [busy, setBusy] = useState<"revoke" | "arm" | "source" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingRevoke, setConfirmingRevoke] = useState(false);
 
+  // Confirmed via ConfirmDialog.tsx, not confirm() (2026-09-30, see
+  // DECISIONS.md) — see confirmingRevoke above.
   async function handleRevoke() {
-    if (!confirm("Revoke this invite? This can't be undone.")) return;
+    setConfirmingRevoke(false);
     setBusy("revoke");
     setError(null);
     try {
@@ -101,7 +105,12 @@ export default function InviteTokenAdminRow({ tokenId, status, source, canRevoke
         </button>
       ) : null}
       {canRevoke ? (
-        <button type="button" onClick={handleRevoke} disabled={busy !== null} className="btn-danger py-1 text-caption">
+        <button
+          type="button"
+          onClick={() => setConfirmingRevoke(true)}
+          disabled={busy !== null}
+          className="btn-danger py-1 text-caption"
+        >
           {busy === "revoke" ? "Revoking…" : "Revoke"}
         </button>
       ) : null}
@@ -109,6 +118,15 @@ export default function InviteTokenAdminRow({ tokenId, status, source, canRevoke
         <p className="text-caption w-full" style={{ color: "var(--color-error)" }}>
           {error}
         </p>
+      ) : null}
+      {confirmingRevoke ? (
+        <ConfirmDialog
+          title="Revoke this invite? This can't be undone."
+          confirmLabel="Revoke"
+          busy={busy === "revoke"}
+          onConfirm={handleRevoke}
+          onCancel={() => setConfirmingRevoke(false)}
+        />
       ) : null}
     </div>
   );

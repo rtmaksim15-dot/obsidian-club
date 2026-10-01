@@ -153,7 +153,7 @@ export default function MfaSecurityPanel() {
             </button>
             <button
               type="button"
-              className="btn-ghost"
+              className="btn-secondary"
               disabled={busy}
               onClick={() => {
                 setEnrolling(null);

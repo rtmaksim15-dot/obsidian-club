@@ -25,7 +25,7 @@ export default function ErrorPage({ error, reset }: { error: Error & { digest?: 
         <button type="button" onClick={reset} className="btn-primary">
           Try again
         </button>
-        <a href="/" className="btn-ghost">
+        <a href="/" className="btn-secondary">
           Return home
         </a>
       </div>

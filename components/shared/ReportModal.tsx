@@ -143,7 +143,7 @@ export default function ReportModal({ targetType, targetId, preview, onClose }: 
               >
                 {status === "submitting" ? "…" : "Submit"}
               </button>
-              <button type="button" onClick={onClose} className="btn-ghost" disabled={status === "submitting"}>
+              <button type="button" onClick={onClose} className="btn-secondary" disabled={status === "submitting"}>
                 Cancel
               </button>
             </div>

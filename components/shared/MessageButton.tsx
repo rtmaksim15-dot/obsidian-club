@@ -161,7 +161,7 @@ export default function MessageButton({
         <button type="submit" className="btn-primary" disabled={busy || !message.trim()}>
           {busy ? "…" : "Send"}
         </button>
-        <button type="button" className="btn-ghost" onClick={() => setOpen(false)} disabled={busy}>
+        <button type="button" className="btn-secondary" onClick={() => setOpen(false)} disabled={busy}>
           Cancel
         </button>
       </div>

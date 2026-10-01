@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { TokenRow } from "./AdminConsole";
 import { formatAdminDateTime as formatDate } from "@/lib/admin/format-date";
+import ConfirmDialog from "@/components/shared/ConfirmDialog";
 
 const SOURCE_LABELS: Record<string, string> = {
   purchase_card: "Purchase Card",
@@ -36,13 +37,13 @@ export default function TokenDetail({
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingRevoke, setConfirmingRevoke] = useState(false);
 
   const t = token;
   const isDisplayOnly = t.source === "member" || t.source === "partner";
   const isTerminal = Boolean(t.redeemedAt) || Boolean(t.revokedAt);
 
-  async function call(path: string, confirmMessage?: string) {
-    if (confirmMessage && !window.confirm(confirmMessage)) return;
+  async function call(path: string) {
     setPending(true);
     setError(null);
     try {
@@ -68,8 +69,11 @@ export default function TokenDetail({
     if (json) onUpdate(t.id, { status: json.status });
   }
 
+  // Confirmed via ConfirmDialog.tsx, not window.confirm() (2026-09-30,
+  // see DECISIONS.md) — see confirmingRevoke below.
   async function revoke() {
-    const json = await call(`/api/admin/invite-tokens/${t.id}/revoke`, "Revoke this invite? It can no longer be used.");
+    setConfirmingRevoke(false);
+    const json = await call(`/api/admin/invite-tokens/${t.id}/revoke`);
     if (json) onUpdate(t.id, { status: json.status, revokedAt: new Date().toISOString(), bucket: "revoked" });
   }
 
@@ -126,7 +130,7 @@ export default function TokenDetail({
           <button type="button" className="btn-secondary" disabled={pending} onClick={arm}>
             Arm
           </button>
-          <button type="button" className="btn-danger" disabled={pending} onClick={revoke}>
+          <button type="button" className="btn-danger" disabled={pending} onClick={() => setConfirmingRevoke(true)}>
             Revoke
           </button>
         </div>
@@ -136,6 +140,16 @@ export default function TokenDetail({
         <p className="text-caption mt-4" style={{ color: "var(--color-error)" }}>
           {error}
         </p>
+      ) : null}
+
+      {confirmingRevoke ? (
+        <ConfirmDialog
+          title="Revoke this invite? It can no longer be used."
+          confirmLabel="Revoke"
+          busy={pending}
+          onConfirm={revoke}
+          onCancel={() => setConfirmingRevoke(false)}
+        />
       ) : null}
     </div>
   );

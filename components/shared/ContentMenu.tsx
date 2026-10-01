@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { MoreHorizontal } from "lucide-react";
 import ReportModal from "./ReportModal";
+import ConfirmDialog from "./ConfirmDialog";
 
 type Props = {
   targetType: "post" | "profile" | "comment" | "message" | "direct_message";
@@ -57,6 +58,7 @@ export default function ContentMenu({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [reporting, setReporting] = useState(false);
+  const [confirming, setConfirming] = useState<"delete" | "block" | null>(null);
   const [busy, setBusy] = useState(false);
   const [blocked, setBlocked] = useState(blockInitialBlocked ?? false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -77,11 +79,16 @@ export default function ContentMenu({
     };
   }, [open]);
 
-  async function handleDelete() {
+  function handleDelete() {
     if (!deletePostId || busy) return;
-    if (!window.confirm("Delete this post?\n\nThis can't be undone.")) return;
-    setBusy(true);
     setOpen(false);
+    setConfirming("delete");
+  }
+
+  async function performDelete() {
+    if (!deletePostId) return;
+    setBusy(true);
+    setConfirming(null);
     const res = await fetch(`/api/posts/${deletePostId}`, { method: "DELETE" });
     setBusy(false);
     if (!res.ok) return;
@@ -90,13 +97,10 @@ export default function ContentMenu({
     else router.refresh();
   }
 
-  async function handleBlockToggle() {
-    if (!blockUserId || busy) return;
-    if (!blocked && !window.confirm("Block this member?\n\nNeither of you will see each other's content.")) {
-      return;
-    }
+  async function performBlock() {
+    if (!blockUserId) return;
     setBusy(true);
-    setOpen(false);
+    setConfirming(null);
     const optimistic = !blocked;
     setBlocked(optimistic);
     const res = await fetch(`/api/users/${blockUserId}/block`, { method: "POST" });
@@ -106,6 +110,19 @@ export default function ContentMenu({
       router.refresh();
     }
     setBusy(false);
+  }
+
+  function handleBlockToggle() {
+    if (!blockUserId || busy) return;
+    setOpen(false);
+    // Unblocking is the reverse, non-destructive direction — only the
+    // actual block needs a confirmation, same as the window.confirm()
+    // this replaced only ever gated that one direction.
+    if (blocked) {
+      performBlock();
+      return;
+    }
+    setConfirming("block");
   }
 
   if (!canReport && !deletePostId && !blockUserId) return null;
@@ -137,7 +154,7 @@ export default function ContentMenu({
               onClick={handleBlockToggle}
               disabled={busy}
               className="block w-full px-3 py-2 text-left text-caption"
-              style={{ color: blocked ? "var(--color-text-secondary)" : "var(--color-btn-danger-border)" }}
+              style={{ color: blocked ? "var(--color-text-secondary)" : "var(--color-btn-border)" }}
             >
               {blocked ? "Unblock" : "Block"}
             </button>
@@ -149,7 +166,7 @@ export default function ContentMenu({
               onClick={handleDelete}
               disabled={busy}
               className="block w-full px-3 py-2 text-left text-caption"
-              style={{ color: "var(--color-btn-danger-border)" }}
+              style={{ color: "var(--color-btn-border)" }}
             >
               Delete
             </button>
@@ -177,6 +194,24 @@ export default function ContentMenu({
           targetId={targetId}
           preview={preview}
           onClose={() => setReporting(false)}
+        />
+      ) : null}
+      {confirming === "delete" ? (
+        <ConfirmDialog
+          title="Delete this post? This can't be undone."
+          confirmLabel="Delete"
+          busy={busy}
+          onConfirm={performDelete}
+          onCancel={() => setConfirming(null)}
+        />
+      ) : null}
+      {confirming === "block" ? (
+        <ConfirmDialog
+          title="Block this member? Neither of you will see each other's content."
+          confirmLabel="Block"
+          busy={busy}
+          onConfirm={performBlock}
+          onCancel={() => setConfirming(null)}
         />
       ) : null}
     </div>
