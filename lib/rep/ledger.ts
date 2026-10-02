@@ -75,10 +75,16 @@ async function findDuplicate(tx: Tx, userId: string, sourceType: string, sourceI
  * the general-purpose way to log a REP-related analytics event. */
 type AnalyticsEventSpec = { type: string; meta?: Record<string, unknown> };
 
-async function emitAnalyticsEvent(tx: Tx, userId: string, spec: AnalyticsEventSpec | undefined) {
+/** `actualDelta` overrides any `amount` the caller put in `spec.meta` —
+ * package 1d (2026-10-02): once the catalog re-prices a reason, the
+ * caller's own pre-computed "amount" (still the old, legacy point value
+ * at the call site in lib/rating/rep-engine.ts) no longer matches what
+ * actually got written. The real, just-resolved delta is always what
+ * lands in the event. */
+async function emitAnalyticsEvent(tx: Tx, userId: string, spec: AnalyticsEventSpec | undefined, actualDelta: number) {
   if (!spec) return;
   await tx.analyticsEvent.create({
-    data: { userId, type: spec.type, meta: spec.meta as Prisma.InputJsonValue | undefined },
+    data: { userId, type: spec.type, meta: { ...spec.meta, amount: actualDelta } as Prisma.InputJsonValue },
   });
 }
 
@@ -113,6 +119,7 @@ export type AwardRepInput = {
 
 export type AwardRepResult =
   | { outcome: "duplicate"; delta: number; repHistoryId: string }
+  | { outcome: "no_reward"; delta: 0 }
   | { outcome: "capped"; delta: 0 }
   | { outcome: "awarded"; delta: number; capped: boolean; repHistoryId: string };
 
@@ -125,6 +132,11 @@ export async function awardRep(input: AwardRepInput): Promise<AwardRepResult> {
   if (def.max < 0) throw new Error(`"${input.reasonCode}" is a penalty reason — use applyPenalty() instead.`);
 
   const base = resolveValue(input.reasonCode, input.value);
+  // Package 1d (2026-10-02, see DECISIONS.md) — a reason re-priced to 0
+  // (e.g. daily_login) writes NO rep_history row at all, not a 0-delta
+  // one: short-circuit before the transaction even opens, same as
+  // lib/rating/rep-engine.ts's old `if (points === 0) return;` guard.
+  if (base === 0) return { outcome: "no_reward", delta: 0 };
 
   return prisma.$transaction(async (tx) => {
     const dup = await findDuplicate(tx, input.userId, input.sourceType, input.sourceId, input.reasonCode);
@@ -183,7 +195,7 @@ export async function awardRep(input: AwardRepInput): Promise<AwardRepResult> {
             }),
       },
     });
-    await emitAnalyticsEvent(tx, input.userId, input.emitAnalyticsEvent);
+    await emitAnalyticsEvent(tx, input.userId, input.emitAnalyticsEvent, delta);
 
     return { outcome: "awarded", delta, capped, repHistoryId: row.id };
   });
@@ -338,7 +350,7 @@ export async function applyAdjustment(input: ApplyAdjustmentInput): Promise<Appl
             }),
       },
     });
-    await emitAnalyticsEvent(tx, input.userId, input.emitAnalyticsEvent);
+    await emitAnalyticsEvent(tx, input.userId, input.emitAnalyticsEvent, input.delta);
 
     return { outcome: "applied", delta: input.delta, repHistoryId: row.id };
   });

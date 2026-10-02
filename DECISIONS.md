@@ -2400,3 +2400,47 @@ Both `reason` and `source` (RepHistory's original two free-text columns) are sti
 | lord.obsidian.oc@gmail.com | 320 → 3200 | (exempt — no title) | true |
 
 **`--apply` was not run** — per this package's explicit constraint, holding for an owner "go" in a later session/package.
+
+### 2026-10-02 — REP core, package 1d: ×10 migration cancelled; legacy reason codes re-priced instead
+
+**The ×10 scale migration is cancelled, not applied.** Package 1c's diagnostic (`docs/REP_SCALE_DIAGNOSTIC.md`) found the premise wrong: `profile_complete` (100) and `first_community_intro` (100) already sit on `REP_TITLES`'s intended scale — every real member's REP was entirely those two plus a few login days, landing at 205–235, not an old-scale number needing a ×10 bump. Final decision: existing balances stand exactly as-is and are treated as new-scale values; title thresholds (Keeper 1000, etc.) are unchanged; every current member correctly computes to Initiate. `scripts/rep-scale-migrate.ts` and `scripts/rep-scale-migrate.test.ts` are deleted outright (not deprecated-and-kept) — the premise they implemented was wrong, not just unused.
+
+**Re-priced the 10 legacy reason codes in `lib/rep/config.ts#REASON_CATALOG`** — applies to future awards only, no historical `rep_history` row touched or edited:
+
+| reasonCode | was | now | category |
+|---|---|---|---|
+| `daily_login` | 5 | **0** | ACTIVITY |
+| `login_streak_7` | 50 | **0** | ACTIVITY |
+| `login_streak_30` | 300 | **0** | ACTIVITY |
+| `profile_complete` | 100 | 100 (unchanged) | ACTIVITY |
+| `first_post` | 5 | **50** | ACTIVITY |
+| `house_post` | 2 | **0** | ACTIVITY |
+| `house_joined` | 10 | **0** | ACTIVITY |
+| `first_community_intro` | 100 | 100 (unchanged) | ACTIVITY |
+| `invitee_level_2` | 500 | **200** | INVITED |
+| `invitee_active_90d` | 1000 | **200** | INVITED |
+
+Per the REP design ("no REP for logins or raw post counts"), the four login/streak/house-post reasons go to 0; `first_post`/`invitee_level_2`/`invitee_active_90d` are re-priced down to match their closer same-category siblings (`first_quality_post`=50, `invitee_reached_keeper`=200) instead of their old, much-larger `REP_TABLE` figures. `User.currentStreak`/`longestStreak` (the actual streak counters, used elsewhere) are completely untouched — only the REP award from reaching a streak milestone is zeroed, not the streak-tracking itself.
+
+**A reason priced at 0 now writes NO `rep_history` row at all**, not a 0-delta one — `lib/rep/ledger.ts#awardRep` short-circuits with a new `{ outcome: "no_reward" }` result right after resolving the catalog value, before the transaction even opens (mirrors the old `lib/rating/rep-engine.ts#awardRep`'s original `if (points === 0) return;` guard). `lib/rating/rep-engine.ts`'s delegation layer no longer forwards its own legacy `points` figure as the ledger's `value` at all — every legacy-mapped reasonCode is a fixed single value (`min === max`), so omitting `value` lets the catalog resolve its own (now re-priced) amount automatically; `points` is still used, but only to disambiguate which reasonCode applies (e.g. which login-streak milestone), never as the actual award amount anymore. One correctness fix that fell out of this: the `rep.granted` analytics event's `meta.amount` was previously the caller's stale legacy figure — `lib/rep/ledger.ts#emitAnalyticsEvent` now always overwrites it with the real, just-resolved delta, so the event matches what was actually written even when re-pricing makes the two numbers differ (e.g. `first_post` logs a 5 → 50 call but the event now correctly says 50).
+
+**UI/copy audit: nothing found that needed changing.** Grepped onboarding/ritual pages, `/profile`, `/hall`, `/vault`, `/houses`, and every admin REP component for any user-facing promise of REP for logins, streaks, or house posts. Found only: code comments (never rendered), content gated behind disabled flags (`HOUSES_UI_ENABLED`, the login-streak block on `/hall` — both unreachable today), and factual historical-record display (`h.reason ?? h.source ?? "REP event"` in the REP History lists, and the admin REP-adjustment confirmation line) — none of these are forward-looking promises, and none needed editing. Two pieces of generic brand-voice copy ("Reputation here is earned slowly and lost instantly" on the Code of Conduct step; "Earned through reputation, not purchased outright" on `/vault`) are thematic, not tied to any specific re-priced action, and were left alone.
+
+**`User.repExempt` behavior is unchanged from package 1b** — still read by `awardRep`/`applyPenalty`/`applyAdjustment`/`recomputeUser`, still freezes `titleLevel`/`councilEligible` while leaving the real ledger sum to keep accruing. New `scripts/set-lord-obsidian-rep-exempt.ts` (`--dry-run` default, `--apply` gated) is the one-line idempotent setter the task asked for — finds the account by email, no-ops if already exempt, otherwise sets the flag. **Run in `--dry-run` only** against production: found `lord.obsidian.oc@gmail.com` (id `e75c0f85-3b91-49c4-a610-0bc17839476a`), not yet exempt, would set it — no write made.
+
+**Dry-run title table** (read-only reimplementation of `recomputeUser`'s math — that module can't be imported by a standalone script, same `server-only` constraint as the deleted migration script — against each user's true `rep_history` sum):
+
+| email | ledger sum | title (if exemption applied) |
+|---|---|---|
+| lord.obsidian.oc@gmail.com | 320 | **(exempt — no title)**, once `set-lord-obsidian-rep-exempt.ts --apply` runs |
+| rtmaksim15@gmail.com | 580 | Initiate |
+| tomakarpeniuk@gmail.com | 235 | Initiate |
+| 20created02@gmail.com | 220 | Initiate |
+| hfjhgfhfffjnknfhh@gmail.com | 205 | Initiate |
+| olgadvornikova2020@gmail.com | 205 | Initiate |
+
+Matches the expectation exactly: every current member computes to Initiate; Lord Obsidian would be exempt once that one pending `--apply` lands (still not run — holding, same as every write this package touches).
+
+**Tests**: added coverage for every change in this package — zero-value reasons write no row (`lib/rep/ledger.test.ts`, 5 reasonCodes table-tested), the three re-priced amounts resolve correctly with `value` omitted, `profile_complete`/`first_community_intro` confirmed unchanged, two new `repExempt` tests (`awardRep` and `recomputeUser` both still accrue the real ledger sum but freeze title/council), and in `lib/rating/rep-engine.test.ts`: the delegation no longer forwards `value` or a stale `amount`, plus new coverage for `awardRepWithDailyCap`'s cap gate (confirmed it still runs and still blocks correctly, independent of `house_post` now being priced at 0 — the gate reads the legacy `source` column, untouched by the re-price). 43 tests total (was 28), all passing. `npx tsc --noEmit`, `npm run lint`, `npm run build` all clean project-wide.
+
+**No writes to production in this package** — the dry-runs above are reads only, confirmed by inspection of each script's own branch logic (no `--apply` flag was ever passed). Work stays on branch `rep-core`, not merged to `main`.

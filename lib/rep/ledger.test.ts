@@ -13,6 +13,7 @@ type FakeUser = {
   trustStars: number;
   titleLevel: number;
   councilEligible: boolean;
+  repExempt: boolean;
 };
 
 type FakeRow = {
@@ -167,7 +168,7 @@ vi.mock("@/lib/db/prisma", () => {
 });
 
 function seedUser(overrides: Partial<FakeUser> = {}) {
-  const user: FakeUser = { id: "u1", rep: 0, trustStars: 3, titleLevel: 1, councilEligible: false, ...overrides };
+  const user: FakeUser = { id: "u1", rep: 0, trustStars: 3, titleLevel: 1, councilEligible: false, repExempt: false, ...overrides };
   state.users.set(user.id, user);
   return user;
 }
@@ -322,5 +323,90 @@ describe("getRepSummary — floor-at-0 display", () => {
     const summary = await getRepSummary("u1");
     expect(summary.repScore).toBe(0);
     expect(state.users.get("u1")?.rep).toBe(-50); // the ledger's true value is untouched
+  });
+});
+
+describe("package 1d — re-priced legacy catalog", () => {
+  it("a reason priced at 0 (e.g. daily_login) writes NO repHistory row, not a 0-delta one", async () => {
+    seedUser();
+    const result = await awardRep({ userId: "u1", reasonCode: "daily_login", sourceType: "login-streak" });
+    expect(result).toEqual({ outcome: "no_reward", delta: 0 });
+    expect(state.repHistory).toHaveLength(0);
+    expect(state.users.get("u1")?.rep).toBe(0);
+  });
+
+  it.each(["daily_login", "login_streak_7", "login_streak_30", "house_post", "house_joined"])(
+    "%s writes no row for a brand-new, non-exempt user",
+    async (reasonCode) => {
+      seedUser();
+      const result = await awardRep({ userId: "u1", reasonCode, sourceType: "test" });
+      expect(result).toEqual({ outcome: "no_reward", delta: 0 });
+      expect(state.repHistory).toHaveLength(0);
+    },
+  );
+
+  it("first_post now awards 50 (re-priced from the old REP_TABLE value of 5), omitting `value` entirely", async () => {
+    seedUser();
+    const result = await awardRep({ userId: "u1", reasonCode: "first_post", sourceType: "first-post" });
+    expect(result).toMatchObject({ outcome: "awarded", delta: 50 });
+    expect(state.users.get("u1")?.rep).toBe(50);
+  });
+
+  it.each([
+    ["invitee_level_2", 200],
+    ["invitee_active_90d", 200],
+  ])("%s now awards %i (re-priced from its old, much larger REP_TABLE value)", async (reasonCode, expected) => {
+    seedUser();
+    const result = await awardRep({ userId: "u1", reasonCode, sourceType: "test" });
+    expect(result).toMatchObject({ outcome: "awarded", delta: expected });
+  });
+
+  it("profile_complete and first_community_intro are unchanged at 100", async () => {
+    seedUser();
+    const a = await awardRep({ userId: "u1", reasonCode: "profile_complete", sourceType: "profile-complete" });
+    const b = await awardRep({ userId: "u1", reasonCode: "first_community_intro", sourceType: "first-community-intro" });
+    expect(a).toMatchObject({ delta: 100 });
+    expect(b).toMatchObject({ delta: 100 });
+  });
+});
+
+describe("repExempt — title/council frozen, ledger still accrues", () => {
+  it("awardRep still writes the row and increments rep, but never touches titleLevel/councilEligible", async () => {
+    const lord = seedUser({ repExempt: true, titleLevel: 1, councilEligible: false });
+    const result = await awardRep({
+      userId: lord.id,
+      reasonCode: "club_project",
+      value: 300,
+      sourceType: "admin",
+      sourceId: "a",
+      grantedBy: "admin-1",
+    });
+    expect(result).toMatchObject({ outcome: "awarded", delta: 300 });
+    expect(state.users.get(lord.id)?.rep).toBe(300); // ledger still real
+    expect(state.repHistory).toHaveLength(1); // still auditable
+    expect(state.users.get(lord.id)?.titleLevel).toBe(1); // frozen
+    expect(state.users.get(lord.id)?.councilEligible).toBe(false); // frozen
+  });
+
+  it("recomputeUser rebuilds rep from the ledger but freezes titleLevel/councilEligible", async () => {
+    const lord = seedUser({ repExempt: true, titleLevel: 1, councilEligible: false });
+    state.repHistory.push({
+      id: "rh_big",
+      userId: lord.id,
+      delta: 50000,
+      category: "ADJUSTMENT",
+      baseDelta: 50000,
+      multiplier: 1,
+      sourceType: "test",
+      sourceId: "x",
+      reasonCode: "x",
+      note: null,
+      grantedById: "admin-1",
+      createdAt: new Date(),
+    });
+    const recomputed = await recomputeUser(lord.id);
+    expect(recomputed.rep).toBe(50000); // rebuilt from the real ledger
+    expect(recomputed.titleLevel).toBe(1); // ...but title/council stay frozen
+    expect(recomputed.councilEligible).toBe(false);
   });
 });

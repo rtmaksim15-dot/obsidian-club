@@ -137,7 +137,11 @@ function splitSource(source: string): { sourceType: string; sourceId?: string } 
 export async function awardRep(userId: string, points: number, reason: string, source: string) {
   if (points === 0) return;
 
-  const analytics = { type: "rep.granted", meta: { amount: points, reason, sourceEvent: source } };
+  // `amount` is deliberately not set here — lib/rep/ledger.ts's
+  // emitAnalyticsEvent always fills it in from the real, just-resolved
+  // delta, not this call's own (possibly stale, since package 1d)
+  // `points` figure. See that function's own comment.
+  const analytics = { type: "rep.granted", meta: { reason, sourceEvent: source } };
 
   if (source === "admin-adjustment") {
     await ledger.applyAdjustment({
@@ -156,10 +160,18 @@ export async function awardRep(userId: string, points: number, reason: string, s
   const { sourceType, sourceId } = splitSource(source);
   const reasonCode = legacyReasonCode(sourceType, points);
 
+  // Package 1d (2026-10-02, see DECISIONS.md) — `value` is deliberately
+  // NOT forwarded here. `points` (this call's own REP_TABLE-derived
+  // figure) is used only above, to disambiguate which reasonCode applies
+  // (e.g. which login-streak milestone) — the actual amount awarded now
+  // comes entirely from lib/rep/config.ts#REASON_CATALOG, which is what
+  // this package re-priced. Every legacy-mapped reasonCode is a fixed
+  // single value (min === max), so omitting `value` resolves to the
+  // catalog's own figure automatically; a reason re-priced to 0 writes no
+  // row at all (see lib/rep/ledger.ts#awardRep's `base === 0` guard).
   await ledger.awardRep({
     userId,
     reasonCode,
-    value: points,
     sourceType,
     sourceId,
     bypassCap: true,

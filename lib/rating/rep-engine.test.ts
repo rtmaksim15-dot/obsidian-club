@@ -21,13 +21,22 @@ vi.mock("@/lib/rep/ledger", () => ({
   }),
 }));
 
-vi.mock("@/lib/db/prisma", () => ({ prisma: {} }));
+const fakeAggregateSum = vi.hoisted(() => ({ value: 0 as number | null }));
 
-import { awardRep } from "./rep-engine";
+vi.mock("@/lib/db/prisma", () => ({
+  prisma: {
+    repHistory: {
+      aggregate: vi.fn(async () => ({ _sum: { delta: fakeAggregateSum.value } })),
+    },
+  },
+}));
+
+import { awardRep, awardRepWithDailyCap } from "./rep-engine";
 
 beforeEach(() => {
   calls.awardRep.length = 0;
   calls.applyAdjustment.length = 0;
+  fakeAggregateSum.value = 0;
 });
 
 describe("rep-engine.ts#awardRep — legacy delegation to lib/rep/ledger.ts", () => {
@@ -49,16 +58,19 @@ describe("rep-engine.ts#awardRep — legacy delegation to lib/rep/ledger.ts", ()
   ])("maps source %s at %i points to reasonCode %s", async (source, points, reasonCode) => {
     await awardRep("u1", points, "some reason", source);
     expect(calls.awardRep).toHaveLength(1);
+    // `value` is deliberately NOT forwarded (package 1d) — the catalog in
+    // lib/rep/config.ts is authoritative on the actual amount now, not
+    // this call's own (legacy, possibly stale) `points` figure.
     expect(calls.awardRep[0]).toMatchObject({
       userId: "u1",
       reasonCode,
-      value: points,
       sourceType: source,
       sourceId: undefined,
       bypassCap: true,
       legacyReason: "some reason",
       legacySource: source,
     });
+    expect(calls.awardRep[0]).not.toHaveProperty("value");
   });
 
   it("splits a templated source into sourceType/sourceId", async () => {
@@ -77,11 +89,12 @@ describe("rep-engine.ts#awardRep — legacy delegation to lib/rep/ledger.ts", ()
     });
   });
 
-  it("preserves the same-transaction rep.granted analytics guarantee", async () => {
-    await awardRep("u1", 5, "First post", "first-post");
+  it("preserves the same-transaction rep.granted analytics guarantee (amount itself is filled in by ledger.ts, not this call)", async () => {
+    await awardRep("u1", 50, "First post", "first-post");
     expect(calls.awardRep[0]).toMatchObject({
-      emitAnalyticsEvent: { type: "rep.granted", meta: { amount: 5, reason: "First post", sourceEvent: "first-post" } },
+      emitAnalyticsEvent: { type: "rep.granted", meta: { reason: "First post", sourceEvent: "first-post" } },
     });
+    expect((calls.awardRep[0] as { emitAnalyticsEvent: { meta: object } }).emitAnalyticsEvent.meta).not.toHaveProperty("amount");
   });
 
   it("routes admin-adjustment through applyAdjustment, not awardRep, preserving an arbitrary signed delta", async () => {
@@ -103,5 +116,26 @@ describe("rep-engine.ts#awardRep — legacy delegation to lib/rep/ledger.ts", ()
 
   it("throws for an unmapped source instead of silently dropping the award", async () => {
     await expect(awardRep("u1", 42, "mystery", "totally-unmapped-source")).rejects.toThrow(/no REP catalog mapping/);
+  });
+});
+
+describe("rep-engine.ts#awardRepWithDailyCap — daily cap gate is unchanged and still enforced", () => {
+  it("delegates through to awardRep when under the cap", async () => {
+    fakeAggregateSum.value = 4; // 2 house-posts so far today (2 each)
+    await awardRepWithDailyCap("u1", 2, "Posted in a House", "house-post", 10);
+    expect(calls.awardRep).toHaveLength(1);
+    expect(calls.awardRep[0]).toMatchObject({ reasonCode: "house_post", sourceType: "house-post" });
+  });
+
+  it("skips the call to awardRep entirely once today's total reaches the cap", async () => {
+    fakeAggregateSum.value = 10; // already at the 10/day cap
+    await awardRepWithDailyCap("u1", 2, "Posted in a House", "house-post", 10);
+    expect(calls.awardRep).toHaveLength(0);
+  });
+
+  it("still gates correctly even though house_post is re-priced to 0 (the aggregate reads the legacy `source` column, untouched by the re-price)", async () => {
+    fakeAggregateSum.value = 0;
+    await awardRepWithDailyCap("u1", 2, "Posted in a House", "house-post", 10);
+    expect(calls.awardRep).toHaveLength(1); // the gate itself still runs; the catalog separately zeroes the actual award
   });
 });
