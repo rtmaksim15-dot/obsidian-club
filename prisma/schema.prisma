@@ -225,6 +225,24 @@ model User {
   reputation        Decimal     @default(0) @db.Decimal(3, 2) // 0.00 - 5.00, peer-review star average — independent of REP as of the 2026-07-05 CLAUDE.md migration (see ADR-0015)
   rep               Int         @default(0) // "REP" — a discrete point ledger (CLAUDE.md's earn/lose tables), replaces the old weighted `rating` score; see ADR-0015. Sum of RepHistory.delta
   trustScore        Int         @default(100) @map("trust_score")
+  // REP core engine extension (2026-10-01, see DECISIONS.md) — additive to
+  // the existing REP system above, not a replacement. `rep` (above) stays
+  // the single cached sum of RepHistory.delta, exactly as before; these
+  // three fields add category caps/trust-multiplier/title tracking on top
+  // of it. Hidden from members; not gated by a UI flag because nothing
+  // renders it yet (lib/rep/ledger.ts is not wired into any feature in
+  // this package — see docs/REP_AUDIT.md).
+  trustStars        Int         @default(3) @map("trust_stars") // 1-5, multiplies POSITIVE RepHistory deltas only — see lib/rep/config.ts#TRUST_STAR_MULTIPLIER
+  // High-water mark derived from `rep` (I Initiate .. V Master = 1..5);
+  // independent of `level` above, which tracks `reputation` (star
+  // average), not `rep` — do not conflate the two. Never decreases on its
+  // own, even if `rep` drops from a penalty. VI Council is never set here;
+  // see councilEligible.
+  titleLevel        Int         @default(1) @map("title_level")
+  // rep >= 20000 (see lib/rep/config.ts#COUNCIL_THRESHOLD). Council
+  // membership itself is always a deliberate, separate action — this
+  // only flags eligibility, it never promotes titleLevel to 6 by itself.
+  councilEligible   Boolean     @default(false) @map("council_eligible")
   status            UserStatus  @default(pending)
   isAdmin           Boolean     @default(false) @map("is_admin") // not in ARCHITECTURE.md's User table — see ADR-0011
   role              MemberRole? // chosen at onboarding, CLAUDE.md's registration flow — see ADR-0015
@@ -267,6 +285,7 @@ model User {
   referralsReceived          Referral[]        @relation("ReferralInvited")
   userAchievements           UserAchievement[]
   repHistory                 RepHistory[]
+  repGrantsGiven             RepHistory[]      @relation("RepGrantedBy")
   notifications              Notification[]
   marketplaceItems           MarketplaceItem[]
   memberInviteTokensCreated  InviteToken[]     @relation("MemberInviteTokens")
@@ -622,10 +641,43 @@ model RepHistory {
   source    String? // откуда пришло изменение
   createdAt DateTime @default(now()) @map("created_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // REP core engine extension (2026-10-01, see DECISIONS.md) — additive
+  // columns for the new categorized/capped/multiplier-aware award path in
+  // lib/rep/ledger.ts. All nullable: every existing row (pre-2026-10-01)
+  // stays NULL across all seven — "legacy, uncategorized" — and is left
+  // untouched, not backfilled. `reason`/`source` above are unchanged and
+  // keep meaning exactly what they always did for old rows written by
+  // lib/rating/rep-engine.ts#awardRep, which continues to write only
+  // those two columns, same as before this migration.
+  category    RepCategory? // ACTIVITY/CLUB_VALUE/INVITED/BEHAVIOR/ADJUSTMENT — new-path rows only
+  baseDelta   Int?         @map("base_delta") // value before the trust-star multiplier
+  multiplier  Decimal?     @db.Decimal(3, 2) // trust-star multiplier actually applied (1.00 for penalties/ADJUSTMENT)
+  sourceType  String?      @map("source_type") // new path's structured source — distinct from the free-text `source` above
+  sourceId    String?      @map("source_id")
+  reasonCode  String?      @map("reason_code") // key into lib/rep/config.ts#REASON_CATALOG — distinct from the free-text `reason` above
+  note        String?      // optional human note on the new path (admin grants, penalties)
+  grantedById String?      @map("granted_by_id") @db.Uuid // set only for admin/founder-granted rows (bypasses the monthly cap; required on every penalty)
 
+  user      User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy User? @relation("RepGrantedBy", fields: [grantedById], references: [id])
+
+  // Idempotency for the new path only (see lib/rep/ledger.ts): a given
+  // (user, sourceType, sourceId, reasonCode) can only ever write one row.
+  // Legacy rows have all four NULL on sourceType/sourceId/reasonCode (userId
+  // never null), and Postgres treats NULL as distinct in a unique index, so
+  // existing rows never collide with each other or with new-path rows.
+  @@unique([userId, sourceType, sourceId, reasonCode])
   @@index([userId])
+  @@index([userId, category, createdAt])
   @@map("rep_history")
+}
+
+enum RepCategory {
+  ACTIVITY
+  CLUB_VALUE
+  INVITED
+  BEHAVIOR
+  ADJUSTMENT
 }
 
 // ============================================================
