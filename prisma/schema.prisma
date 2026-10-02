@@ -243,6 +243,14 @@ model User {
   // membership itself is always a deliberate, separate action — this
   // only flags eligibility, it never promotes titleLevel to 6 by itself.
   councilEligible   Boolean     @default(false) @map("council_eligible")
+  // Package 1b (2026-10-01, see DECISIONS.md) — true only for the
+  // narrative/founder "Lord Obsidian" account. When set, lib/rep/ledger.ts
+  // keeps writing ledger rows and the raw `rep` sum for this account (its
+  // history stays real and auditable) but never updates `titleLevel` or
+  // `councilEligible` for it, and it's excluded from any future ranking —
+  // the profile page already shows "∞" instead of a number for this
+  // account (isFounder() check), so a title was never meaningful here.
+  repExempt         Boolean     @default(false) @map("rep_exempt")
   status            UserStatus  @default(pending)
   isAdmin           Boolean     @default(false) @map("is_admin") // not in ARCHITECTURE.md's User table — see ADR-0011
   role              MemberRole? // chosen at onboarding, CLAUDE.md's registration flow — see ADR-0015

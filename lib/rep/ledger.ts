@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
-import type { RepCategory } from "@prisma/client";
+import type { Prisma, RepCategory } from "@prisma/client";
 import {
   CATEGORY_MONTHLY_CAP,
   clampTrustStars,
@@ -66,6 +66,22 @@ async function findDuplicate(tx: Tx, userId: string, sourceType: string, sourceI
   });
 }
 
+/** Opt-in same-transaction AnalyticsEvent write. Used by
+ * lib/rating/rep-engine.ts's legacy delegation layer to preserve the
+ * pre-existing "rep.granted written in the same transaction as the grant"
+ * guarantee (SPEC-analytics-panel.md §2.2, see that file's own prior
+ * comment). A new (package 2+) caller should normally use
+ * lib/analytics/track.ts instead — this exists for legacy parity, not as
+ * the general-purpose way to log a REP-related analytics event. */
+type AnalyticsEventSpec = { type: string; meta?: Record<string, unknown> };
+
+async function emitAnalyticsEvent(tx: Tx, userId: string, spec: AnalyticsEventSpec | undefined) {
+  if (!spec) return;
+  await tx.analyticsEvent.create({
+    data: { userId, type: spec.type, meta: spec.meta as Prisma.InputJsonValue | undefined },
+  });
+}
+
 export type AwardRepInput = {
   userId: string;
   reasonCode: string;
@@ -77,6 +93,22 @@ export type AwardRepInput = {
    * reason's category is ADJUSTMENT). */
   grantedBy?: string;
   note?: string;
+  /** Package 1b (2026-10-01) — skips the monthly-cap check regardless of
+   * `grantedBy`. Used only by lib/rating/rep-engine.ts's legacy delegation
+   * layer, to preserve pre-existing uncapped behavior for call sites that
+   * predate the cap concept entirely (daily login, first post, etc.). Do
+   * not set this from a new (package 2+) call site. */
+  bypassCap?: boolean;
+  /** Package 1b — legacy-compat free text for RepHistory's pre-existing
+   * `reason`/`source` columns, so rows written through this new path still
+   * render correctly in the existing `/hall`/`/profile` REP-history UI,
+   * which reads those two columns directly and knows nothing about
+   * `reasonCode`/`sourceType`. New (package 2+) callers should omit these —
+   * they fall back to `reasonCode`/`sourceType` themselves. */
+  legacyReason?: string;
+  legacySource?: string;
+  /** See emitAnalyticsEvent above — legacy delegation parity only. */
+  emitAnalyticsEvent?: AnalyticsEventSpec;
 };
 
 export type AwardRepResult =
@@ -100,7 +132,7 @@ export async function awardRep(input: AwardRepInput): Promise<AwardRepResult> {
 
     const user = await tx.user.findUniqueOrThrow({
       where: { id: input.userId },
-      select: { rep: true, trustStars: true, titleLevel: true, councilEligible: true },
+      select: { rep: true, trustStars: true, titleLevel: true, councilEligible: true, repExempt: true },
     });
 
     const multiplier = def.category === "ADJUSTMENT" ? 1 : multiplierForStars(user.trustStars);
@@ -108,7 +140,7 @@ export async function awardRep(input: AwardRepInput): Promise<AwardRepResult> {
 
     let capped = false;
     const cap = CATEGORY_MONTHLY_CAP[def.category];
-    if (cap !== undefined && !input.grantedBy) {
+    if (cap !== undefined && !input.grantedBy && !input.bypassCap) {
       const used = await monthUsedForCategory(tx, input.userId, def.category, new Date());
       const remaining = Math.max(0, cap - used);
       if (delta > remaining) {
@@ -125,6 +157,8 @@ export async function awardRep(input: AwardRepInput): Promise<AwardRepResult> {
       data: {
         userId: input.userId,
         delta,
+        reason: input.legacyReason,
+        source: input.legacySource,
         category: def.category,
         baseDelta: base,
         multiplier,
@@ -139,10 +173,17 @@ export async function awardRep(input: AwardRepInput): Promise<AwardRepResult> {
       where: { id: input.userId },
       data: {
         rep: { increment: delta },
-        titleLevel: Math.max(user.titleLevel, title.level),
-        councilEligible: user.councilEligible || newRep >= COUNCIL_THRESHOLD,
+        // repExempt (Lord Obsidian) — the ledger row above still writes
+        // normally, but title/council are never computed for this account.
+        ...(user.repExempt
+          ? {}
+          : {
+              titleLevel: Math.max(user.titleLevel, title.level),
+              councilEligible: user.councilEligible || newRep >= COUNCIL_THRESHOLD,
+            }),
       },
     });
+    await emitAnalyticsEvent(tx, input.userId, input.emitAnalyticsEvent);
 
     return { outcome: "awarded", delta, capped, repHistoryId: row.id };
   });
@@ -160,6 +201,9 @@ export type ApplyPenaltyInput = {
   sourceType: string;
   sourceId?: string;
   note?: string;
+  /** See AwardRepInput#legacyReason/legacySource. */
+  legacyReason?: string;
+  legacySource?: string;
 };
 
 export type ApplyPenaltyResult =
@@ -190,6 +234,8 @@ export async function applyPenalty(input: ApplyPenaltyInput): Promise<ApplyPenal
       data: {
         userId: input.userId,
         delta,
+        reason: input.legacyReason,
+        source: input.legacySource,
         category: "BEHAVIOR",
         baseDelta: delta,
         multiplier: 1,
@@ -211,6 +257,93 @@ export async function applyPenalty(input: ApplyPenaltyInput): Promise<ApplyPenal
   });
 }
 
+export type ApplyAdjustmentInput = {
+  userId: string;
+  /** Arbitrary non-zero integer, either sign — not validated against
+   * REASON_CATALOG (there's no fixed range for "whatever an admin typed"
+   * or a scale-migration multiple of someone's existing total). */
+  delta: number;
+  /** Defaults to "admin_adjustment" (the legacy admin-rep-adjustment
+   * route's delegation target). The scale-migration script passes its own
+   * ("scale_migration") so the two are never confused in the ledger. */
+  reasonCode?: string;
+  sourceType: string;
+  sourceId?: string;
+  /** Optional, unlike applyPenalty — the legacy admin-rep-adjustment route
+   * (app/api/admin/rep-adjustment/route.ts) never threaded the admin's id
+   * into awardRep's generic (userId, points, reason, source) signature, and
+   * this package can't change that signature (existing callers must keep
+   * compiling unchanged). Pass it when the caller actually has it (e.g.
+   * the scale-migration script could, but doesn't act "as" a specific
+   * admin, so it also omits this). */
+  grantedBy?: string;
+  note?: string;
+  legacyReason?: string;
+  legacySource?: string;
+  emitAnalyticsEvent?: AnalyticsEventSpec;
+};
+
+export type ApplyAdjustmentResult =
+  | { outcome: "duplicate"; delta: number; repHistoryId: string }
+  | { outcome: "applied"; delta: number; repHistoryId: string };
+
+/** Direct ADJUSTMENT-category write — never multiplied, never capped,
+ * value taken exactly as given (no REASON_CATALOG lookup at all). For
+ * manual corrections (admin rep-adjustment) and bulk corrections (the
+ * REP scale migration) — anything that is, by definition, "set this
+ * account's REP by exactly this amount," not an earned or cataloged
+ * amount. */
+export async function applyAdjustment(input: ApplyAdjustmentInput): Promise<ApplyAdjustmentResult> {
+  if (!Number.isInteger(input.delta) || input.delta === 0) {
+    throw new Error("applyAdjustment requires a non-zero integer delta.");
+  }
+  const reasonCode = input.reasonCode ?? "admin_adjustment";
+
+  return prisma.$transaction(async (tx) => {
+    const dup = await findDuplicate(tx, input.userId, input.sourceType, input.sourceId, reasonCode);
+    if (dup) return { outcome: "duplicate", delta: dup.delta, repHistoryId: dup.id };
+
+    const user = await tx.user.findUniqueOrThrow({
+      where: { id: input.userId },
+      select: { rep: true, titleLevel: true, councilEligible: true, repExempt: true },
+    });
+    const newRep = user.rep + input.delta;
+    const title = titleFor(newRep);
+
+    const row = await tx.repHistory.create({
+      data: {
+        userId: input.userId,
+        delta: input.delta,
+        reason: input.legacyReason,
+        source: input.legacySource,
+        category: "ADJUSTMENT",
+        baseDelta: input.delta,
+        multiplier: 1,
+        sourceType: input.sourceType,
+        sourceId: input.sourceId ?? null,
+        reasonCode,
+        note: input.note,
+        grantedById: input.grantedBy ?? null,
+      },
+    });
+    await tx.user.update({
+      where: { id: input.userId },
+      data: {
+        rep: { increment: input.delta },
+        ...(user.repExempt
+          ? {}
+          : {
+              titleLevel: Math.max(user.titleLevel, title.level),
+              councilEligible: user.councilEligible || newRep >= COUNCIL_THRESHOLD,
+            }),
+      },
+    });
+    await emitAnalyticsEvent(tx, input.userId, input.emitAnalyticsEvent);
+
+    return { outcome: "applied", delta: input.delta, repHistoryId: row.id };
+  });
+}
+
 /** Repair tool — rebuilds `User.rep` from the full ledger (every row,
  * legacy and new-path alike: "score = sum of ledger deltas" is already
  * true for both). titleLevel/councilEligible are recomputed the same
@@ -219,7 +352,18 @@ export async function recomputeUser(userId: string): Promise<{ rep: number; titl
   return prisma.$transaction(async (tx) => {
     const agg = await tx.repHistory.aggregate({ where: { userId }, _sum: { delta: true } });
     const rep = agg._sum.delta ?? 0;
-    const user = await tx.user.findUniqueOrThrow({ where: { id: userId }, select: { titleLevel: true, councilEligible: true } });
+    const user = await tx.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { titleLevel: true, councilEligible: true, repExempt: true },
+    });
+
+    if (user.repExempt) {
+      // rep itself is still rebuilt from the real ledger (history stays
+      // real and auditable); title/council are frozen, never recomputed.
+      await tx.user.update({ where: { id: userId }, data: { rep } });
+      return { rep, titleLevel: user.titleLevel, councilEligible: user.councilEligible };
+    }
+
     const title = titleFor(rep);
     const titleLevel = Math.max(user.titleLevel, title.level);
     const councilEligible = user.councilEligible || rep >= COUNCIL_THRESHOLD;

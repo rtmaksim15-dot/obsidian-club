@@ -110,6 +110,31 @@ export const REASON_CATALOG: Record<string, ReasonDef> = {
   rule_violation: { category: "BEHAVIOR", min: -500, max: -200 },
   codex_violation: { category: "BEHAVIOR", min: -1000, max: -1000 },
   invite_abuse: { category: "BEHAVIOR", min: -500, max: -500 },
+
+  // Package 1b (2026-10-01, see DECISIONS.md) — one entry per legacy
+  // lib/rating/rep-engine.ts#awardRep call site, so that function can
+  // delegate its actual write to lib/rep/ledger.ts while every existing
+  // caller keeps compiling and behaving exactly as before. Values match
+  // REP_TABLE in rep-engine.ts verbatim; category is this package's own
+  // judgment call (not specified by the original CLAUDE.md earn table),
+  // grouped by what the action actually is: self-directed activity vs.
+  // a reward for someone the member invited. These are deliberately
+  // NOT subject to the ACTIVITY/INVITED monthly cap above — that cap is
+  // a new package-1 concept that never existed for these flows, and
+  // retroactively capping years of already-live behavior would be a
+  // silent change beyond "migrate the writer." The legacy delegation
+  // layer passes `bypassCap: true` for every one of these — see
+  // lib/rep/ledger.ts#AwardRepInput.
+  daily_login: { category: "ACTIVITY", min: 5, max: 5 },
+  login_streak_7: { category: "ACTIVITY", min: 50, max: 50 },
+  login_streak_30: { category: "ACTIVITY", min: 300, max: 300 },
+  profile_complete: { category: "ACTIVITY", min: 100, max: 100 }, // distinct from profile_verified above — this is the existing self-service "bio+avatar+city" bonus, not an admin verification
+  first_post: { category: "ACTIVITY", min: 5, max: 5 }, // distinct from first_quality_post above
+  house_post: { category: "ACTIVITY", min: 2, max: 2 }, // daily cap of 10 stays enforced by rep-engine.ts#awardRepWithDailyCap, unchanged
+  house_joined: { category: "ACTIVITY", min: 10, max: 10 },
+  first_community_intro: { category: "ACTIVITY", min: 100, max: 100 },
+  invitee_level_2: { category: "INVITED", min: 500, max: 500 }, // "invitee reached Level II" (the reviews/level system, not titleLevel) — distinct from invitee_reached_keeper above
+  invitee_active_90d: { category: "INVITED", min: 1000, max: 1000 }, // distinct from invitee_active_30d above (different duration, different value, pre-existing)
 };
 
 export type ReasonCode = keyof typeof REASON_CATALOG;

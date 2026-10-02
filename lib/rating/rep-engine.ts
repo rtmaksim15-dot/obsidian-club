@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
+import * as ledger from "@/lib/rep/ledger";
 
 /**
  * REP — CLAUDE.md's (2026-07-05) "Layer 2 — Reputation Score" earn/lose
@@ -60,28 +61,112 @@ export const REP_TABLE = {
 } as const;
 
 /**
+ * Package 1b (2026-10-01, see DECISIONS.md) — maps this function's
+ * long-standing (source-prefix, points) pairs onto a lib/rep/config.ts
+ * `REASON_CATALOG` entry, so `awardRep` below can delegate its actual
+ * write to lib/rep/ledger.ts instead of doing its own `$transaction`
+ * array, making that module the single real writer of `rep_history`.
+ * `source` here is the part before any `:` (see `splitSource` below) —
+ * e.g. `"invitee-level-2:${userId}"` arrives as prefix `"invitee-level-2"`.
+ * Throws for anything unmapped, deliberately: a new call site must add an
+ * entry here (and a matching one in lib/rep/config.ts#REASON_CATALOG)
+ * rather than silently falling through.
+ */
+function legacyReasonCode(sourcePrefix: string, points: number): string {
+  switch (sourcePrefix) {
+    case "login-streak":
+      if (points === REP_TABLE.earn.dailyLogin.points) return "daily_login";
+      if (points === REP_TABLE.earn.streak7Day.points) return "login_streak_7";
+      if (points === REP_TABLE.earn.streak30Day.points) return "login_streak_30";
+      break;
+    case "profile-complete":
+      return "profile_complete";
+    case "first-post":
+      return "first_post";
+    case "house-post":
+      return "house_post";
+    case "house-joined":
+      return "house_joined";
+    case "first-community-intro":
+      return "first_community_intro";
+    case "invitee-level-2":
+      return "invitee_level_2";
+    case "referral-active-90d":
+      return "invitee_active_90d";
+  }
+  throw new Error(
+    `awardRep: no REP catalog mapping for source "${sourcePrefix}" at ${points} points — ` +
+      `add one to lib/rep/config.ts#REASON_CATALOG and lib/rating/rep-engine.ts#legacyReasonCode.`,
+  );
+}
+
+/** Splits "prefix:id" into { sourceType: "prefix", sourceId: "id" }, or
+ * just { sourceType: source } when there's no colon. */
+function splitSource(source: string): { sourceType: string; sourceId?: string } {
+  const i = source.indexOf(":");
+  if (i === -1) return { sourceType: source };
+  return { sourceType: source.slice(0, i), sourceId: source.slice(i + 1) };
+}
+
+/**
  * Awards (or deducts) REP and logs the change to `RepHistory` — the
  * ledger IS the score (`User.rep` is just a cached running total, kept
  * in sync here). Call this at the moment an earn/lose event in
  * `REP_TABLE` actually happens; don't call it speculatively.
  *
- * The `rep.granted` analytics event (SPEC-analytics-panel.md §2.2) is
- * written as a third statement in the same `$transaction` array, not
- * via `lib/analytics/track.ts` — the spec requires it be in the same
- * transaction as the grant itself, and every REP award in this codebase
- * funnels through this one function, so this is the single place that
- * guarantee needs to be made.
+ * Package 1b (2026-10-01) — this function's signature and behavior are
+ * unchanged for every caller (all nine existing call sites compile and
+ * behave exactly as before); internally it now delegates the actual
+ * database write to lib/rep/ledger.ts, the single real writer of
+ * `rep_history` going forward. `reason`/`source` are still written
+ * verbatim to RepHistory's original two text columns (via
+ * `legacyReason`/`legacySource`), so the existing `/hall`/`/profile` REP-
+ * history UI — which reads those two columns directly — renders every
+ * row exactly as it did before this change, legacy or new. Every mapped
+ * reason passes `bypassCap: true`: the ACTIVITY/INVITED monthly caps are
+ * a new package-1 concept that never existed for these flows, and
+ * silently capping years of already-live behavior would be exactly the
+ * kind of behavior change this refactor isn't supposed to make — see
+ * lib/rep/config.ts's REASON_CATALOG comment on these entries.
+ *
+ * The `rep.granted` analytics event (SPEC-analytics-panel.md §2.2) still
+ * lands in the SAME transaction as the grant, via lib/rep/ledger.ts's
+ * `emitAnalyticsEvent` option — that guarantee predates this refactor and
+ * is preserved exactly, not relaxed to a follow-up write.
  */
 export async function awardRep(userId: string, points: number, reason: string, source: string) {
   if (points === 0) return;
 
-  await prisma.$transaction([
-    prisma.user.update({ where: { id: userId }, data: { rep: { increment: points } } }),
-    prisma.repHistory.create({ data: { userId, delta: points, reason, source } }),
-    prisma.analyticsEvent.create({
-      data: { userId, type: "rep.granted", meta: { amount: points, reason, sourceEvent: source } },
-    }),
-  ]);
+  const analytics = { type: "rep.granted", meta: { amount: points, reason, sourceEvent: source } };
+
+  if (source === "admin-adjustment") {
+    await ledger.applyAdjustment({
+      userId,
+      delta: points,
+      reasonCode: "admin_adjustment",
+      sourceType: source,
+      legacyReason: reason,
+      legacySource: source,
+      note: reason,
+      emitAnalyticsEvent: analytics,
+    });
+    return;
+  }
+
+  const { sourceType, sourceId } = splitSource(source);
+  const reasonCode = legacyReasonCode(sourceType, points);
+
+  await ledger.awardRep({
+    userId,
+    reasonCode,
+    value: points,
+    sourceType,
+    sourceId,
+    bypassCap: true,
+    legacyReason: reason,
+    legacySource: source,
+    emitAnalyticsEvent: analytics,
+  });
 }
 
 /**
