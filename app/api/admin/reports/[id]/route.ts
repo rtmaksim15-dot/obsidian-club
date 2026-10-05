@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { logModerationAction } from "@/lib/moderation/log";
+import { requiresMandatoryRetention } from "@/lib/moderation/retention";
 
 type Action = "dismiss" | "review" | "preserve" | "remove";
 const VALID_ACTIONS: Action[] = ["dismiss", "review", "preserve", "remove"];
@@ -73,7 +74,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       if (!comment.isDeleted) {
         await prisma.comment.update({
           where: { id: comment.id },
-          data: { isDeleted: true, deletedAt: new Date(), deletedById: admin.id },
+          data: {
+            isDeleted: true,
+            deletedAt: new Date(),
+            deletedById: admin.id,
+            preserveIndefinitely: requiresMandatoryRetention(report.category),
+          },
         });
         await logModerationAction({
           adminId: admin.id,
@@ -92,7 +98,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       if (!message.isDeleted) {
         await prisma.message.update({
           where: { id: message.id },
-          data: { isDeleted: true, deletedAt: new Date(), deletedById: admin.id },
+          data: {
+            isDeleted: true,
+            deletedAt: new Date(),
+            deletedById: admin.id,
+            preserveIndefinitely: requiresMandatoryRetention(report.category),
+          },
         });
         await logModerationAction({
           adminId: admin.id,

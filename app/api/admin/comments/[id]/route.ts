@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { logModerationAction } from "@/lib/moderation/log";
+import { REPORT_CATEGORIES } from "@/lib/moderation/report";
+import { requiresMandatoryRetention } from "@/lib/moderation/retention";
+
+const KNOWN_CATEGORIES = REPORT_CATEGORIES.map((c) => c.value as string);
 
 // DELETE /api/admin/comments/:id — admin-only soft-delete (moderation
 // gap 1, 2026-09-08, see DECISIONS.md). Never hard-deletes: content
@@ -9,10 +13,24 @@ import { logModerationAction } from "@/lib/moderation/log";
 // filter everywhere comments are listed) plus who/when. No member-
 // facing equivalent exists or is planned — this is the only way a
 // comment is ever removed.
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+//
+// Security package 4, FIX 13 (2026-10-05, see DECISIONS.md) — optional
+// `category` body field, same reasoning as the messages route's
+// identical addition.
+export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   const admin = await requireAdmin();
   if (!admin) {
     return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  }
+
+  let category: string | undefined;
+  try {
+    const body = await request.json();
+    if (typeof body?.category === "string" && KNOWN_CATEGORIES.includes(body.category)) {
+      category = body.category;
+    }
+  } catch {
+    // No body, or not JSON — category stays optional, same as before.
   }
 
   const comment = await prisma.comment.findUnique({ where: { id: params.id } });
@@ -25,7 +43,12 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
 
   await prisma.comment.update({
     where: { id: comment.id },
-    data: { isDeleted: true, deletedAt: new Date(), deletedById: admin.id },
+    data: {
+      isDeleted: true,
+      deletedAt: new Date(),
+      deletedById: admin.id,
+      preserveIndefinitely: requiresMandatoryRetention(category),
+    },
   });
 
   await logModerationAction({
@@ -33,6 +56,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
     action: "comment.removed",
     targetType: "comment",
     targetId: comment.id,
+    aupSection: category,
     note: `Removed comment on post ${comment.postId}: "${comment.content.slice(0, 200)}"`,
   });
 

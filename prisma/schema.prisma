@@ -398,6 +398,14 @@ model Message {
   // is added alongside the first real writer of that flag.
   deletedAt   DateTime? @map("deleted_at")
   deletedById String?   @map("deleted_by_id") @db.Uuid
+  // Security package 4, FIX 13 (2026-10-05, see DECISIONS.md) — set at
+  // the moment of soft-deletion (never re-derived later) from
+  // lib/moderation/retention.ts#MANDATORY_RETENTION_CATEGORIES, using
+  // whatever report/removal category applied. When true, the 90-day
+  // content-scrub cleanup never blanks this row's `content`. Decided
+  // once, here, on the row itself — deliberately not cross-referenced
+  // from the removal's ModerationAction row at cleanup time.
+  preserveIndefinitely Boolean @default(false) @map("preserve_indefinitely")
 
   room     Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
   user     User      @relation(fields: [userId], references: [id])
@@ -478,6 +486,9 @@ model Comment {
   // identical pair for why this is added now, not when isDeleted was.
   deletedAt   DateTime? @map("deleted_at")
   deletedById String?   @map("deleted_by_id") @db.Uuid
+  // Security package 4, FIX 13 (2026-10-05, see DECISIONS.md) — see
+  // Message's identical field for the full reasoning.
+  preserveIndefinitely Boolean @default(false) @map("preserve_indefinitely")
 
   post      Post  @relation(fields: [postId], references: [id], onDelete: Cascade)
   author    User  @relation(fields: [authorId], references: [id])
@@ -1085,6 +1096,15 @@ model ModerationAction {
   aupSection String?  @map("aup_section")
   note       String?
   createdAt  DateTime @default(now()) @map("created_at")
+  // Security package 4, FIX 13 (2026-10-05, see DECISIONS.md) — set once,
+  // at creation, by lib/moderation/log.ts#logModerationAction from
+  // lib/moderation/retention.ts#MANDATORY_RETENTION_CATEGORIES. When
+  // true, the 90-day note-fragment cleanup never touches this row's
+  // `note`. Deliberately a plain boolean here, not derived at cleanup
+  // time from `aupSection` — the owner's choice: a later edit to the
+  // category taxonomy must never retroactively change what an
+  // already-created row is exempt from.
+  preserveIndefinitely Boolean @default(false) @map("preserve_indefinitely")
 
   admin User @relation(fields: [adminId], references: [id])
 

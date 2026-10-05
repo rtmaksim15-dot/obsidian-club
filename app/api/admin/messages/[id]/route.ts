@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { logModerationAction } from "@/lib/moderation/log";
+import { REPORT_CATEGORIES } from "@/lib/moderation/report";
+import { requiresMandatoryRetention } from "@/lib/moderation/retention";
+
+const KNOWN_CATEGORIES = REPORT_CATEGORIES.map((c) => c.value as string);
 
 // DELETE /api/admin/messages/:id — admin-only soft-delete (moderation
 // gap 1, 2026-09-08, see DECISIONS.md). Same shape as the comment
@@ -11,10 +15,27 @@ import { logModerationAction } from "@/lib/moderation/log";
 // comment), so this UPDATE won't push live to open chat sessions —
 // members see the tombstone on their next fetch, not instantly. Fixing
 // that is a Realtime/member-facing UI change, out of scope here.
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+//
+// Security package 4, FIX 13 (2026-10-05, see DECISIONS.md) — optional
+// `category` body field, added ahead of any UI actually calling this
+// route with one (today only PATCH/restore is wired, from
+// ReportDetail.tsx — this DELETE path has no caller yet). Without it,
+// a removal through this route has no classification signal at all and
+// defaults to NOT red-line, same as before this change.
+export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   const admin = await requireAdmin();
   if (!admin) {
     return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  }
+
+  let category: string | undefined;
+  try {
+    const body = await request.json();
+    if (typeof body?.category === "string" && KNOWN_CATEGORIES.includes(body.category)) {
+      category = body.category;
+    }
+  } catch {
+    // No body, or not JSON — category stays optional, same as before.
   }
 
   const message = await prisma.message.findUnique({ where: { id: params.id } });
@@ -27,7 +48,12 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
 
   await prisma.message.update({
     where: { id: message.id },
-    data: { isDeleted: true, deletedAt: new Date(), deletedById: admin.id },
+    data: {
+      isDeleted: true,
+      deletedAt: new Date(),
+      deletedById: admin.id,
+      preserveIndefinitely: requiresMandatoryRetention(category),
+    },
   });
 
   await logModerationAction({
@@ -35,6 +61,7 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
     action: "message.removed",
     targetType: "message",
     targetId: message.id,
+    aupSection: category,
     note: `Removed message in room ${message.roomId}: "${message.content.slice(0, 200)}"`,
   });
 
