@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { REPORT_CATEGORIES, isRedLineCategory } from "@/lib/moderation/report";
 import { sendReportAlert } from "@/lib/utils/email";
 import { checkRateLimit } from "@/lib/security/rate-limit";
+import { errCode } from "@/lib/utils/safe-error";
 
 // Fix 10 (2026-09-29, see DECISIONS.md) — a real red-line report should
 // never be rate-limited away, but nothing stopped a flood of frivolous
@@ -140,7 +141,7 @@ export async function POST(request: Request) {
     targetType,
     categoryLabel,
     isUnderage: category === "underage",
-  }).catch((err) => console.error("[reports] Failed to send report alert email:", err));
+  }).catch((err) => console.error("[reports] Failed to send report alert email:", errCode(err)));
 
   return NextResponse.json({ id: report.id }, { status: 201 });
 }

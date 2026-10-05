@@ -2,6 +2,7 @@ import { createClient } from "./supabase-server";
 import { prisma } from "@/lib/db/prisma";
 import { touchDailyLogin } from "@/lib/rating/rep-engine";
 import { isAdminId } from "./admin-allowlist";
+import { errCode } from "@/lib/utils/safe-error";
 
 /**
  * Current authenticated member, joined against this app's own `User` row
@@ -35,7 +36,7 @@ export async function getCurrentUser() {
   // safe under that.
   if (user) {
     touchDailyLogin(user.id).catch((err) =>
-      console.error("[session] Failed to touch daily-login streak:", err),
+      console.error("[session] Failed to touch daily-login streak:", errCode(err)),
     );
 
     // Admin access hardening (item 2, 2026-09-17, see DECISIONS.md): the

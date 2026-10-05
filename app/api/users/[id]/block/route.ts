@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
+import { errCode } from "@/lib/utils/safe-error";
 
 // POST /api/users/:id/block — toggles the caller's block on another
 // member (member protection mechanics, pre-launch legal package,
@@ -69,7 +70,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
     ]);
     return NextResponse.json({ blocked: true });
   } catch (err) {
-    console.error("[users/block] Failed to toggle block:", err);
+    console.error("[users/block] Failed to toggle block:", errCode(err));
     return NextResponse.json({ error: "Could not update. Try again shortly." }, { status: 503 });
   }
 }

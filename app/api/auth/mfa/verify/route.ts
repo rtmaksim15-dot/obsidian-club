@@ -4,6 +4,7 @@ import { createClient } from "@/lib/auth/supabase-server";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
 import { logAdminAuthEvent } from "@/lib/security/admin-auth-log";
 import { sendAdminSignInCompletedAlert } from "@/lib/utils/email";
+import { errCode } from "@/lib/utils/safe-error";
 
 const RATE_LIMIT = { max: 5, windowMs: 15 * 60 * 1000 };
 
@@ -72,7 +73,7 @@ export async function POST(request: Request) {
         ip,
         userAgent: request.headers.get("user-agent"),
         at: new Date(),
-      }).catch((err) => console.error("[auth/mfa/verify] Failed to send sign-in-completed alert:", err));
+      }).catch((err) => console.error("[auth/mfa/verify] Failed to send sign-in-completed alert:", errCode(err)));
     }
   }
 

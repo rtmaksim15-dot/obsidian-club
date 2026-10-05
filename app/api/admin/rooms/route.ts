@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { RoomType } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { requireAdmin } from "@/lib/auth/require-admin";
+import { errCode } from "@/lib/utils/safe-error";
 
 type Body = {
   name?: string;
@@ -66,7 +67,7 @@ export async function POST(request: Request) {
     if (isUniqueViolation) {
       return NextResponse.json({ error: "That slug is already taken." }, { status: 409 });
     }
-    console.error("[admin/rooms] Failed to create room:", err);
+    console.error("[admin/rooms] Failed to create room:", errCode(err));
     return NextResponse.json({ error: "Could not create the room." }, { status: 503 });
   }
 }

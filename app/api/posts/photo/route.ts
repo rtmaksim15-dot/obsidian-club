@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/session";
 import { createAdminClient } from "@/lib/auth/supabase-admin";
+import { errCode } from "@/lib/utils/safe-error";
 
 // Feed & Posts MVP (2026-07-16): a single optional photo per post,
 // stored in Supabase Storage (not UploadThing, which the avatar flow
@@ -89,7 +90,7 @@ export async function POST(request: Request) {
 
   const { data, error } = await admin.storage.from(BUCKET).createSignedUploadUrl(path);
   if (error) {
-    console.error("[posts/photo] Could not create signed upload URL:", error);
+    console.error("[posts/photo] Could not create signed upload URL:", errCode(error));
     return NextResponse.json({ error: "Could not start photo upload. Try again shortly." }, { status: 503 });
   }
 

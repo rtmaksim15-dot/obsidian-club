@@ -6,6 +6,7 @@ import { getRequestEligibility } from "@/lib/dm/eligibility";
 import { checkDailyRequestLimit } from "@/lib/dm/limits";
 import { effectiveRequestStatus, isRequestExpired } from "@/lib/dm/lifecycle";
 import { resolveAvatarUrls } from "@/lib/storage/resolve-media";
+import { errCode } from "@/lib/utils/safe-error";
 
 const MAX_MESSAGE_LENGTH = 1000;
 
@@ -143,7 +144,7 @@ export async function POST(request: Request) {
     if (err instanceof EligibilityError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
-    console.error("[dm/requests] Failed to create request:", err);
+    console.error("[dm/requests] Failed to create request:", errCode(err));
     return NextResponse.json({ error: "Could not send. Try again shortly." }, { status: 503 });
   }
 }

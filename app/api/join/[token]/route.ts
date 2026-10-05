@@ -8,6 +8,7 @@ import { track } from "@/lib/analytics/track";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
 import { recordLegalConsent } from "@/lib/legal/record-consent";
 import { evaluateTokenLifecycle, lifecycleMessage } from "@/lib/invites/lifecycle";
+import { errCode } from "@/lib/utils/safe-error";
 
 // Same transient-JWKS-staleness workaround as app/api/invite/[token]/route.ts.
 async function withRetry<R extends { error: unknown }>(fn: () => Promise<R>): Promise<R> {
@@ -20,7 +21,7 @@ async function findAuthUserByEmail(admin: ReturnType<typeof createAdminClient>, 
   for (let page = 1; page <= 20; page++) {
     const { data, error } = await withRetry(() => admin.auth.admin.listUsers({ page, perPage: 200 }));
     if (error) {
-      console.error("[join] listUsers failed while looking up an existing auth identity:", error);
+      console.error("[join] listUsers failed while looking up an existing auth identity:", errCode(error));
       return null;
     }
     const match = data.users.find((u) => u.email === email);
@@ -136,20 +137,20 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
     // failing.
     const existing = await findAuthUserByEmail(supabaseAdmin, email);
     if (!existing) {
-      console.error("[join] email_exists but couldn't find the matching auth user:", email);
+      console.error("[join] email_exists but couldn't find the matching auth user — invite", invite.id);
       return NextResponse.json({ error: "Could not create your account. Try again shortly." }, { status: 503 });
     }
     const { data: updated, error: updateError } = await withRetry(() =>
       supabaseAdmin.auth.admin.updateUserById(existing.id, { password, email_confirm: true }),
     );
     if (updateError || !updated?.user) {
-      console.error("[join] Failed to set a password on the existing auth user:", updateError);
+      console.error("[join] Failed to set a password on the existing auth user:", errCode(updateError));
       return NextResponse.json({ error: "Could not create your account. Try again shortly." }, { status: 503 });
     }
     authUserId = updated.user.id;
     linkedExistingIdentity = true;
   } else if (createError || !created?.user) {
-    console.error("[join] Failed to create Supabase Auth user:", createError);
+    console.error("[join] Failed to create Supabase Auth user:", errCode(createError));
     return NextResponse.json({ error: "Could not create your account. Try again shortly." }, { status: 503 });
   } else {
     authUserId = created.user.id;
@@ -231,8 +232,8 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
     await recordLegalConsent(newUserId, getClientIp(request));
   } catch (err) {
     console.error(
-      `[join] Settled ${email} in Supabase Auth (user id ${authUserId}) but failed to write the matching rows — needs manual reconciliation:`,
-      err,
+      `[join] Settled auth user ${authUserId} but failed to write the matching rows (invite ${invite.id}) — needs manual reconciliation:`,
+      errCode(err),
     );
     return NextResponse.json({ error: "Account partially created. This needs manual follow-up." }, { status: 503 });
   }
@@ -254,7 +255,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
   });
   const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
   if (signInError) {
-    console.error("[join] Account created but sign-in failed:", signInError);
+    console.error("[join] Account created but sign-in failed:", errCode(signInError));
     return NextResponse.json({ ok: true, signedIn: false, newUserId });
   }
 

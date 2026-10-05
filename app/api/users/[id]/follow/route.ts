@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
+import { errCode } from "@/lib/utils/safe-error";
 
 // POST /api/users/:id/follow — toggles the caller's follow relationship
 // on another member. Same toggle shape as /api/posts/:id/like. The Feed
@@ -36,7 +37,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
     await prisma.follow.create({ data: { followerId: user.id, followingId: target.id } });
     return NextResponse.json({ following: true });
   } catch (err) {
-    console.error("[users/follow] Failed to toggle follow:", err);
+    console.error("[users/follow] Failed to toggle follow:", errCode(err));
     return NextResponse.json({ error: "Could not update. Try again shortly." }, { status: 503 });
   }
 }

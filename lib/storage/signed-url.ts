@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/auth/supabase-admin";
+import { errCode } from "@/lib/utils/safe-error";
 
 // Private-storage read path (task 2, 2026-09-23, see DECISIONS.md) —
 // post-photos and avatars are both private buckets now; every read
@@ -17,7 +18,7 @@ export async function getSignedUrl(bucket: string, path: string | null): Promise
   const admin = createAdminClient();
   const { data, error } = await admin.storage.from(bucket).createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
   if (error || !data) {
-    console.error(`[signed-url] Failed to sign ${bucket}/${path}:`, error);
+    console.error(`[signed-url] Failed to sign ${bucket}/${path}:`, errCode(error));
     return null;
   }
   return data.signedUrl;
@@ -38,7 +39,7 @@ export async function getSignedUrls(bucket: string, paths: (string | null)[]): P
   const admin = createAdminClient();
   const { data, error } = await admin.storage.from(bucket).createSignedUrls(uniquePaths, SIGNED_URL_TTL_SECONDS);
   if (error || !data) {
-    console.error(`[signed-url] Failed to batch-sign ${uniquePaths.length} paths in ${bucket}:`, error);
+    console.error(`[signed-url] Failed to batch-sign ${uniquePaths.length} paths in ${bucket}:`, errCode(error));
     return paths.map(() => null);
   }
 

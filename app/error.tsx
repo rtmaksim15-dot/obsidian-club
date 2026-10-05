@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import Logo from "@/components/ui/Logo";
+import { errCode } from "@/lib/utils/safe-error";
 
 // August hardening pass (ROADMAP v3.1), Block 3 (2026-08-04): Next.js's
 // own 500 fallback is generic and off-brand — this catches any
@@ -11,7 +12,7 @@ import Logo from "@/components/ui/Logo";
 // chrome, since the error may have originated inside that layout.
 export default function ErrorPage({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
-    console.error("[error boundary]", error);
+    console.error("[error boundary]", errCode(error), error.digest ?? "");
   }, [error]);
 
   return (

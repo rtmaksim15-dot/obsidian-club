@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
+import { errCode } from "@/lib/utils/safe-error";
 
 // POST /api/posts/:id/like — toggles the caller's like on a post.
 // `Post.likesCount` is a cached counter kept in sync here; the `Like`
@@ -38,7 +39,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
     ]);
     return NextResponse.json({ liked: true });
   } catch (err) {
-    console.error("[posts/like] Failed to toggle like:", err);
+    console.error("[posts/like] Failed to toggle like:", errCode(err));
     return NextResponse.json({ error: "Could not update like. Try again shortly." }, { status: 503 });
   }
 }

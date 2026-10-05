@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { track } from "@/lib/analytics/track";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
 import { MIN_MEMBER_AGE } from "@/lib/legal/eligibility";
+import { errCode } from "@/lib/utils/safe-error";
 
 // POST /api/applications — the invitation panel's intake (Invitation
 // Panel flow, A2/A3, 2026-08-2x, see DECISIONS.md). Writes to the same
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
     // applied."
     const isDuplicate = err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
     if (!isDuplicate) {
-      console.error("[applications] Failed to store application:", err);
+      console.error("[applications] Failed to store application:", errCode(err));
       return NextResponse.json({ error: "The club could not be reached. Try again shortly." }, { status: 503 });
     }
   }

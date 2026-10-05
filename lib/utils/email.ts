@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { HARD_CAP_DAYS, joinUrl } from "@/lib/invites/lifecycle";
+import { errCode } from "@/lib/utils/safe-error";
 
 // Transactional emails. Email clients don't reliably load custom fonts or
 // read CSS variables, so brand colors are inlined here as literal hex —
@@ -325,7 +326,7 @@ async function sendEmail(to: string, subject: string, html: string): Promise<{ o
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     const error = "RESEND_API_KEY not set";
-    console.warn(`[email] ${error} — skipping "${subject}" email to`, to);
+    console.warn(`[email] ${error} — skipping "${subject}" email`);
     return { ok: false, error };
   }
 
@@ -340,13 +341,13 @@ async function sendEmail(to: string, subject: string, html: string): Promise<{ o
     // this feature with a deliberately-bad key.
     const { error: sendError } = await resend.emails.send({ from: FROM, to, subject, html });
     if (sendError) {
-      console.error(`[email] Failed to send "${subject}":`, sendError);
+      console.error(`[email] Failed to send "${subject}":`, errCode(sendError));
       return { ok: false, error: sendError.message };
     }
     return { ok: true };
   } catch (err) {
     const error = err instanceof Error ? err.message : "Unknown send error";
-    console.error(`[email] Failed to send "${subject}":`, err);
+    console.error(`[email] Failed to send "${subject}":`, errCode(err));
     return { ok: false, error };
   }
 }

@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/auth/supabase-admin";
 import { detectImageSignature } from "@/lib/utils/validateImageBytes";
 import { stripExifIfPresent } from "@/lib/utils/stripExif";
 import { resolveAvatarUrl } from "@/lib/storage/resolve-media";
+import { errCode } from "@/lib/utils/safe-error";
 
 // User Profiles task (2026-07-17): replaces the old UploadThing avatar
 // flow (never actually verifiable — UPLOADTHING_SECRET/APP_ID were
@@ -86,7 +87,7 @@ export async function POST(request: Request) {
     upsert: true,
   });
   if (uploadError) {
-    console.error("[profile/avatar] Upload failed:", uploadError);
+    console.error("[profile/avatar] Upload failed:", errCode(uploadError));
     return NextResponse.json({ error: "Could not upload avatar. Try again shortly." }, { status: 503 });
   }
 

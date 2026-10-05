@@ -4,6 +4,7 @@ import { SUPABASE_COOKIE_OPTIONS } from "@/lib/auth/cookie-options";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
 import { logAdminAuthEvent, resolveAdminByEmail } from "@/lib/security/admin-auth-log";
 import { sendAdminPasswordAcceptedAlert } from "@/lib/utils/email";
+import { errCode } from "@/lib/utils/safe-error";
 
 // POST /api/auth/sign-in — item 2, 2026-09-17 (see DECISIONS.md). The
 // email/password path used to call supabase.auth.signInWithPassword()
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest) {
       ip,
       userAgent: request.headers.get("user-agent"),
       at: new Date(),
-    }).catch((err) => console.error("[auth/sign-in] Failed to send password-accepted alert:", err));
+    }).catch((err) => console.error("[auth/sign-in] Failed to send password-accepted alert:", errCode(err)));
   }
 
   const response = NextResponse.json({

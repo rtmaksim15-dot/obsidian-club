@@ -1,6 +1,7 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
+import { errCode } from "@/lib/utils/safe-error";
 
 // SPEC-analytics-panel.md §2.3/§2.2. `import "server-only"` is the only
 // guarantee this can't leak into a Client Component bundle — events are
@@ -23,7 +24,7 @@ export async function track(input: TrackInput): Promise<void> {
       data: { ...input, meta: (input.meta ?? undefined) as Prisma.InputJsonValue | undefined },
     });
   } catch (err) {
-    console.error("[analytics] track failed", input.type, err);
+    console.error("[analytics] track failed", input.type, errCode(err));
     // Never throw — analytics must not break the user-facing flow it's
     // instrumenting.
   }

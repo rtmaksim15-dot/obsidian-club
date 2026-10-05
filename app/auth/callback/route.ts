@@ -7,6 +7,7 @@ import { SUPABASE_COOKIE_OPTIONS } from "@/lib/auth/cookie-options";
 import { logAdminAuthEvent } from "@/lib/security/admin-auth-log";
 import { getClientIp } from "@/lib/security/rate-limit";
 import { sendAdminPasswordAcceptedAlert } from "@/lib/utils/email";
+import { errCode } from "@/lib/utils/safe-error";
 
 // GET /auth/callback — Supabase OAuth (PKCE) redirect target. Google
 // Sign-In (and any future OAuth provider) redirects here with a `code`
@@ -43,9 +44,11 @@ export async function GET(request: NextRequest) {
   // allowlist) — logged so a failure is diagnosable from the server
   // console instead of just silently landing back on /login.
   const providerError = searchParams.get("error");
-  const providerErrorDescription = searchParams.get("error_description");
   if (providerError) {
-    console.error(`[auth/callback] Supabase/provider error: ${providerError} — ${providerErrorDescription}`);
+    // Just the short provider-issued code (e.g. "access_denied") — the
+    // longer error_description is free text from the provider and isn't
+    // trusted to never echo back request context.
+    console.error(`[auth/callback] Supabase/provider error: ${providerError}`);
     return NextResponse.redirect(`${origin}/login?error=oauth`);
   }
 
@@ -120,7 +123,7 @@ export async function GET(request: NextRequest) {
               ip: getClientIp(request),
               userAgent: request.headers.get("user-agent"),
               at: new Date(),
-            }).catch((err) => console.error("[auth/callback] Failed to send password-accepted alert:", err));
+            }).catch((err) => console.error("[auth/callback] Failed to send password-accepted alert:", errCode(err)));
           }
           return redirectWithCookies(`/login/mfa?next=${encodeURIComponent(next)}`, cookiesToSet);
         }
@@ -143,7 +146,7 @@ export async function GET(request: NextRequest) {
 
       return redirectWithCookies("/apply?status=pending", cookiesToSet);
     }
-    console.error("[auth/callback] exchangeCodeForSession failed:", error?.message, error?.status, error?.code);
+    console.error("[auth/callback] exchangeCodeForSession failed:", errCode(error));
   } else {
     console.error("[auth/callback] No `code` param on the callback request.");
   }

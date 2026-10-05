@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { canAccessRoom } from "@/lib/rating/room-access";
 import { resolveAvatarUrl, resolveAvatarUrls } from "@/lib/storage/resolve-media";
 import { checkRateLimit } from "@/lib/security/rate-limit";
+import { errCode } from "@/lib/utils/safe-error";
 
 const PAGE_SIZE = 50;
 // Fix 10 (2026-09-29, see DECISIONS.md) — 60/hour per sender, per room.
@@ -114,7 +115,7 @@ export async function POST(request: Request, { params }: { params: { slug: strin
     const resolvedMessage = { ...message, user: { ...message.user, avatarUrl: await resolveAvatarUrl(message.user.avatarUrl) } };
     return NextResponse.json({ message: resolvedMessage }, { status: 201 });
   } catch (err) {
-    console.error("[rooms/messages] Failed to create message:", err);
+    console.error("[rooms/messages] Failed to create message:", errCode(err));
     return NextResponse.json({ error: "Could not send. Try again shortly." }, { status: 503 });
   }
 }

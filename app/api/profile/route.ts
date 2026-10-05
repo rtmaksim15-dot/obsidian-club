@@ -3,6 +3,7 @@ import type { MemberRole, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import { checkProfileCompleteBonus } from "@/lib/rating/rep-engine";
+import { errCode } from "@/lib/utils/safe-error";
 
 const VALID_ROLES: MemberRole[] = ["dominant", "submissive", "switch", "observer", "newcomer"];
 const MAX_INTERESTS = 10;
@@ -162,7 +163,7 @@ export async function PATCH(request: Request) {
 
     // Non-critical side effect — never fail the save over it.
     await checkProfileCompleteBonus(user.id).catch((err) =>
-      console.error("[profile] Failed to check profile-complete REP bonus:", err),
+      console.error("[profile] Failed to check profile-complete REP bonus:", errCode(err)),
     );
 
     return NextResponse.json({ ok: true });
@@ -172,7 +173,7 @@ export async function PATCH(request: Request) {
     if (isUniqueViolation) {
       return NextResponse.json({ error: "That username is already taken." }, { status: 409 });
     }
-    console.error("[profile] Failed to update:", err);
+    console.error("[profile] Failed to update:", errCode(err));
     return NextResponse.json({ error: "Could not save changes. Try again shortly." }, { status: 503 });
   }
 }

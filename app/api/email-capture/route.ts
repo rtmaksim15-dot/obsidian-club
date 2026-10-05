@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
 import { hashIp } from "@/lib/security/hash-ip";
+import { errCode } from "@/lib/utils/safe-error";
 
 // POST /api/email-capture — the landing page's #apply secondary path
 // (item 1, 2026-09-17, see DECISIONS.md). Replaces the retired
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
       // to branch on.
       const isDuplicate = err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
       if (!isDuplicate) {
-        console.error("[email-capture] Failed to store entry:", err);
+        console.error("[email-capture] Failed to store entry:", errCode(err));
       }
     }
   }

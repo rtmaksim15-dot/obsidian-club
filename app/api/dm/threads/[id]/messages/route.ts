@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { isBlockedEitherWay } from "@/lib/moderation/block";
 import { resolveAvatarUrl, resolveAvatarUrls } from "@/lib/storage/resolve-media";
 import { checkRateLimit } from "@/lib/security/rate-limit";
+import { errCode } from "@/lib/utils/safe-error";
 
 const PAGE_SIZE = 100;
 const MAX_MESSAGE_LENGTH = 2000;
@@ -128,7 +129,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const resolvedMessage = { ...message, sender: { ...message.sender, avatarUrl: await resolveAvatarUrl(message.sender.avatarUrl) } };
     return NextResponse.json({ message: resolvedMessage }, { status: 201 });
   } catch (err) {
-    console.error("[dm/threads/messages] Failed to create message:", err);
+    console.error("[dm/threads/messages] Failed to create message:", errCode(err));
     return NextResponse.json({ error: "Could not send. Try again shortly." }, { status: 503 });
   }
 }

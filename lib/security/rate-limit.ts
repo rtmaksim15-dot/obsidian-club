@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
+import { errCode } from "@/lib/utils/safe-error";
 
 // DB-backed rate limiting (August hardening pass, Block 2, 2026-08-04)
 // — see prisma/schema.prisma's RateLimitHit comment for why this isn't
@@ -20,7 +21,7 @@ async function maybeCleanup() {
   if (Math.random() > 0.02) return;
   const cutoff = new Date(Date.now() - 60 * 60 * 1000);
   await prisma.rateLimitHit.deleteMany({ where: { createdAt: { lt: cutoff } } }).catch((err) => {
-    console.error("[rate-limit] Cleanup failed (non-fatal):", err);
+    console.error("[rate-limit] Cleanup failed (non-fatal):", errCode(err));
   });
 }
 

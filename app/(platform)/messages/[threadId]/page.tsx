@@ -11,6 +11,7 @@ import LeaveThreadButton from "@/components/shared/LeaveThreadButton";
 import ContentMenu from "@/components/shared/ContentMenu";
 import ChatShell from "@/components/shared/ChatShell";
 import { resolveAvatarUrl, resolveAvatarUrls } from "@/lib/storage/resolve-media";
+import { errCode } from "@/lib/utils/safe-error";
 
 // /messages/:threadId (2026-09-14, see DECISIONS.md). Same 404-for-
 // everything shape as the API routes: doesn't exist, isn't yours, or
@@ -45,7 +46,7 @@ export default async function ThreadPage({ params }: { params: { threadId: strin
       where: { threadId_userId: { threadId: participant.threadId, userId: user.id } },
       data: { lastReadAt: new Date() },
     })
-    .catch((err) => console.error("[messages/thread] failed to mark thread read:", err));
+    .catch((err) => console.error("[messages/thread] failed to mark thread read:", errCode(err)));
 
   const thread = await prisma.thread.findUnique({
     where: { id: params.threadId },

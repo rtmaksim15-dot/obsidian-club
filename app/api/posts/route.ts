@@ -12,6 +12,7 @@ import { createAdminClient } from "@/lib/auth/supabase-admin";
 import { resolveAvatarUrl, resolveAvatarUrls, resolvePostMediaUrls } from "@/lib/storage/resolve-media";
 import { getBlockedEitherWayUserIds } from "@/lib/moderation/block";
 import { checkRateLimit } from "@/lib/security/rate-limit";
+import { errCode } from "@/lib/utils/safe-error";
 
 const PAGE_SIZE = 20;
 // Fix 10 (2026-09-29, see DECISIONS.md) — 20/hour per author. Generous
@@ -259,12 +260,12 @@ export async function POST(request: Request) {
           .from("post-photos")
           .upload(path, stripped, { contentType: realType, upsert: true });
         if (reuploadError) {
-          console.error("[posts] Failed to re-upload EXIF-stripped photo:", reuploadError);
+          console.error("[posts] Failed to re-upload EXIF-stripped photo:", errCode(reuploadError));
           return NextResponse.json({ error: "Could not process the photo. Try again shortly." }, { status: 503 });
         }
       }
     } catch (err) {
-      console.error("[posts] Failed to verify/process photo bytes:", err);
+      console.error("[posts] Failed to verify/process photo bytes:", errCode(err));
       return NextResponse.json({ error: "Could not verify the photo. Try again shortly." }, { status: 503 });
     }
   }
@@ -314,7 +315,7 @@ export async function POST(request: Request) {
     };
     return NextResponse.json({ post: resolvedPost }, { status: 201 });
   } catch (err) {
-    console.error("[posts] Failed to create post:", err);
+    console.error("[posts] Failed to create post:", errCode(err));
     return NextResponse.json({ error: "Could not publish. Try again shortly." }, { status: 503 });
   }
 }

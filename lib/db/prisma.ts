@@ -22,7 +22,11 @@ function withPoolLogging(client: PrismaClient) {
           return await query(args);
         } catch (err) {
           if (isPoolExhaustionError(err)) {
-            console.error(`[DB_POOL_EXHAUSTED] ${model ?? "raw"}.${operation} rejected — connection pool saturated`, err);
+            // Not lib/utils/safe-error.ts#errCode here — this file IS
+            // lib/db/prisma.ts, so importing it back would be circular.
+            // Same extraction, inlined.
+            const message = err instanceof Error ? err.message : String(err);
+            console.error(`[DB_POOL_EXHAUSTED] ${model ?? "raw"}.${operation} rejected — connection pool saturated`, message);
           }
           throw err;
         }

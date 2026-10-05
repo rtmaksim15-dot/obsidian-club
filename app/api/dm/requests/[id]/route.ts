@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { isBlockedEitherWay } from "@/lib/moderation/block";
 import { needsDmRulesAcceptance } from "@/lib/legal/dm-rules";
 import { effectiveRequestStatus } from "@/lib/dm/lifecycle";
+import { errCode } from "@/lib/utils/safe-error";
 
 type Body = { action?: "accept" | "decline" };
 
@@ -138,7 +139,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (err instanceof AlreadyResolvedError) {
       return NextResponse.json({ error: "This request is no longer pending." }, { status: 409 });
     }
-    console.error("[dm/requests/:id] Failed to accept:", err);
+    console.error("[dm/requests/:id] Failed to accept:", errCode(err));
     return NextResponse.json({ error: "Could not accept. Try again shortly." }, { status: 503 });
   }
 }
