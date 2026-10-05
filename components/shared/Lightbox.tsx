@@ -208,6 +208,13 @@ export default function Lightbox({ src, alt, onClose }: Props) {
           This photo is no longer available. Try reloading the page.
         </p>
       ) : (
+        // `h-[90vh] w-[90vw]` (not max-h/max-w) is deliberate — an <img>
+        // with only a max-size never grows past its own natural pixel
+        // size, so a small source (e.g. an old low-res avatar) rendered
+        // tiny and centered instead of filling the viewer. Forcing the
+        // box to the full 90vh/90vw and letting object-contain fit the
+        // image inside it scales small images up and large ones down,
+        // in both cases preserving aspect ratio.
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={src}
@@ -218,7 +225,7 @@ export default function Lightbox({ src, alt, onClose }: Props) {
           onMouseDown={handleMouseDown}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
-          className="max-h-[90vh] max-w-[90vw] select-none object-contain"
+          className="h-[90vh] w-[90vw] select-none object-contain"
           style={{
             transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
             transition: interacting ? "none" : "transform 0.15s ease-out",
