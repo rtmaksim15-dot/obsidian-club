@@ -2414,3 +2414,5 @@ ALTER TABLE "comments" ADD COLUMN "preserve_indefinitely" BOOLEAN NOT NULL DEFAU
 Verified immediately after: all 3 columns present with the correct type/default; all 4 `rep-core` `User` columns, all 8 `rep_history` extra columns, and the `RepCategory` enum all still intact; row counts on `messages`/`comments`/`moderation_actions` unchanged (6/7/5, same as before — zero data touched); `npm run check:rls` still shows RLS enabled on all 40 tables.
 
 `npx tsc --noEmit`, `npm run lint`, `npm run build` all clean. Zero real rows exist in any of the affected tables yet (confirmed in the prior investigation), so none of this touches real data regardless of when the migration runs.
+
+**Permission-wording follow-up**: the migration itself was approved and accepted with no complaint, but the owner asked afterward that a plain "continue"/"ok"/"go ahead" not be treated as permission for a production schema/data change going forward — only an explicit reply naming the specific action counts. Recorded as CLAUDE.md rule 11.
