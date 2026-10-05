@@ -1,3 +1,4 @@
+import "server-only";
 import { Resend } from "resend";
 import { HARD_CAP_DAYS, joinUrl } from "@/lib/invites/lifecycle";
 import { errCode } from "@/lib/utils/safe-error";
