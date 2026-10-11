@@ -2438,3 +2438,86 @@ Full scope per the task: `AgeVerification` model, `lib/age-verification/` adapte
 **Not done, by design**: age-gate guards were added to 24 of 63 `app/api/` route files — the real content/action surface (feed, posts, comments, likes, uploads, profile, rooms, DMs, reports, ritual progress, invites, house-join, block/follow/review) — deliberately skipping admin routes (already gated by `requireAdmin()`), auth/sign-out/account-deletion/legal/pre-membership routes (A6's own exemption list), and `profile/username-check` (used during pre-verification onboarding). See `TECH_DEBT.md` for the full list and reasoning.
 
 `npx tsc --noEmit`, `npm run lint`, `npm run build` all clean. `npm run check:rls` confirms the current baseline (40 tables, all RLS enabled) before this migration exists — re-run after applying, once approved.
+
+### 2026-10-10 — Bundle 1, Phase B: Navigation v2
+
+Full scope per the task: a new top bar and bottom tab bar, a `[+]`
+post sheet, THE WORLD drawer (left) and MINE menu (right), Veil
+(per-viewer image blur), Keepsakes, and a Notifications page. Zero
+database migrations — Veil reuses `UserProfile.settings` (already
+unused JSON, already deny-all RLS, Prisma-only access — sufficient as
+owner-only without any new policy), Keepsakes reuses the existing
+`Like` model. `npx tsc --noEmit`, `npm run lint`, `npm run build` all
+clean; see TECH_DEBT.md for what couldn't be verified live (no
+authenticated session reachable in this sandbox, same constraint
+already recorded there for the Batch generator v2 entry) and the full
+list of omitted drawer/menu items with reasons.
+
+**One real interpretation call, made without stopping to ask, flagged
+here**: the task describes "Top bar on all member screens" and a
+separate "Bottom tab bar" without saying whether the bottom bar is
+mobile-only (matching the existing `BottomNav`/`DesktopNav` split) or
+universal (matching the top bar). Chose universal for both —
+`TopBar`/`BottomTabBar` now render identically on every breakpoint,
+replacing `DesktopNav`/`BottomNav` entirely rather than keeping the old
+fork. Reasoning: the task frames this as one layered system ("two
+layers: actions / the world / mine") applying everywhere, not two
+different navigation strategies per breakpoint; keeping the old fork
+would have meant deciding, item by item, which of the six top-bar
+destinations and five bottom-tab destinations desktop still gets some
+other way — a worse, more fragmented outcome than one shell everywhere.
+`PlatformShell.tsx`'s `pt-20`/`pb-16` padding and `ChatShell.tsx`'s
+height `calc()` (previously split `sm:`/non-`sm:`) were updated to
+apply unconditionally to match — found and fixed while making this
+change, not a separately-reported bug.
+
+**Both bars are now gated on `fullAccess` (ritual complete + doors
+open or bypassed), not `BottomNav`'s old "any logged-in user."** A
+mid-ritual or antechamber member already has their own persistent
+sign-out on those pages (`ritual/layout.tsx`, `antechamber/page.tsx`)
+and the new menus show real account state (invitation counts, Veil)
+that doesn't make sense to surface before a member is actually in.
+
+**"My Circle" (MINE menu) is treated as the same not-yet-built feature
+as THE WORLD drawer's "Circles" row** (`CIRCLES_UI_ENABLED`, both
+default false) rather than repurposed onto the existing but
+differently-named Follow system (which has counts on profiles but no
+list-view UI at all to link to). "Keepsakes" **is** built, on the
+existing `Like` model — the task's own spec names "bookmarks/likes" as
+either being acceptable, and Like already exists with nothing missing.
+
+**Veil** (B6): per-viewer preference on `UserProfile.settings.veil`
+(read-merge-write, copying `app/api/ritual/progress/route.ts`'s exact
+pattern — CLAUDE.md rule 9). Applied to post photos only — threaded
+through `PostCard`'s one shared photo-render call site and from there
+into `PostList`/`FeedList` and all five pages that use them (feed,
+hall, houses/[slug], posts/[id], profile/[username]) — not avatars
+(identity, not content) and not "Community," which currently renders
+no images at all (Rooms list shows only metadata; `RoomChat.tsx`
+doesn't render `Message.mediaUrl` despite the column existing) — there
+is nothing to veil there yet.
+
+**First real use of `@radix-ui/react-dialog`** (a dependency since
+before this session, confirmed unused everywhere including
+`Lightbox.tsx`, which deliberately stayed hand-rolled) for the new
+`SideSheet.tsx` — chosen specifically because B7 requires a real focus
+trap, which this app's existing hand-rolled overlays
+(`ConfirmDialog`/`ReportModal`/`Lightbox`) don't attempt (Escape +
+backdrop-click only, no focus cycling). Body scroll lock is still done
+by hand, copying `Lightbox.tsx`'s own scrollbar-width-compensated
+technique, so the visible behavior matches the rest of the app.
+
+**"Account" (MINE menu Settings) links to `/profile/edit`**, where
+`CloseAccountButton` already lives — matches the task's own "(existing
+settings/deletion)" phrasing. `/account/security` (MFA) isn't
+separately surfaced; the task names one row, not two.
+
+**Notifications**: the `Notification` model existed and was already
+written to (level-ups, DM-request replies, welcome messages) but had
+no reader anywhere — built a minimal `/notifications` list (mark-as-
+read on view, same as opening a DM thread already works) so the top
+bar's bell has a real destination. The badge count excludes
+`dm.request_*` types, matching `/hall`'s own existing notification-card
+filter — those three already have their own signal on the Messages
+badge, and double-counting the same event across two badges would be
+confusing, not informative.

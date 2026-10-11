@@ -26,6 +26,8 @@ const PROTECTED_PREFIXES = [
   "/codex",
   "/messages",
   "/account",
+  "/keepsakes",
+  "/notifications",
 ];
 
 export async function middleware(request: NextRequest) {

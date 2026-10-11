@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getRitualStatus } from "@/lib/auth/ritual";
 import { getDoorsState, bypassesDoors } from "@/lib/config/doors";
 import { getFeedPosts } from "@/lib/feed/query";
+import { getVeilEnabled } from "@/lib/profile/veil";
 import FeedList from "@/components/shared/FeedList";
 
 /**
@@ -46,12 +47,18 @@ export default async function FeedPage() {
   // antechamber instead of real content while doors.active.
   if (!bypassesDoors(user) && getDoorsState().active) redirect("/antechamber");
 
-  const { posts, hasMore } = await getFeedPosts(user);
+  const [{ posts, hasMore }, veilEnabled] = await Promise.all([getFeedPosts(user), getVeilEnabled(user.id)]);
 
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
       <div className="mx-auto max-w-2xl">
-        <FeedList initialPosts={posts} initialHasMore={hasMore} viewerId={user.id} viewerIsAdmin={user.isAdmin} />
+        <FeedList
+          initialPosts={posts}
+          initialHasMore={hasMore}
+          viewerId={user.id}
+          viewerIsAdmin={user.isAdmin}
+          viewerVeilEnabled={veilEnabled}
+        />
       </div>
     </main>
   );

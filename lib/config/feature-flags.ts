@@ -123,6 +123,28 @@ export const LIBRARY_UI_ENABLED = false;
 // their own referral link/count while this is off.
 export const REFERRALS_UI_ENABLED = false;
 
+// Navigation v2 (Phase B, 2026-10-10, see DECISIONS.md) — search isn't
+// built yet (no query/index behind it); gates the top bar's search
+// icon only. Default false until a real search exists to search.
+export const SEARCH_UI_ENABLED = false;
+
+// Navigation v2, THE WORLD drawer (Phase B) — each of these four gates
+// one drawer row for a feature that doesn't exist yet at all (no model,
+// no route). Default false; turning one on before its feature is built
+// will 404 — these exist so the drawer's rows can ship ahead of each
+// feature and be turned on independently later, same pattern as
+// LIBRARY_UI_ENABLED/HOUSES_UI_ENABLED above.
+export const CHRONICLES_UI_ENABLED = false;
+export const CIRCLES_UI_ENABLED = false;
+export const GATHERINGS_UI_ENABLED = false;
+export const ATLAS_UI_ENABLED = false;
+
+// Navigation v2, MINE menu (Phase B) — "Seal of Authenticity" and "My
+// Boundaries" rows. Neither feature exists yet (no model, no route);
+// same not-built-yet posture as the four flags above. Default false.
+export const SEAL_UI_ENABLED = false;
+export const BOUNDARIES_UI_ENABLED = false;
+
 // Community tab hidden for v1 (2026-09-27): with only Newcomers active,
 // /rooms is an empty-feeling single-room list for anyone past the
 // ritual — worse than not showing a nav destination at all. Gates only

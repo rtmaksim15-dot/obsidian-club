@@ -1,12 +1,16 @@
 import { redirect } from "next/navigation";
+import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import { needsLegalReconsent } from "@/lib/legal/reconsent";
 import { needsAgeVerification } from "@/lib/age-verification/gate";
 import { isRitualComplete } from "@/lib/auth/ritual";
 import { getDoorsState, bypassesDoors } from "@/lib/config/doors";
-import { hasUnreadDm } from "@/lib/dm/unread";
-import BottomNav from "@/components/shared/BottomNav";
-import DesktopNav from "@/components/shared/DesktopNav";
+import { getUnreadDmCount } from "@/lib/dm/unread";
+import { getUnreadNotificationCount } from "@/lib/notifications/unread";
+import { getVeilEnabled } from "@/lib/profile/veil";
+import { resolveAvatarUrl } from "@/lib/storage/resolve-media";
+import TopBar from "@/components/shared/TopBar";
+import BottomTabBar from "@/components/shared/BottomTabBar";
 import PlatformShell from "@/components/shared/PlatformShell";
 
 // Legal re-consent gate (Block 4, 2026-08-10) — applied once here
@@ -54,15 +58,71 @@ export default async function PlatformLayout({ children }: { children: React.Rea
     fullAccess = user.isAdmin || ((await isRitualComplete(user)) && (bypassesDoors(user) || !getDoorsState().active));
   }
 
-  // Messages nav unread indicator (item 3, 2026-09-18, see DECISIONS.md)
-  // — only worth computing once the member can actually reach /messages.
-  const unreadDm = fullAccess ? await hasUnreadDm(user!.id) : false;
+  // Navigation v2 (Phase B, 2026-10-10, see DECISIONS.md) — TopBar and
+  // BottomTabBar replace DesktopNav/BottomNav entirely, on EVERY
+  // breakpoint (not a mobile/desktop fork like the nav they replace —
+  // see DECISIONS.md for why this session chose one universal shell).
+  // Gated on `fullAccess` for both, tightening BottomNav's old "any
+  // logged-in user" gate: a mid-ritual/antechamber member already has
+  // their own persistent sign-out on those pages (ritual/layout.tsx,
+  // antechamber/page.tsx) and showing them "Invitations: you hold N"
+  // or a Veil toggle before they're actually inside doesn't make sense.
+  let navData: {
+    avatarUrl: string | null;
+    unreadDmCount: number;
+    unreadNotificationCount: number;
+    title: string | null;
+    inviteAllowance: number;
+    hasOutstandingMemberInvite: boolean;
+    veilEnabled: boolean;
+  } | null = null;
+
+  if (fullAccess) {
+    const [avatarUrl, unreadDmCount, unreadNotificationCount, profile, memberInviteTokens, veilEnabled] =
+      await Promise.all([
+        resolveAvatarUrl(user!.avatarUrl),
+        getUnreadDmCount(user!.id),
+        getUnreadNotificationCount(user!.id),
+        prisma.userProfile.findUnique({ where: { userId: user!.id }, select: { title: true } }),
+        prisma.inviteToken.findMany({ where: { source: "member", inviterId: user!.id }, select: { redeemedAt: true } }),
+        getVeilEnabled(user!.id),
+      ]);
+
+    navData = {
+      avatarUrl,
+      unreadDmCount,
+      unreadNotificationCount,
+      title: profile?.title ?? null,
+      inviteAllowance: user!.inviteAllowance,
+      hasOutstandingMemberInvite: memberInviteTokens.some((t) => !t.redeemedAt),
+      veilEnabled,
+    };
+  }
 
   return (
     <>
       <PlatformShell fullAccess={fullAccess}>{children}</PlatformShell>
-      {user ? <BottomNav unreadDm={unreadDm} /> : null}
-      {fullAccess ? <DesktopNav unreadDm={unreadDm} /> : null}
+      {fullAccess && navData ? (
+        <>
+          <TopBar
+            avatarUrl={navData.avatarUrl}
+            displayName={user!.displayName}
+            unreadDmCount={navData.unreadDmCount}
+            unreadNotificationCount={navData.unreadNotificationCount}
+            worldDrawerProps={{}}
+            mineMenuProps={{
+              displayName: user!.displayName,
+              avatarUrl: navData.avatarUrl,
+              username: user!.username,
+              title: navData.title,
+              inviteAllowance: navData.inviteAllowance,
+              hasOutstandingMemberInvite: navData.hasOutstandingMemberInvite,
+              initialVeilEnabled: navData.veilEnabled,
+            }}
+          />
+          <BottomTabBar />
+        </>
+      ) : null}
     </>
   );
 }

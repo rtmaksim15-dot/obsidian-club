@@ -1,7 +1,7 @@
 import type { PostType } from "@prisma/client";
 import LikeButton from "./LikeButton";
 import ContentMenu from "./ContentMenu";
-import ZoomableImage from "./ZoomableImage";
+import VeiledPhoto from "./VeiledPhoto";
 import { HOUSES_UI_ENABLED, LEVELS_UI_ENABLED } from "@/lib/config/feature-flags";
 import { isFounder } from "@/lib/config/founder";
 
@@ -42,6 +42,12 @@ type Props = {
   // so a successful delete removes this card instantly instead of
   // waiting on router.refresh() — see ContentMenu's onDeleted comment.
   onDeleted?: () => void;
+  // Veil (Phase B, B6, 2026-10-10, see DECISIONS.md) — the VIEWER's own
+  // preference, not a property of the post itself; every call site
+  // fetches it once per page load from lib/profile/veil.ts and threads
+  // it down here. Defaults to false (unveiled) so every existing
+  // PostCard call site this session didn't update stays unaffected.
+  viewerVeilEnabled?: boolean;
 };
 
 /** Shared post-card rendering for /feed, /hall, /profile/[username], and
@@ -61,6 +67,7 @@ export default function PostCard({
   viewerIsAdmin = false,
   deleteRedirectTo,
   onDeleted,
+  viewerVeilEnabled = false,
 }: Props) {
   const photo = firstPhoto(post.mediaUrls);
   const isOwn = viewerId != null && post.author.id === viewerId;
@@ -126,7 +133,12 @@ export default function PostCard({
       {post.content ? <p className="text-body mt-1 whitespace-pre-wrap">{post.content}</p> : null}
 
       {photo ? (
-        <ZoomableImage src={photo} alt="" className="mt-3 max-h-[480px] w-full rounded-ob object-cover" />
+        <VeiledPhoto
+          src={photo}
+          alt=""
+          className="mt-3 max-h-[480px] w-full rounded-ob object-cover"
+          veiled={viewerVeilEnabled}
+        />
       ) : null}
 
       <div className="mt-3 flex items-center gap-5">

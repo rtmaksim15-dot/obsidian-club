@@ -11,6 +11,7 @@ import { isBlockedEitherWay } from "@/lib/moderation/block";
 import { isRitualComplete } from "@/lib/auth/ritual";
 import { getMessageButtonState } from "@/lib/dm/relationship";
 import { resolveAvatarUrl, resolveAvatarUrls, resolvePostMediaUrls } from "@/lib/storage/resolve-media";
+import { getVeilEnabled } from "@/lib/profile/veil";
 import { LEVEL_NAMES } from "@/lib/rating/levels";
 import {
   REP_NUMBER_ENABLED,
@@ -150,9 +151,10 @@ export default async function ProfilePage({ params }: { params: { username: stri
     : null;
 
   // Private storage (task 2, 2026-09-23, see DECISIONS.md).
-  const [profileAvatarUrl, postAvatarUrls] = await Promise.all([
+  const [profileAvatarUrl, postAvatarUrls, veilEnabled] = await Promise.all([
     resolveAvatarUrl(user.avatarUrl),
     resolveAvatarUrls(posts.map((p) => p.author.avatarUrl)),
+    viewer ? getVeilEnabled(viewer.id) : Promise.resolve(false),
   ]);
   const resolvedPosts = await Promise.all(
     posts.map(async (post, i) => ({
@@ -380,6 +382,7 @@ export default async function ProfilePage({ params }: { params: { username: stri
                   post={post as FeedPost}
                   viewerId={viewer?.id}
                   viewerIsAdmin={viewer?.isAdmin}
+                  viewerVeilEnabled={veilEnabled}
                 />
               ))}
             </div>

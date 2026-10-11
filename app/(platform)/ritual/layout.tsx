@@ -2,10 +2,10 @@ import SignOutButton from "@/components/shared/SignOutButton";
 
 // Every /ritual* page (2026-09-10, production incident) — a member
 // whose ritual is incomplete can reach nothing else in the app (every
-// other gated page bounces back here), BottomNav is mobile-only
-// (`sm:hidden`) and doesn't even link anywhere reachable while
-// incomplete, and desktop has no nav chrome at all outside what a page
-// renders itself. None of the four /ritual pages rendered a sign-out
+// other gated page bounces back here), and TopBar/BottomTabBar
+// (app/(platform)/layout.tsx) render nothing at all here either — both
+// are gated on `fullAccess`, which a mid-ritual member never has. None
+// of the four /ritual pages rendered a sign-out
 // control, so there was no way out of the platform at all until the
 // ritual finished -- the same gap /antechamber's own comment already
 // flagged and fixed for itself, just never carried over here. Fixed

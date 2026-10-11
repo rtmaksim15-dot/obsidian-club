@@ -5,6 +5,7 @@ import PostCard from "@/components/shared/PostCard";
 import CommentSection from "@/components/shared/CommentSection";
 import { resolveAvatarUrl, resolveAvatarUrls, resolvePostMediaUrls } from "@/lib/storage/resolve-media";
 import { isBlockedEitherWay, getBlockedEitherWayUserIds } from "@/lib/moderation/block";
+import { getVeilEnabled } from "@/lib/profile/veil";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -74,6 +75,7 @@ export default async function PostDetailPage({ params }: { params: { id: string 
     ...(c.isDeleted ? { ...c, content: "" } : c),
     author: { ...c.author, avatarUrl: commentAvatarUrls[i] },
   }));
+  const veilEnabled = await getVeilEnabled(user.id);
 
   return (
     <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
@@ -83,6 +85,7 @@ export default async function PostDetailPage({ params }: { params: { id: string 
           linkComments={false}
           viewerId={user.id}
           viewerIsAdmin={user.isAdmin}
+          viewerVeilEnabled={veilEnabled}
           deleteRedirectTo="/feed"
         />
 

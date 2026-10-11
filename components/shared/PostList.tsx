@@ -11,6 +11,7 @@ type Props = {
   compact?: boolean;
   viewerId?: string;
   viewerIsAdmin?: boolean;
+  viewerVeilEnabled?: boolean;
   // Only a caller with its own client-side list (FeedList) passes this —
   // see ContentMenu's onDeleted comment. Callers that render straight
   // from a Server Component (e.g. /hall) leave it unset; there's no
@@ -19,7 +20,7 @@ type Props = {
   onPostDeleted?: (postId: string) => void;
 };
 
-export default function PostList({ posts, compact = false, viewerId, viewerIsAdmin, onPostDeleted }: Props) {
+export default function PostList({ posts, compact = false, viewerId, viewerIsAdmin, viewerVeilEnabled, onPostDeleted }: Props) {
   if (posts.length === 0) {
     return <p className="text-body">Nothing here yet.</p>;
   }
@@ -33,6 +34,7 @@ export default function PostList({ posts, compact = false, viewerId, viewerIsAdm
           compact={compact}
           viewerId={viewerId}
           viewerIsAdmin={viewerIsAdmin}
+          viewerVeilEnabled={viewerVeilEnabled}
           onDeleted={onPostDeleted ? () => onPostDeleted(post.id) : undefined}
         />
       ))}

@@ -1128,3 +1128,76 @@ table. This migration's own new `age_verifications_admin_read` policy
 uses the SECURITY DEFINER `is_admin_caller()` function instead, to not
 repeat it. Flagged for the owner's awareness; fixing
 `analytics_events_admin_read` itself is a separate, standalone task.
+
+## Navigation v2, Phase B (2026-10-10)
+
+New `TopBar`/`BottomTabBar`/`WorldDrawer`/`MineMenu`/`PostSheet`
+replace `DesktopNav`/`BottomNav` entirely, on every breakpoint (not the
+old mobile-bottom-bar/desktop-top-bar fork) — see DECISIONS.md for the
+full reasoning. No database migration at all for this phase: Veil
+reuses the already-unused `UserProfile.settings` JSON field (already
+deny-all RLS, already sufficient — Prisma-only access), and Keepsakes
+reuses the existing `Like` model. Nothing here is gated behind a
+pending permission request.
+
+**Omitted, per the task's own "omit + report" instruction** (a
+destination with no real existing route, not invented):
+- THE WORLD drawer: a standalone "Rules" page (Safety & Respect
+  guidelines only exists inside the ritual flow; a separate "DM rules"
+  page exists but is a different, narrower document) and "How to
+  report" (reporting is `ReportModal.tsx`, an inline modal — no
+  explainer page anywhere) and "2257 Statement" (no public route; only
+  an internal legal memo exists, and this task explicitly says not to
+  create legal content) and "About the Club" (no route anywhere).
+- MINE menu: "My Circle" — treated as part of the same not-yet-built
+  Circles feature as THE WORLD drawer's "Circles" row (same
+  `CIRCLES_UI_ENABLED` flag), not repurposed onto the existing but
+  differently-named Follow system. Will need its own real destination
+  once Circles is actually built.
+
+**Built instead of omitted, using existing data with no schema
+change**: "Keepsakes" (B5) — the task's own spec names "bookmarks/likes"
+as either being an acceptable underlying feature; there's no Bookmark
+model, but `Like` already exists, so this is "posts you've liked," not
+an omission. The Notifications bell (B1) had no existing list page to
+link to at all (`Notification` model existed and was written to, but
+nothing ever read it) — built a minimal `/notifications` list rather
+than pointing the bell at nothing.
+
+**Veil (B6) only covers post photos** (feed/hall/houses/posts/profile,
+via `PostCard`'s shared photo render) — not avatars (an identity
+element, not content, and blurring every tiny avatar everywhere would
+make the UI unusable just to see who's who) and not "Community": the
+Rooms list shows only room metadata (no images at all), and
+`RoomChat.tsx` doesn't currently render message photos even though
+`Message.mediaUrl` exists in the schema — there is genuinely nothing
+image-bearing under Community today to veil.
+
+**"Account" in the MINE menu's Settings section links to
+`/profile/edit`** (where `CloseAccountButton` already lives, matching
+the task's own "(existing settings/deletion)" phrasing) — it does not
+separately surface `/account/security` (MFA settings), since the task
+names one row, not two.
+
+**First real use of `@radix-ui/react-dialog`** (installed since before
+this session, confirmed unused everywhere, including `Lightbox.tsx`,
+which deliberately stayed hand-rolled) — used for `SideSheet.tsx`'s
+WORLD/MINE drawers specifically because B7 requires a real focus trap,
+which Radix's `Dialog.Content` already implements correctly and this
+app's own hand-rolled overlays (`ConfirmDialog`/`ReportModal`/
+`Lightbox`) do not attempt (Escape + backdrop-click only). Body scroll
+lock is still done by hand (same scrollbar-width-compensated technique
+`Lightbox.tsx` already uses) rather than relied on from Radix, so the
+visible behavior matches the rest of this app's overlays.
+
+**Not verified live in a browser with a real authenticated session** —
+same sandbox constraint already recorded in this file for the Batch
+generator v2 entry: this environment can't establish an authenticated
+session against the local dev server (Supabase's redirect allow-list
+only covers the production domain). Verified instead via `tsc`/`lint`/
+`build` (all clean) and an unauthenticated-request redirect check
+(`/feed` → `/login?next=/feed`, confirming no crash). The DONE WHEN
+items that specifically need a real session — flagged items absent/
+present in both states, Veil persisting across a real session, the
+invitations count matching a real test account's data, and a Lighthouse
+mobile accessibility run — are unverified and worth a manual pass.

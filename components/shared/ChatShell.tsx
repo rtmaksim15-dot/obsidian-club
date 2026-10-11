@@ -12,26 +12,26 @@
  * `h-dvh` (dynamic viewport height, not the static 100vh `min-h-screen`
  * Room chat used to fall back on) is what actually keeps the composer
  * above an open on-screen keyboard on iOS/Android — dvh shrinks with
- * the keyboard, static vh doesn't. `sm:h-[calc(100dvh-5rem)]` accounts
- * for PlatformShell's `sm:pt-20` (reserving space for the fixed
- * DesktopNav), which isn't route-aware and still pushes this block down
- * by that same 5rem on desktop — subtracting it back out here keeps
- * padding-top + box height summing to exactly 100dvh again, still
- * fully dvh-derived, never a hardcoded pixel height.
+ * the keyboard, static vh doesn't.
+ *
+ * Navigation v2 (Phase B, 2026-10-10, see DECISIONS.md): TopBar is now
+ * universal on every breakpoint (replacing DesktopNav, which was
+ * desktop-only) — the `sm:`-only top offset this component used to
+ * need is now unconditional. `calc(100dvh-5rem)` subtracts
+ * PlatformShell's `pt-20` (reserving space for the fixed TopBar, which
+ * — like the old DesktopNav before it — is never route-hidden, even on
+ * an open DM thread) back out, on every breakpoint, so padding-top +
+ * box height still sum to exactly 100dvh.
  *
  * `reserveBottomNavSpace` (found live while verifying Room chat on
  * mobile, 2026-09-24): unlike the DM thread's route — which hides
- * BottomNav entirely via isDmThreadRoute(), and correspondingly stops
- * PlatformShell reserving its `pb-16` — Room chat's route keeps the
- * mobile bottom nav and that same `pb-16`. A flat `h-dvh` on mobile here
- * ran exactly that reserved 64px past the true bottom of the viewport,
- * putting the composer behind the fixed nav — the identical "composer
- * covered" bug the DM thread's own comment already named, just from the
- * padding side, on the one route that never got the matching mobile
- * exemption. `h-[calc(100dvh-4rem)]` subtracts that same 4rem (64px)
- * back out on mobile when this route still reserves the space; pass
- * `false` only for a route where BottomNav is hidden the way the DM
- * thread's is.
+ * BottomTabBar entirely via isDmThreadRoute(), and correspondingly
+ * stops PlatformShell reserving its `pb-16` — Room chat's route keeps
+ * the bottom tab bar and that same `pb-16`, now on every breakpoint
+ * too (BottomTabBar replaced the old mobile-only BottomNav). Subtracts
+ * that same 4rem (64px) back out when this route still reserves the
+ * space; pass `false` only for a route where BottomTabBar is hidden
+ * the way the DM thread's is.
  */
 export default function ChatShell({
   header,
@@ -44,8 +44,8 @@ export default function ChatShell({
 }) {
   return (
     <div
-      className={`flex flex-col overflow-hidden bg-ob-black text-ob-text sm:h-[calc(100dvh-5rem)] ${
-        reserveBottomNavSpace ? "h-[calc(100dvh-4rem)]" : "h-dvh"
+      className={`flex flex-col overflow-hidden bg-ob-black text-ob-text ${
+        reserveBottomNavSpace ? "h-[calc(100dvh-9rem)]" : "h-[calc(100dvh-5rem)]"
       }`}
     >
       {header}

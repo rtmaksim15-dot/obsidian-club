@@ -8,6 +8,7 @@ import JoinHouseButton from "@/components/shared/JoinHouseButton";
 import { track } from "@/lib/analytics/track";
 import { HOUSES_UI_ENABLED } from "@/lib/config/feature-flags";
 import { resolveAvatarUrls, resolvePostMediaUrls } from "@/lib/storage/resolve-media";
+import { getVeilEnabled } from "@/lib/profile/veil";
 
 /**
  * House detail (`/houses/[slug]`) — the house's own room (community) and
@@ -62,7 +63,10 @@ export default async function HouseDetailPage({ params }: { params: { slug: stri
   const roomLocked = room ? !(await canAccessRoom(user, room)) : false;
 
   // Private storage (task 2, 2026-09-23, see DECISIONS.md).
-  const avatarUrls = await resolveAvatarUrls(posts.map((p) => p.author.avatarUrl));
+  const [avatarUrls, veilEnabled] = await Promise.all([
+    resolveAvatarUrls(posts.map((p) => p.author.avatarUrl)),
+    getVeilEnabled(user.id),
+  ]);
   const resolvedPosts = await Promise.all(
     posts.map(async (post, i) => ({
       ...post,
@@ -112,7 +116,7 @@ export default async function HouseDetailPage({ params }: { params: { slug: stri
 
         <section className="mt-10">
           <p className="text-label mb-3">Content</p>
-          <PostList posts={resolvedPosts} viewerId={user.id} viewerIsAdmin={user.isAdmin} />
+          <PostList posts={resolvedPosts} viewerId={user.id} viewerIsAdmin={user.isAdmin} viewerVeilEnabled={veilEnabled} />
         </section>
       </div>
     </main>

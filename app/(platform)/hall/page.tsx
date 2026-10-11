@@ -8,6 +8,7 @@ import { getLevelProgress } from "@/lib/rating/level-progress";
 import { syncReferralLifecycle } from "@/lib/rating/referral-lifecycle";
 import { checkLevelUp } from "@/lib/rating/level-progression";
 import { LEVEL_NAMES } from "@/lib/rating/levels";
+import { getVeilEnabled } from "@/lib/profile/veil";
 import PostList, { type FeedPost } from "@/components/shared/PostList";
 import CreateMemberInviteButton from "@/components/shared/CreateMemberInviteButton";
 import CreatePartnerButton from "@/components/shared/CreatePartnerButton";
@@ -168,9 +169,10 @@ export default async function HallPage() {
   const resolvedPartner = withPartner?.partner ?? withPartner?.partnerOf ?? null;
 
   // Private storage (task 2, 2026-09-23, see DECISIONS.md).
-  const [ownAvatarUrl, postAvatarUrls] = await Promise.all([
+  const [ownAvatarUrl, postAvatarUrls, veilEnabled] = await Promise.all([
     resolveAvatarUrl(user.avatarUrl),
     resolveAvatarUrls(posts.map((p) => p.author.avatarUrl)),
+    getVeilEnabled(user.id),
   ]);
   const resolvedPosts = await Promise.all(
     posts.map(async (post, i) => ({
@@ -414,7 +416,13 @@ export default async function HallPage() {
         {/* Own posts */}
         <section className="mt-10">
           <p className="text-label mb-3">Your Posts</p>
-          <PostList posts={resolvedPosts as FeedPost[]} compact viewerId={user.id} viewerIsAdmin={user.isAdmin} />
+          <PostList
+            posts={resolvedPosts as FeedPost[]}
+            compact
+            viewerId={user.id}
+            viewerIsAdmin={user.isAdmin}
+            viewerVeilEnabled={veilEnabled}
+          />
         </section>
 
         {/* Sign out (2026-09-29, see DECISIONS.md) — moved off DesktopNav
