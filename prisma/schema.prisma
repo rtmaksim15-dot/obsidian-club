@@ -452,13 +452,60 @@ model Post {
   // visibility check to keep in sync.
   isPreserved    Boolean   @default(false) @map("is_preserved")
 
-  author   User      @relation(fields: [authorId], references: [id])
-  house    House?    @relation(fields: [houseId], references: [id])
+  author   User        @relation(fields: [authorId], references: [id])
+  house    House?      @relation(fields: [houseId], references: [id])
   likes    Like[]
   comments Comment[]
+  // Multi-photo posts, Phase C (2026-10-10, see DECISIONS.md) —
+  // `mediaUrls` above is no longer written to by new posts (kept,
+  // unread by new code, only because every historical post's single
+  // photo was backfilled into a PostImage row at position 0 — see that
+  // migration). `images` is the only read path going forward.
+  images   PostImage[]
 
   @@index([authorId])
   @@map("posts")
+}
+
+// Multi-photo posts, Phase C (2026-10-10, see DECISIONS.md). One row
+// per photo, ordered by `position` (0-indexed, matches the task's own
+// schema spec exactly except for one addition — see below). Every
+// historical single-photo post was backfilled into a position-0 row by
+// the migration without touching the underlying Storage object at all
+// (same bucket, same path).
+//
+// `width`/`height` are nullable, unlike the task's literal spec — every
+// backfilled historical row has neither (mediaUrls never recorded
+// dimensions), and making them required would mean fabricating values
+// for real existing posts. New uploads DO report real dimensions from
+// the client (cosmetic — used only for the feed carousel's
+// aspect-ratio hint — so trusting client-reported values here carries
+// no security weight, unlike every actually-validated field on Post).
+//
+// `isDeleted`: the task's own PostImage field list (C1) didn't include
+// a deletion field at all, but C6 explicitly requires "admin can
+// soft-delete a single image" while the post remains — a real gap,
+// filled the same way Message/Comment already do it (a plain boolean,
+// not Post's isPublished/isPreserved split — there's no "image
+// visibility toggle" concept needed here beyond binary deleted/not).
+// Logged via the existing ModerationAction table, same as every other
+// moderation action in this app — no preserveIndefinitely companion
+// field, since image deletion isn't a red-line-adjacent action the way
+// message/comment removal can be.
+model PostImage {
+  id          String   @id @default(uuid()) @db.Uuid
+  postId      String   @map("post_id") @db.Uuid
+  position    Int
+  storagePath String   @map("storage_path")
+  width       Int?
+  height      Int?
+  isDeleted   Boolean  @default(false) @map("is_deleted")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, position])
+  @@map("post_images")
 }
 
 // Additive beyond ARCHITECTURE.md's originally-documented Post-adjacent
@@ -1044,6 +1091,13 @@ model Report {
   id           String           @id @default(uuid()) @db.Uuid
   targetType   ReportTargetType @map("target_type")
   targetId     String           @map("target_id") @db.Uuid
+  // Multi-photo posts, Phase C (C6, 2026-10-10, see DECISIONS.md) — only
+  // meaningful when targetType is "post"; identifies which of that
+  // post's images the report is actually about. Same bare-uuid, no-FK
+  // shape as targetId itself (additive only — see ReportTargetType's own
+  // comment on why that shape was chosen originally). Null means "the
+  // post as a whole," same as every report filed before this existed.
+  imageId      String?          @map("image_id") @db.Uuid
   reporterId   String           @map("reporter_id") @db.Uuid
   category     ReportCategory
   // Computed once at creation from `category` (see lib/moderation/report.ts)

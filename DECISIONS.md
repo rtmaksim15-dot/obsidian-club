@@ -2521,3 +2521,88 @@ bar's bell has a real destination. The badge count excludes
 filter — those three already have their own signal on the Messages
 badge, and double-counting the same event across two badges would be
 confusing, not informative.
+
+### 2026-10-10 — Bundle 1, Phase C: Multi-photo posts
+
+Full scope per the task: `PostImage` model, backfill migration,
+`MAX_PHOTOS_PER_POST`-limited upload/validation, a feed carousel
+(swipe via native scroll-snap, "1/3" counter, dots, first image sets
+aspect ratio), composer support for up to 3 images with drag-to-
+reorder, and per-image moderation (admin soft-delete, author delete,
+`Report.imageId`). `npx tsc --noEmit`, `npm run lint`, `npm run build`
+all clean. Database migration **not applied** — same rule 11 gate as
+Phases A/B.
+
+**Drift check repeated, same as Phase A**: `prisma migrate diff`
+against the live DB, run again before writing this migration, still
+surfaces `rep-core`'s own live-but-undeclared columns
+(`rep_history`/`users` extras, the `RepCategory` enum). The hand-
+written `supabase/migrations/20261010150000_multi_photo_posts.sql`
+contains only `post_images` (table + index + RLS) and
+`reports.image_id` — confirmed against the same diff output, which
+also independently agreed on this phase's own additive shape.
+
+**`Post.mediaUrls` is retired as a read path, not dropped as a
+column.** Every post-reading query across the app (`lib/feed/query.ts`,
+both `app/api/posts*` routes, and all five pages that render
+`PostCard`) now selects `images` (filtered to `isDeleted: false`,
+ordered by `position`) instead, resolved through a new
+`resolvePostImages()` — `resolvePostMediaUrls()` stays in
+`lib/storage/resolve-media.ts` only because nothing requires deleting
+it, not because anything still calls it. New posts never write
+`mediaUrls` at all. The migration backfills every historical post's
+single photo into a `position: 0` `PostImage` row from the existing
+`mediaUrls` value, so this cutover needs no dual-read compatibility
+shim — once the migration runs, every post (old or new) has a real
+`PostImage` row behind it.
+
+**Two real gaps filled, not literal spec, flagged rather than guessed
+silently**:
+- `PostImage.width`/`height` are nullable — the task's own field list
+  didn't say so, but every backfilled historical row genuinely has
+  neither (the old `mediaUrls` array never recorded dimensions), and
+  making them required would mean fabricating values for real posts.
+- `PostImage.isDeleted` — C1's field list didn't include a deletion
+  field at all, but C6 explicitly needs "admin can soft-delete a
+  single image" while the post remains. Added the same shape Message/
+  Comment already use (a plain boolean) rather than Post's own
+  `isPublished`/`isPreserved` pair — there's no "visibility toggle"
+  concept needed at the single-image level, just deleted/not. No
+  `preserveIndefinitely` companion — image removal isn't a red-line-
+  adjacent action the way message/comment removal can be.
+
+**RLS**: deny-all, confirmed as the correct mirror of `posts`' own
+posture (not a new real policy) per Phase A's C6 research — nothing in
+this app reads Post/PostImage via a direct anon/authenticated Supabase
+client; every real access goes through Prisma.
+
+**C6's "report can target a specific image" and "author can delete a
+single image" were both built as real, working capabilities — not
+stubs** — but there is **no member-facing UI yet to pick which image
+to report** from a multi-image post; `Report.imageId` exists and is
+validated end-to-end (`POST /api/reports` accepts and checks it,
+`PATCH /api/admin/reports/[id]`'s new `remove_image` action acts on
+it, `ReportDetail.tsx` has a real "Remove Image" button gated on
+`targetType === "post" && imageId`), but `ReportModal`/`ContentMenu`
+still only ever file a whole-post report. The author's own per-image
+delete (new `DELETE /api/posts/:id/images/:imageId`, with a small
+trash-icon button inside `PostCarousel.tsx` shown only to the post's
+own author) **is** fully wired into the UI, including a guard against
+removing the last image from a photo-only post (same "a post can't be
+empty" rule `POST /api/posts` already enforces at creation).
+
+**Rate limiting**: C3's "counts images, not posts" is implemented as
+`max(1, photos.length)` `RateLimitHit` rows per post — an
+interpretation (the task doesn't say what a zero-image post should
+cost), chosen so unlimited text-only posting doesn't become free
+while a multi-photo post still costs proportionally more. Every photo
+is still validated individually (magic bytes, EXIF strip, ownership
+prefix) and the whole post is rejected if any one fails, per C3's
+explicit instruction — no partial publish.
+
+Not verified live (same sandbox constraint as the rest of this
+bundle) — the DONE WHEN items needing a real session or the applied
+migration (existing posts rendering unchanged on 3 real old posts,
+1/2/3/4-image behavior, the admin single-image soft-delete end to end,
+the RLS two-account test) are unverified and worth a manual pass once
+the migration is approved and applied.

@@ -1,7 +1,7 @@
 import type { PostType } from "@prisma/client";
 import LikeButton from "./LikeButton";
 import ContentMenu from "./ContentMenu";
-import VeiledPhoto from "./VeiledPhoto";
+import PostCarousel, { type CarouselImage } from "./PostCarousel";
 import { HOUSES_UI_ENABLED, LEVELS_UI_ENABLED } from "@/lib/config/feature-flags";
 import { isFounder } from "@/lib/config/founder";
 
@@ -10,7 +10,11 @@ export type FeedPost = {
   title: string | null;
   content: string | null;
   type: PostType;
-  mediaUrls: unknown;
+  // Multi-photo posts, Phase C (2026-10-10, see DECISIONS.md) — replaces
+  // the old bare `mediaUrls: unknown`. Already resolved to signed URLs
+  // and ordered by position by the time it reaches this component (see
+  // lib/storage/resolve-media.ts#resolvePostImages).
+  images: CarouselImage[];
   likesCount: number;
   createdAt: string | Date;
   author: { id: string; username: string | null; displayName: string; avatarUrl: string | null; level: number; rep: number };
@@ -18,10 +22,6 @@ export type FeedPost = {
   likes: { userId: string }[];
   _count: { comments: number };
 };
-
-function firstPhoto(mediaUrls: unknown): string | null {
-  return Array.isArray(mediaUrls) && typeof mediaUrls[0] === "string" ? mediaUrls[0] : null;
-}
 
 type Props = {
   post: FeedPost;
@@ -69,7 +69,6 @@ export default function PostCard({
   onDeleted,
   viewerVeilEnabled = false,
 }: Props) {
-  const photo = firstPhoto(post.mediaUrls);
   const isOwn = viewerId != null && post.author.id === viewerId;
   const canDelete = isOwn || (viewerId != null && viewerIsAdmin);
   const canReport = viewerId != null && !isOwn;
@@ -132,14 +131,13 @@ export default function PostCard({
           margin-only paragraph between the header and the photo. */}
       {post.content ? <p className="text-body mt-1 whitespace-pre-wrap">{post.content}</p> : null}
 
-      {photo ? (
-        <VeiledPhoto
-          src={photo}
-          alt=""
-          className="mt-3 max-h-[480px] w-full rounded-ob object-cover"
-          veiled={viewerVeilEnabled}
-        />
-      ) : null}
+      <PostCarousel
+        postId={post.id}
+        images={post.images}
+        veiled={viewerVeilEnabled}
+        canManage={isOwn}
+        className="mt-3 max-h-[480px] w-full rounded-ob object-cover"
+      />
 
       <div className="mt-3 flex items-center gap-5">
         <LikeButton postId={post.id} initialCount={post.likesCount} initialLiked={post.likes.length > 0} />

@@ -5,7 +5,7 @@ import type { ReportRow } from "./AdminConsole";
 import { levelName } from "@/lib/rating/levels";
 import { formatAdminDateTime as formatDate } from "@/lib/admin/format-date";
 
-type Action = "dismiss" | "review" | "preserve" | "remove";
+type Action = "dismiss" | "review" | "preserve" | "remove" | "remove_image";
 
 const CONFIRM_MESSAGE: Record<Action, string> = {
   dismiss: "Dismiss this report? It will be marked reviewed with no action taken.",
@@ -14,6 +14,8 @@ const CONFIRM_MESSAGE: Record<Action, string> = {
     "Preserve and remove this post?\n\nIt will be unpublished and isolated (never deleted) — this is the red-line action for underage/non-consensual/threat reports.",
   remove:
     "Remove this content and mark the report reviewed?\n\nIt will be soft-deleted (never hard-deleted) and shown to other members as removed by a moderator.",
+  remove_image:
+    "Remove this one image and mark the report reviewed?\n\nOnly the reported image is soft-deleted — the rest of the post (and any other images on it) stays exactly as it is.",
 };
 
 // Zone 3 full depth (2026-09-11, see DECISIONS.md). Reuses the existing
@@ -43,6 +45,12 @@ export default function ReportDetail({
   const canPreserve = r.targetType === "post" && r.isRedLine;
   const canRemove = r.targetType === "comment" || r.targetType === "message";
   const canRestore = canRemove && r.target.isDeleted;
+  // Multi-photo posts, Phase C (C6, 2026-10-10, see DECISIONS.md) —
+  // offered alongside (not instead of) "Preserve & Unpublish": a
+  // red-line report against a post with multiple images may still
+  // warrant removing just the one depicted image, without the
+  // preserve-the-evidence posture applying to the whole post.
+  const canRemoveImage = r.targetType === "post" && Boolean(r.imageId);
 
   // Direct Messages (2026-09-14, see DECISIONS.md) — the only place in
   // the admin console a message's actual text ever appears. Fetched on
@@ -233,6 +241,11 @@ export default function ReportDetail({
             {canRemove ? (
               <button type="button" className="btn-secondary" disabled={pending} onClick={() => act("remove")}>
                 Remove Content
+              </button>
+            ) : null}
+            {canRemoveImage ? (
+              <button type="button" className="btn-secondary" disabled={pending} onClick={() => act("remove_image")}>
+                Remove Image
               </button>
             ) : null}
             {canPreserve ? (

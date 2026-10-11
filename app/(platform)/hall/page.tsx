@@ -23,7 +23,7 @@ import {
   REFERRALS_UI_ENABLED,
 } from "@/lib/config/feature-flags";
 import { isFounder } from "@/lib/config/founder";
-import { resolveAvatarUrl, resolveAvatarUrls, resolvePostMediaUrls } from "@/lib/storage/resolve-media";
+import { resolveAvatarUrl, resolveAvatarUrls, resolvePostImages } from "@/lib/storage/resolve-media";
 
 /**
  * The Hall (`/hall`) — the "Profile" nav tab. Threads-level-simplicity
@@ -133,7 +133,6 @@ export default async function HallPage() {
           id: true,
           title: true,
           content: true,
-          mediaUrls: true,
           type: true,
           likesCount: true,
           createdAt: true,
@@ -141,6 +140,11 @@ export default async function HallPage() {
           house: { select: { id: true, name: true, slug: true } },
           likes: { where: { userId: user.id }, select: { userId: true } },
           _count: { select: { comments: true } },
+          images: {
+            where: { isDeleted: false },
+            orderBy: { position: "asc" },
+            select: { id: true, storagePath: true, position: true, width: true, height: true },
+          },
         },
       }),
       // Invitation & Partner system v1 (2026-08-01) — "My Invitation" below.
@@ -177,7 +181,7 @@ export default async function HallPage() {
   const resolvedPosts = await Promise.all(
     posts.map(async (post, i) => ({
       ...post,
-      mediaUrls: await resolvePostMediaUrls(post.mediaUrls),
+      images: await resolvePostImages(post.images),
       author: { ...post.author, avatarUrl: postAvatarUrls[i] },
     })),
   );

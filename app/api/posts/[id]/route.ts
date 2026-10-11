@@ -2,14 +2,13 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import { requireAgeVerifiedApi } from "@/lib/age-verification/gate";
-import { resolveAvatarUrl, resolvePostMediaUrls } from "@/lib/storage/resolve-media";
+import { resolveAvatarUrl, resolvePostImages } from "@/lib/storage/resolve-media";
 import { isBlockedEitherWay } from "@/lib/moderation/block";
 
 const postSelect = {
   id: true,
   title: true,
   content: true,
-  mediaUrls: true,
   type: true,
   minLevel: true,
   isPublished: true,
@@ -20,6 +19,12 @@ const postSelect = {
   publishedAt: true,
   author: { select: { id: true, username: true, displayName: true, avatarUrl: true, level: true } },
   _count: { select: { comments: true } },
+  // Multi-photo posts, Phase C (2026-10-10, see DECISIONS.md).
+  images: {
+    where: { isDeleted: false },
+    orderBy: { position: "asc" as const },
+    select: { id: true, storagePath: true, position: true, width: true, height: true },
+  },
 };
 
 // GET /api/posts/:id
@@ -63,11 +68,11 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     return NextResponse.json({ error: "This content isn't open to you yet." }, { status: 403 });
   }
 
-  const [mediaUrls, avatarUrl] = await Promise.all([
-    resolvePostMediaUrls(post.mediaUrls),
+  const [images, avatarUrl] = await Promise.all([
+    resolvePostImages(post.images),
     resolveAvatarUrl(post.author.avatarUrl),
   ]);
-  return NextResponse.json({ post: { ...post, mediaUrls, author: { ...post.author, avatarUrl } } });
+  return NextResponse.json({ post: { ...post, images, author: { ...post.author, avatarUrl } } });
 }
 
 type Body = { title?: string; content?: string };
@@ -120,11 +125,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     select: postSelect,
   });
 
-  const [mediaUrls, avatarUrl] = await Promise.all([
-    resolvePostMediaUrls(updated.mediaUrls),
+  const [images, avatarUrl] = await Promise.all([
+    resolvePostImages(updated.images),
     resolveAvatarUrl(updated.author.avatarUrl),
   ]);
-  return NextResponse.json({ post: { ...updated, mediaUrls, author: { ...updated.author, avatarUrl } } });
+  return NextResponse.json({ post: { ...updated, images, author: { ...updated.author, avatarUrl } } });
 }
 
 // DELETE /api/posts/:id — author or admin.

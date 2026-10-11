@@ -9,10 +9,11 @@ import { track } from "@/lib/analytics/track";
 import { detectImageSignature } from "@/lib/utils/validateImageBytes";
 import { stripExifIfPresent } from "@/lib/utils/stripExif";
 import { createAdminClient } from "@/lib/auth/supabase-admin";
-import { resolveAvatarUrl, resolveAvatarUrls, resolvePostMediaUrls } from "@/lib/storage/resolve-media";
+import { resolveAvatarUrl, resolveAvatarUrls, resolvePostImages } from "@/lib/storage/resolve-media";
 import { getBlockedEitherWayUserIds } from "@/lib/moderation/block";
 import { checkRateLimit } from "@/lib/security/rate-limit";
 import { requireAgeVerifiedApi } from "@/lib/age-verification/gate";
+import { getMaxPhotosPerPost } from "@/lib/config/limits";
 import { errCode } from "@/lib/utils/safe-error";
 
 const PAGE_SIZE = 20;
@@ -30,7 +31,6 @@ const postSelect = (viewerId: string) => ({
   id: true,
   title: true,
   content: true,
-  mediaUrls: true,
   type: true,
   minLevel: true,
   viewsCount: true,
@@ -41,6 +41,14 @@ const postSelect = (viewerId: string) => ({
   house: { select: { id: true, name: true, slug: true } },
   likes: { where: { userId: viewerId }, select: { userId: true } },
   _count: { select: { comments: true } },
+  // Multi-photo posts, Phase C (2026-10-10, see DECISIONS.md) —
+  // excludes soft-deleted images (C6); ordered so position always
+  // matches render order.
+  images: {
+    where: { isDeleted: false },
+    orderBy: { position: "asc" as const },
+    select: { id: true, storagePath: true, position: true, width: true, height: true },
+  },
 });
 
 // GET /api/posts — the content feed, newest-first, filtered to what the
@@ -82,7 +90,7 @@ export async function GET(request: Request) {
   const resolved = await Promise.all(
     posts.map(async (post, i) => ({
       ...post,
-      mediaUrls: await resolvePostMediaUrls(post.mediaUrls),
+      images: await resolvePostImages(post.images),
       author: { ...post.author, avatarUrl: avatarUrls[i] },
     })),
   );
@@ -90,13 +98,15 @@ export async function GET(request: Request) {
   return NextResponse.json({ posts: resolved });
 }
 
+type PhotoInput = { url?: string; width?: number; height?: number };
+
 type Body = {
   type?: string;
   title?: string;
   content?: string;
   minLevel?: number;
   houseId?: string;
-  photoUrl?: string;
+  photos?: PhotoInput[];
   imageConsentGiven?: boolean;
 };
 
@@ -111,19 +121,30 @@ export async function POST(request: Request) {
   const ageBlocked = requireAgeVerifiedApi(user);
   if (ageBlocked) return ageBlocked;
 
-  const rateLimit = await checkRateLimit(`post:${user.id}`, POST_CREATE_LIMIT);
-  if (!rateLimit.allowed) {
-    return NextResponse.json(
-      { error: "Too many posts. Try again later." },
-      { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } },
-    );
-  }
-
   let body: Body;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
+  }
+
+  const photos = Array.isArray(body.photos) ? body.photos : [];
+
+  // Multi-photo posts, Phase C (C3, 2026-10-10, see DECISIONS.md) —
+  // "rate limiting counts images, not posts." A text-only post still
+  // costs at least 1 hit (otherwise unlimited text spam would be free);
+  // a post with N photos costs N. Checked before any of the expensive
+  // per-photo validation below, same fail-fast posture the original
+  // single-hit check had.
+  const rateLimitHits = Math.max(1, photos.length);
+  for (let i = 0; i < rateLimitHits; i++) {
+    const rateLimit = await checkRateLimit(`post:${user.id}`, POST_CREATE_LIMIT);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: "Too many posts. Try again later." },
+        { status: 429, headers: { "Retry-After": String(rateLimit.retryAfterSeconds) } },
+      );
+    }
   }
 
   const type = body.type;
@@ -145,8 +166,12 @@ export async function POST(request: Request) {
   // one. Mirrors the same either/or gate ContentComposer.tsx enforces
   // client-side, re-checked here since the UI gate is trivially
   // bypassable by anyone calling this route directly.
-  if (!content && !body.photoUrl?.trim()) {
+  if (!content && photos.length === 0) {
     return NextResponse.json({ error: "Post can't be empty." }, { status: 422 });
+  }
+  const maxPhotos = getMaxPhotosPerPost();
+  if (photos.length > maxPhotos) {
+    return NextResponse.json({ error: `Up to ${maxPhotos} images per post.` }, { status: 422 });
   }
   if (content && content.length > 20000) {
     return NextResponse.json({ error: "Content is too long." }, { status: 422 });
@@ -179,21 +204,31 @@ export async function POST(request: Request) {
     houseId = membership.houseId;
   }
 
-  const photoUrl = body.photoUrl?.trim();
-  let photoPath: string | undefined;
   // Member protection mechanics (pre-launch legal package, 2026-08-09):
   // a photo can't be published without the "all depicted are adults
   // who consented to this publication" checkbox — enforced here, not
   // just in the composer's UI, since the UI-level disable is
   // trivially bypassable by anyone calling this route directly.
-  if (photoUrl && !body.imageConsentGiven) {
-    return NextResponse.json({ error: "Image consent is required to publish a photo." }, { status: 422 });
+  // "these images" (plural) per C4's exact wording change.
+  if (photos.length > 0 && !body.imageConsentGiven) {
+    return NextResponse.json({ error: "Image consent is required to publish these images." }, { status: 422 });
   }
-  if (photoUrl) {
+
+  const bucketPrefix = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/post-photos/`;
+  const admin = createAdminClient();
+  // Multi-photo posts, Phase C (C3, 2026-10-10, see DECISIONS.md) —
+  // every check below ran once per post before this; now it runs once
+  // per photo, and ANY single failure rejects the WHOLE post (per C3's
+  // explicit instruction) rather than publishing a partial set.
+  const validatedPhotos: { storagePath: string; width: number | null; height: number | null }[] = [];
+  for (const photo of photos) {
+    const photoUrl = photo.url?.trim();
+    if (!photoUrl) {
+      return NextResponse.json({ error: "Invalid photo." }, { status: 422 });
+    }
     // Block 2 (August hardening pass, 2026-08-04): must be our own
     // post-photos bucket, not an arbitrary https URL a client could
     // otherwise smuggle in here (e.g. a third-party tracking pixel).
-    const bucketPrefix = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/post-photos/`;
     if (!photoUrl.startsWith(bucketPrefix)) {
       return NextResponse.json({ error: "Invalid photo." }, { status: 422 });
     }
@@ -202,9 +237,10 @@ export async function POST(request: Request) {
     // returns the same deterministic string regardless of the bucket's
     // actual public/private setting, so validating/parsing it needed no
     // change), but only the bare path is ever stored from here on;
-    // mediaUrls is resolved into a fresh signed URL on every read
-    // (lib/storage/resolve-media.ts), never a stored permanent one.
-    photoPath = photoUrl.slice(bucketPrefix.length);
+    // resolved into a fresh signed URL on every read
+    // (lib/storage/resolve-media.ts#resolvePostImages), never a stored
+    // permanent one.
+    const photoPath = photoUrl.slice(bucketPrefix.length);
 
     // Security fix (2026-09-23, see DECISIONS.md) — the only check above
     // was that photoUrl points somewhere inside the post-photos bucket;
@@ -243,19 +279,11 @@ export async function POST(request: Request) {
     // segments, so the full object (bounded at 8MB by the bucket's own
     // fileSizeLimit) is fetched once here regardless.
     try {
-      const path = photoPath;
-      const admin = createAdminClient();
-      // Reads via the service-role client's own download(), not a plain
-      // fetch(photoUrl) against the public endpoint (changed while
-      // scoping task 2, 2026-09-22, see DECISIONS.md) — a same-project
-      // server-to-Storage read has no reason to round-trip through the
-      // public CDN edge, and unlike a plain fetch, this keeps working
-      // completely unchanged if the bucket is ever switched to private.
-      const { data: downloaded, error: downloadError } = await admin.storage.from("post-photos").download(path);
+      const { data: downloaded, error: downloadError } = await admin.storage.from("post-photos").download(photoPath);
       const rawBytes = downloaded ? Buffer.from(await downloaded.arrayBuffer()) : null;
       const realType = !downloadError && rawBytes ? detectImageSignature(rawBytes) : null;
       if (!realType || !rawBytes) {
-        await admin.storage.from("post-photos").remove([path]).catch(() => {});
+        await admin.storage.from("post-photos").remove([photoPath]).catch(() => {});
         return NextResponse.json({ error: "This photo doesn't look like a valid image." }, { status: 422 });
       }
 
@@ -263,7 +291,7 @@ export async function POST(request: Request) {
       if (!stripped.equals(rawBytes)) {
         const { error: reuploadError } = await admin.storage
           .from("post-photos")
-          .upload(path, stripped, { contentType: realType, upsert: true });
+          .upload(photoPath, stripped, { contentType: realType, upsert: true });
         if (reuploadError) {
           console.error("[posts] Failed to re-upload EXIF-stripped photo:", errCode(reuploadError));
           return NextResponse.json({ error: "Could not process the photo. Try again shortly." }, { status: 503 });
@@ -273,6 +301,13 @@ export async function POST(request: Request) {
       console.error("[posts] Failed to verify/process photo bytes:", errCode(err));
       return NextResponse.json({ error: "Could not verify the photo. Try again shortly." }, { status: 503 });
     }
+
+    // Client-reported, cosmetic only (feed carousel aspect-ratio hint) —
+    // never validated against the real bytes, same trust level as any
+    // other display-only client field (see PostImage's schema comment).
+    const width = Number.isInteger(photo.width) ? (photo.width as number) : null;
+    const height = Number.isInteger(photo.height) ? (photo.height as number) : null;
+    validatedPhotos.push({ storagePath: photoPath, width, height });
   }
 
   try {
@@ -284,15 +319,32 @@ export async function POST(request: Request) {
         content,
         minLevel,
         houseId,
-        mediaUrls: photoPath ? [photoPath] : [],
+        // mediaUrls is no longer written — PostImage (below) is the
+        // only read path going forward (see Post.images' schema
+        // comment, Phase C, 2026-10-10, DECISIONS.md).
         isPublished: true,
         publishedAt: new Date(),
-        imageConsentAt: photoUrl ? new Date() : null,
+        imageConsentAt: validatedPhotos.length > 0 ? new Date() : null,
+        images: {
+          create: validatedPhotos.map((p, position) => ({
+            position,
+            storagePath: p.storagePath,
+            width: p.width,
+            height: p.height,
+          })),
+        },
       },
       select: postSelect(user.id),
     });
 
-    await track({ userId: user.id, type: "post.created", entity: "post", entityId: post.id });
+    // C7 — image_count, no content data.
+    await track({
+      userId: user.id,
+      type: "post.created",
+      entity: "post",
+      entityId: post.id,
+      meta: { image_count: validatedPhotos.length },
+    });
 
     const publishedCount = await prisma.post.count({ where: { authorId: user.id, isPublished: true } });
     if (publishedCount === 1) {
@@ -315,7 +367,7 @@ export async function POST(request: Request) {
 
     const resolvedPost = {
       ...post,
-      mediaUrls: await resolvePostMediaUrls(post.mediaUrls),
+      images: await resolvePostImages(post.images),
       author: { ...post.author, avatarUrl: await resolveAvatarUrl(post.author.avatarUrl) },
     };
     return NextResponse.json({ post: resolvedPost }, { status: 201 });

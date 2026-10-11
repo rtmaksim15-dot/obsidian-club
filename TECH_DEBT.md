@@ -1201,3 +1201,75 @@ items that specifically need a real session — flagged items absent/
 present in both states, Veil persisting across a real session, the
 invitations count matching a real test account's data, and a Lighthouse
 mobile accessibility run — are unverified and worth a manual pass.
+
+## Multi-photo posts, Phase C (2026-10-10)
+
+New `PostImage` model (ordered, `postId`+`position` unique), threaded
+through every post-reading surface (`lib/feed/query.ts`,
+`app/api/posts/route.ts`, `app/api/posts/[id]/route.ts`,
+`hall`/`houses/[slug]`/`posts/[id]`/`profile/[username]`/`keepsakes`
+pages), a new `PostCarousel.tsx`, and a rewritten `ContentComposer.tsx`
+for up to `MAX_PHOTOS_PER_POST` (default 3) images with drag-to-
+reorder. `Post.mediaUrls` is kept in the schema but **no longer
+written** by new posts — `PostImage` is the only read path, including
+for historical posts (backfilled into a position-0 row by the
+migration, without touching the underlying Storage object). Migration
+**not yet applied** — same Rule 11 permission gate as Phase A/B's
+schema work, and the same drift-check discipline: `prisma migrate
+diff` against the live DB was re-run before writing this migration and
+still shows the `rep-core`-owned columns that must never be touched —
+`supabase/migrations/20261010150000_multi_photo_posts.sql` is
+hand-written to contain only this phase's additive changes.
+
+**`PostImage.width`/`height` are nullable**, unlike the task's literal
+field list — every backfilled historical row has neither (the old
+`mediaUrls` array never recorded dimensions), and new uploads report
+them from the client (cosmetic only — the feed carousel's aspect-ratio
+hint — never validated against the real bytes, same trust level as
+any other display-only client field).
+
+**`PostImage.isDeleted` was added even though the task's own C1 field
+list didn't include a deletion field at all** — C6 explicitly needs
+"admin can soft-delete a single image" while the post remains, so this
+was a real gap to fill, not an interpretation call. Filled the same
+way Message/Comment already do it (a plain boolean), not Post's own
+`isPublished`/`isPreserved` split — there's no "image visibility
+toggle" concept needed here beyond binary deleted/not. No
+`preserveIndefinitely` companion field: image deletion isn't a
+red-line-adjacent action the way message/comment removal can be.
+
+**RLS mirrors `posts`' own posture — deny-all** (confirmed in Phase
+A's research: nothing in this codebase reads Post/PostImage via a
+direct anon/authenticated Supabase client; every real read/write goes
+through Prisma, which bypasses RLS). "RLS mirrors Post visibility"
+means mirroring that deny-all, not inventing a new real policy where
+none is needed — the two-account RLS test for this phase, once
+applied, just needs to confirm the anon key still can't read anything
+from `post_images` either way, same as `posts` itself.
+
+**"Report can target a specific image" (C6) is implemented at the API
+layer only** (`Report.imageId`, validated against the reported post;
+`PATCH /api/admin/reports/[id]`'s new `remove_image` action; a member-
+facing `DELETE /api/posts/:id/images/:imageId` for the author) — there
+is **no member-facing UI yet for picking which image to report** from
+a multi-image carousel. `ReportModal`/`ContentMenu` still file a
+whole-post report; a future UI could pass `imageId` through once
+there's a real design for "report this specific photo" inside the
+carousel. The admin side (`ReportDetail.tsx`'s new "Remove Image"
+button) and the author's own per-image delete button (in
+`PostCarousel.tsx`, shown only to the post's author) are both wired up
+and real, not stubs.
+
+**Rate limiting weight interpretation**: C3 says "rate limiting counts
+images, not posts." Implemented as `max(1, photos.length)` hits per
+post — a text-only post still costs 1 (so unlimited text spam isn't
+free), an N-photo post costs N. This is an interpretation, not a
+literal spec (the task doesn't say what a 0-image post should cost),
+flagged here rather than assumed silently.
+
+**Not verified live** — same sandbox constraint as the rest of this
+bundle. `tsc`/`lint`/`build` all clean; the DONE WHEN items needing a
+real session or the applied migration (existing posts rendering
+unchanged, 1/2/3/4-image post behavior, the admin single-image
+soft-delete end to end, the RLS two-account test) are unverified and
+worth a manual pass once the migration is approved and applied.

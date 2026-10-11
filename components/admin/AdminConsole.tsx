@@ -142,6 +142,10 @@ export type ReportRow = {
   id: string;
   targetType: string;
   targetId: string;
+  // Multi-photo posts, Phase C (C6, 2026-10-10, see DECISIONS.md) —
+  // only meaningful when targetType is "post"; which of that post's
+  // images this report is actually about, if any.
+  imageId: string | null;
   category: string;
   isRedLine: boolean;
   note: string | null;

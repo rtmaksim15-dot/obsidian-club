@@ -7,7 +7,7 @@ import PostList from "@/components/shared/PostList";
 import JoinHouseButton from "@/components/shared/JoinHouseButton";
 import { track } from "@/lib/analytics/track";
 import { HOUSES_UI_ENABLED } from "@/lib/config/feature-flags";
-import { resolveAvatarUrls, resolvePostMediaUrls } from "@/lib/storage/resolve-media";
+import { resolveAvatarUrls, resolvePostImages } from "@/lib/storage/resolve-media";
 import { getVeilEnabled } from "@/lib/profile/veil";
 
 /**
@@ -46,7 +46,6 @@ export default async function HouseDetailPage({ params }: { params: { slug: stri
         id: true,
         title: true,
         content: true,
-        mediaUrls: true,
         type: true,
         likesCount: true,
         createdAt: true,
@@ -54,6 +53,11 @@ export default async function HouseDetailPage({ params }: { params: { slug: stri
         house: { select: { id: true, name: true, slug: true } },
         likes: { where: { userId: user.id }, select: { userId: true } },
         _count: { select: { comments: true } },
+        images: {
+          where: { isDeleted: false },
+          orderBy: { position: "asc" },
+          select: { id: true, storagePath: true, position: true, width: true, height: true },
+        },
       },
     }),
     prisma.houseMembership.findUnique({ where: { userId_houseId: { userId: user.id, houseId: house.id } } }),
@@ -70,7 +74,7 @@ export default async function HouseDetailPage({ params }: { params: { slug: stri
   const resolvedPosts = await Promise.all(
     posts.map(async (post, i) => ({
       ...post,
-      mediaUrls: await resolvePostMediaUrls(post.mediaUrls),
+      images: await resolvePostImages(post.images),
       author: { ...post.author, avatarUrl: avatarUrls[i] },
     })),
   );

@@ -818,6 +818,7 @@ export default async function AdminConsolePage() {
           id: r.id,
           targetType: r.targetType,
           targetId: r.targetId,
+          imageId: r.imageId,
           category: r.category,
           isRedLine: r.isRedLine,
           note: r.note,

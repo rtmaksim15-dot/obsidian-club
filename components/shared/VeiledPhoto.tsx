@@ -22,7 +22,7 @@ export default function VeiledPhoto({ src, alt, className, veiled }: Props) {
   }
 
   return (
-    <div className="relative">
+    <div className="relative h-full w-full">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={src} alt="" aria-hidden="true" className={className} style={{ filter: "blur(24px)" }} />
       <button

@@ -1,7 +1,7 @@
 import "server-only";
 import type { PostType, User } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
-import { resolveAvatarUrls, resolvePostMediaUrls } from "@/lib/storage/resolve-media";
+import { resolveAvatarUrls, resolvePostImages } from "@/lib/storage/resolve-media";
 import { getBlockedEitherWayUserIds } from "@/lib/moderation/block";
 
 export const FEED_TYPES: PostType[] = ["post", "story"];
@@ -11,13 +11,18 @@ export const feedPostSelect = {
   id: true,
   title: true,
   content: true,
-  mediaUrls: true,
   type: true,
   likesCount: true,
   createdAt: true,
   author: { select: { id: true, username: true, displayName: true, avatarUrl: true, level: true, rep: true } },
   house: { select: { id: true, name: true, slug: true } },
   _count: { select: { comments: true } },
+  // Multi-photo posts, Phase C (2026-10-10, see DECISIONS.md).
+  images: {
+    where: { isDeleted: false },
+    orderBy: { position: "asc" as const },
+    select: { id: true, storagePath: true, position: true, width: true, height: true },
+  },
 } as const;
 
 /**
@@ -74,7 +79,7 @@ export async function getFeedPosts(user: User, { skip = 0 }: { skip?: number } =
   const resolvedPosts = await Promise.all(
     posts.map(async (post, i) => ({
       ...post,
-      mediaUrls: await resolvePostMediaUrls(post.mediaUrls),
+      images: await resolvePostImages(post.images),
       author: { ...post.author, avatarUrl: avatarUrls[i] },
     })),
   );

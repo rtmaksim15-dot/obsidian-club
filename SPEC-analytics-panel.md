@@ -78,7 +78,7 @@ waitlist.approved        meta: { reviewedBy, waitDays }
 waitlist.rejected        meta: { reason }
 
 house.viewed             entity: house
-post.created             entity: post
+post.created             entity: post,  meta: { image_count }         // image_count added Phase C, 2026-10-10
 post.replied             entity: post,  meta: { parentId }
 post.reacted             entity: post
 

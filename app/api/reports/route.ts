@@ -21,7 +21,7 @@ const REPORT_LIMIT = { max: 10, windowMs: 60 * 60 * 1000 };
 const VALID_TARGET_TYPES: ReportTargetType[] = ["post", "profile", "comment", "message", "direct_message"];
 const VALID_CATEGORIES = REPORT_CATEGORIES.map((c) => c.value);
 
-type Body = { targetType?: string; targetId?: string; category?: string; note?: string };
+type Body = { targetType?: string; targetId?: string; imageId?: string; category?: string; note?: string };
 
 // POST /api/reports — one-step report, reachable from every post,
 // profile, comment, and chat message (member protection mechanics,
@@ -66,6 +66,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid category." }, { status: 422 });
   }
 
+  // Multi-photo posts, Phase C (C6, 2026-10-10, see DECISIONS.md) —
+  // optional, only meaningful for targetType "post"; validated against
+  // that same post below rather than trusted as a bare id.
+  let imageId: string | undefined;
+
   // Confirm the target actually exists — a report against a
   // just-deleted post or a typo'd id shouldn't silently succeed.
   if (targetType === "post") {
@@ -75,6 +80,13 @@ export async function POST(request: Request) {
     }
     if (post.authorId === user.id) {
       return NextResponse.json({ error: "You can't report your own post." }, { status: 422 });
+    }
+    if (body.imageId) {
+      const image = await prisma.postImage.findUnique({ where: { id: body.imageId } });
+      if (!image || image.postId !== targetId || image.isDeleted) {
+        return NextResponse.json({ error: "That image no longer exists on this post." }, { status: 404 });
+      }
+      imageId = image.id;
     }
   } else if (targetType === "profile") {
     const profile = await prisma.user.findUnique({ where: { id: targetId }, select: { id: true } });
@@ -123,6 +135,7 @@ export async function POST(request: Request) {
     data: {
       targetType,
       targetId,
+      imageId: imageId ?? null,
       reporterId: user.id,
       category,
       isRedLine: isRedLineCategory(category),

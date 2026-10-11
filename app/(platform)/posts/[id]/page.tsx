@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import PostCard from "@/components/shared/PostCard";
 import CommentSection from "@/components/shared/CommentSection";
-import { resolveAvatarUrl, resolveAvatarUrls, resolvePostMediaUrls } from "@/lib/storage/resolve-media";
+import { resolveAvatarUrl, resolveAvatarUrls, resolvePostImages } from "@/lib/storage/resolve-media";
 import { isBlockedEitherWay, getBlockedEitherWayUserIds } from "@/lib/moderation/block";
 import { getVeilEnabled } from "@/lib/profile/veil";
 
@@ -29,7 +29,6 @@ export default async function PostDetailPage({ params }: { params: { id: string 
       id: true,
       title: true,
       content: true,
-      mediaUrls: true,
       type: true,
       minLevel: true,
       isPublished: true,
@@ -39,6 +38,11 @@ export default async function PostDetailPage({ params }: { params: { id: string 
       house: { select: { id: true, name: true, slug: true } },
       likes: { where: { userId: user.id }, select: { userId: true } },
       _count: { select: { comments: true } },
+      images: {
+        where: { isDeleted: false },
+        orderBy: { position: "asc" },
+        select: { id: true, storagePath: true, position: true, width: true, height: true },
+      },
     },
   });
   if (!post || !post.isPublished || post.minLevel > user.level) notFound();
@@ -65,12 +69,12 @@ export default async function PostDetailPage({ params }: { params: { id: string 
   });
 
   // Private storage (task 2, 2026-09-23, see DECISIONS.md).
-  const [postMediaUrls, postAvatarUrl, commentAvatarUrls] = await Promise.all([
-    resolvePostMediaUrls(post.mediaUrls),
+  const [postImages, postAvatarUrl, commentAvatarUrls] = await Promise.all([
+    resolvePostImages(post.images),
     resolveAvatarUrl(post.author.avatarUrl),
     resolveAvatarUrls(rawComments.map((c) => c.author.avatarUrl)),
   ]);
-  const resolvedPost = { ...post, mediaUrls: postMediaUrls, author: { ...post.author, avatarUrl: postAvatarUrl } };
+  const resolvedPost = { ...post, images: postImages, author: { ...post.author, avatarUrl: postAvatarUrl } };
   const comments = rawComments.map((c, i) => ({
     ...(c.isDeleted ? { ...c, content: "" } : c),
     author: { ...c.author, avatarUrl: commentAvatarUrls[i] },

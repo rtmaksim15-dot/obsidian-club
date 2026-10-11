@@ -10,7 +10,7 @@ import ZoomableAvatar from "@/components/shared/ZoomableAvatar";
 import { isBlockedEitherWay } from "@/lib/moderation/block";
 import { isRitualComplete } from "@/lib/auth/ritual";
 import { getMessageButtonState } from "@/lib/dm/relationship";
-import { resolveAvatarUrl, resolveAvatarUrls, resolvePostMediaUrls } from "@/lib/storage/resolve-media";
+import { resolveAvatarUrl, resolveAvatarUrls, resolvePostImages } from "@/lib/storage/resolve-media";
 import { getVeilEnabled } from "@/lib/profile/veil";
 import { LEVEL_NAMES } from "@/lib/rating/levels";
 import {
@@ -126,7 +126,6 @@ export default async function ProfilePage({ params }: { params: { username: stri
           id: true,
           title: true,
           content: true,
-          mediaUrls: true,
           type: true,
           likesCount: true,
           createdAt: true,
@@ -134,6 +133,11 @@ export default async function ProfilePage({ params }: { params: { username: stri
           house: { select: { id: true, name: true, slug: true } },
           likes: { where: { userId: viewer?.id ?? "" }, select: { userId: true } },
           _count: { select: { comments: true } },
+          images: {
+            where: { isDeleted: false },
+            orderBy: { position: "asc" },
+            select: { id: true, storagePath: true, position: true, width: true, height: true },
+          },
         },
       }),
       prisma.follow.count({ where: { followingId: user.id } }),
@@ -159,7 +163,7 @@ export default async function ProfilePage({ params }: { params: { username: stri
   const resolvedPosts = await Promise.all(
     posts.map(async (post, i) => ({
       ...post,
-      mediaUrls: await resolvePostMediaUrls(post.mediaUrls),
+      images: await resolvePostImages(post.images),
       author: { ...post.author, avatarUrl: postAvatarUrls[i] },
     })),
   );

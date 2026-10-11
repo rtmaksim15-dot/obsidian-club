@@ -4,8 +4,8 @@ import { requireAdmin } from "@/lib/auth/require-admin";
 import { logModerationAction } from "@/lib/moderation/log";
 import { requiresMandatoryRetention } from "@/lib/moderation/retention";
 
-type Action = "dismiss" | "review" | "preserve" | "remove";
-const VALID_ACTIONS: Action[] = ["dismiss", "review", "preserve", "remove"];
+type Action = "dismiss" | "review" | "preserve" | "remove" | "remove_image";
+const VALID_ACTIONS: Action[] = ["dismiss", "review", "preserve", "remove", "remove_image"];
 
 // PATCH /api/admin/reports/:id — the only way an open report changes
 // state (member protection mechanics, pre-launch legal package,
@@ -18,7 +18,12 @@ const VALID_ACTIONS: Action[] = ["dismiss", "review", "preserve", "remove"];
 // rather than making the admin go soft-delete it separately via
 // DELETE /api/admin/comments|messages/:id (that route still exists and
 // still works on its own; this is a second caller of the same shape,
-// not a replacement). Every action is logged to ModerationAction — who,
+// not a replacement). "remove_image" (C6, multi-photo posts, Phase C,
+// 2026-10-10, see DECISIONS.md) is the PostImage equivalent — soft-
+// deletes only the ONE reported image (Report.imageId), leaving the
+// post and any other images on it untouched; deliberately distinct
+// from "preserve", which still applies to the whole post for a
+// red-line category. Every action is logged to ModerationAction — who,
 // when, what, against which report's category.
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const admin = await requireAdmin();
@@ -62,6 +67,28 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       aupSection: report.category,
       note: `Preserved via report ${report.id} (${report.category}).`,
     });
+  } else if (action === "remove_image") {
+    if (report.targetType !== "post" || !report.imageId) {
+      return NextResponse.json(
+        { error: "remove_image only applies to a post report filed against a specific image." },
+        { status: 422 },
+      );
+    }
+    const image = await prisma.postImage.findUnique({ where: { id: report.imageId } });
+    if (!image || image.postId !== report.targetId) {
+      return NextResponse.json({ error: "That image no longer exists." }, { status: 404 });
+    }
+    if (!image.isDeleted) {
+      await prisma.postImage.update({ where: { id: image.id }, data: { isDeleted: true } });
+      await logModerationAction({
+        adminId: admin.id,
+        action: "post_image.removed",
+        targetType: "post",
+        targetId: report.targetId,
+        aupSection: report.category,
+        note: `Removed image ${image.id} via report ${report.id} (${report.category}).`,
+      });
+    }
   } else if (action === "remove") {
     if (report.targetType !== "comment" && report.targetType !== "message") {
       return NextResponse.json({ error: "Remove only applies to comment or message reports." }, { status: 422 });

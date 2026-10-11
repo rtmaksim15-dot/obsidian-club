@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { feedPostSelect } from "@/lib/feed/query";
-import { resolveAvatarUrls, resolvePostMediaUrls } from "@/lib/storage/resolve-media";
+import { resolveAvatarUrls, resolvePostImages } from "@/lib/storage/resolve-media";
 import { getBlockedEitherWayUserIds } from "@/lib/moderation/block";
 import { getVeilEnabled } from "@/lib/profile/veil";
 import PostList, { type FeedPost } from "@/components/shared/PostList";
@@ -29,7 +29,7 @@ export default async function KeepsakesPage() {
     Promise.all(
       likes.map(async (l, i) => ({
         ...l.post,
-        mediaUrls: await resolvePostMediaUrls(l.post.mediaUrls),
+        images: await resolvePostImages(l.post.images),
         author: { ...l.post.author, avatarUrl: avatarUrls[i] },
       })),
     ),
