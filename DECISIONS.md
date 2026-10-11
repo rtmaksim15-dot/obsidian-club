@@ -2606,3 +2606,104 @@ migration (existing posts rendering unchanged on 3 real old posts,
 1/2/3/4-image behavior, the admin single-image soft-delete end to end,
 the RLS two-account test) are unverified and worth a manual pass once
 the migration is approved and applied.
+
+### 2026-10-11 — Bundle 1: both pending migrations applied, analytics_events_admin_read fixed
+
+Owner's explicit go-ahead, per CLAUDE.md rule 11, naming both files
+and the exact order. `psql`/`pg_dump`/the Supabase CLI are not
+installed in this sandbox, so every step below ran as hand-split SQL
+statements over Prisma's own `DATABASE_URL` connection (the session
+pooler, port 5432 — the same connection `scripts/check-rls.ts` already
+uses, and the one `.env.example` already documents as DDL-capable),
+each migration's statements wrapped in one `prisma.$transaction` so a
+failure partway through rolls back the whole migration instead of
+leaving it half-applied. Scratch scripts lived in this session's
+scratchpad directory, never in the repo; none were committed.
+
+**0. Backup.** A full, read-only JSON export of every row in every one
+of the then-39 live tables (`post_images`/`age_verifications` excluded
+— neither existed yet), via raw `SELECT * FROM "<table>"` rather than
+the typed Prisma Client, specifically because the generated client
+already expected columns (`Report.imageId`, `ModerationAction.actorLabel`)
+that didn't exist on the live DB yet and would have failed a typed
+`findMany()`. Written to this session's scratchpad directory (outside
+the repo, as asked) — **not pg_dump/custom-format**, a logical
+per-table JSON dump instead, since neither `pg_dump` nor the Supabase
+CLI could be installed here; flagged so this isn't mistaken for a
+literal pg_dump artifact. File and row counts:
+`obsidian-club-backup-2026-10-11T04-37-39-818Z.json` (0.59 MB) — notable
+counts: `users` 6, `posts` 7, `invite_tokens` 512, `analytics_events`
+307, `rep_history` 88, `reports` 2, `moderation_actions` 5, `blocks` 1
+(full per-table counts in that session's tool output). This file sits
+under `/private/tmp/...` on the owner's own machine, which is not a
+durable location — worth copying somewhere permanent if it needs to
+outlive this session/sandbox.
+
+**1. Confirmed the multi-photo migration's backfill** (re-read live
+before applying, per the owner's own ask): lines 25–28 of
+`20261010150000_multi_photo_posts.sql` insert one `position: 0` row
+per post with a non-empty `media_urls` array, `is_deleted` defaulting
+to `false` via the column default, with no write to Supabase Storage
+anywhere in the file. No amendment needed.
+
+**2. Applied `20261010120000_age_verification.sql`.**
+`npm run check:rls` → 41 tables, RLS enabled on all (was 40).
+Two-account RLS test on `age_verifications`, using two real,
+pre-existing, non-admin user ids purely as RLS subjects (no account
+data read or changed) plus the real admin account's id, via `SET ROLE
+authenticated`/`anon` + `set_config('request.jwt.claim.sub', ...)`
+(what `auth.uid()` actually reads) inside its own transaction per
+check:
+- User A — SELECT: saw only their own disposable test row.
+- User B — SELECT: saw only their own disposable test row.
+- Admin — SELECT: saw both rows.
+- Anon (no JWT) — SELECT: 0 rows.
+- User A — INSERT attempt: denied.
+- User A — UPDATE attempt on their own row: 0 rows affected (RLS has
+  no UPDATE policy at all, so the implicit `USING` is false for every
+  row — denied via filtering rather than a thrown error, which is the
+  correct Postgres behavior here).
+- Anon — INSERT attempt: denied.
+All passed as specified ("user A cannot read B's rows; neither can
+INSERT/UPDATE; admin can read all"). The two disposable test rows were
+deleted at the end of the script regardless of outcome.
+
+**3. Applied `20261010150000_multi_photo_posts.sql`.**
+`npm run check:rls` → 42 tables, RLS enabled on all. Backfill counts:
+posts with non-empty `media_urls` = **4**; distinct `post_id` in
+`post_images` = **4** (and 4 total rows) — exact match. Two-account
+RLS test on `post_images` (deny-all, mirroring `posts`' own posture,
+not an owner-read policy like `age_verifications` — there's no "owner"
+concept to test two different users against here):
+- Authenticated (two different real user ids) — SELECT: 0 rows each.
+- Anon — SELECT: 0 rows.
+- Authenticated — UPDATE attempt: 0 rows affected.
+- Authenticated — INSERT attempt with literal values: denied.
+- Anon — INSERT attempt with literal values: denied.
+One false alarm during this pass, corrected before concluding: the
+first INSERT check used `INSERT ... SELECT ... FROM post_images LIMIT
+1` as the row source, and that source SELECT was itself RLS-filtered
+to zero rows under the restricted role — so the statement "succeeded"
+by inserting nothing (confirmed separately: row count unchanged at 4
+afterward). Re-run with a literal `VALUES (...)` row (a real `post_id`
+obtained beforehand via the elevated connection) to remove the
+ambiguity — genuinely denied both times, confirmed again by re-reading
+the row count via the elevated connection (still 4, no stray rows).
+
+**4. Fixed `analytics_events_admin_read`**, in its own migration
+(`20261011050000_fix_analytics_events_admin_read.sql`), same SECURITY
+DEFINER pattern as `age_verifications_admin_read`/the earlier
+`messages` fix: drops the old direct-join policy, recreates it using
+`public.is_admin_caller()`. `npm run check:rls` → still 42 tables, all
+RLS enabled (a policy swap doesn't change the table count). Verified
+the fix actually changes behavior, not just that it applies cleanly:
+before, an admin reading `analytics_events` under RLS got 0 rows (the
+bug); after, the same admin got all 307 (the table's real count at the
+time), while a non-admin test account continued to see only their own
+41 rows via the pre-existing, unaffected `analytics_events_own_read`
+policy. `TECH_DEBT.md`'s note on this bug updated from "flagged, not
+fixed" to fixed, with this verification.
+
+**Not pushed to origin** — matches the explicit instruction to stop
+and report rather than push. All four steps above are committed to
+`main` locally only.

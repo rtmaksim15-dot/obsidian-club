@@ -1068,12 +1068,13 @@ DECISIONS.md (2026-08-14) for the full scenario list and results.
 New `AgeVerification` model, `lib/age-verification/` adapter (`yoti.ts`
 + `mock.ts`), `/verify`/`/verify/return` pages, three API routes,
 `app/(platform)/layout.tsx` gate, and API-route guards. Migration
-written but **not yet applied** to the live database — Rule 11
-(CLAUDE.md) requires separate, explicit, action-naming permission
-before `psql`/`supabase db push`ing `supabase/migrations/20261010120000_
-age_verification.sql`. Nothing in this feature is reachable in
-production until `AGE_VERIFICATION_ENABLED=true`, which is also unset
-by default. See DECISIONS.md (2026-10-10) for the full report.
+(`supabase/migrations/20261010120000_age_verification.sql`) applied
+live 2026-10-11 on the owner's explicit go-ahead — two-account RLS
+test passed (own-row read, admin read-all, anon/authenticated denied
+INSERT/UPDATE), see DECISIONS.md's 2026-10-11 entry for the full
+output. Nothing in this feature is reachable in production yet —
+`AGE_VERIFICATION_ENABLED` is still unset (default false). See
+DECISIONS.md (2026-10-10) for the full report.
 
 **Three real gaps in Yoti's Age Verification API aren't resolvable from
 public documentation** (confirmed via live doc fetches this session,
@@ -1115,19 +1116,23 @@ unverified. Worth a second pass if a new member-facing route is added
 later without remembering this convention.
 
 **A pre-existing RLS bug was found while researching this feature's own
-RLS policy, not introduced by it, and was deliberately NOT fixed
-here** (out of scope for Phase A): `analytics_events_admin_read`
-(`supabase/migrations/20260726120000_analytics_events_rls.sql`) joins
-`public.users` directly inside the policy body to check `is_admin`.
-Since `users` itself has RLS enabled with zero SELECT policies
-(deny-all), that join is itself denied for the calling role, so this
-policy likely returns nothing for every admin, not just non-admins —
-the exact bug `20260923030000_fix_messages_select_policy.sql` already
-found and fixed for `messages`, just never re-checked on this other
-table. This migration's own new `age_verifications_admin_read` policy
-uses the SECURITY DEFINER `is_admin_caller()` function instead, to not
-repeat it. Flagged for the owner's awareness; fixing
-`analytics_events_admin_read` itself is a separate, standalone task.
+RLS policy** (`analytics_events_admin_read`,
+`supabase/migrations/20260726120000_analytics_events_rls.sql` — joined
+`public.users` directly inside the policy body to check `is_admin`;
+since `users` itself has RLS enabled with zero SELECT policies
+(deny-all), that join was itself denied for the calling role, so the
+policy returned nothing for every admin too, not just non-admins — the
+same bug `20260923030000_fix_messages_select_policy.sql` already found
+and fixed for `messages`, just never re-checked on this other table).
+**Fixed 2026-10-11, on the owner's explicit go-ahead**, in a separate
+migration (`supabase/migrations/20261011050000_fix_analytics_events_admin_read.sql`)
+that drops and recreates the policy using the SECURITY DEFINER
+`is_admin_caller()` function (the same one `age_verifications_admin_read`
+already used) instead of the direct join. Verified live: before the
+fix an admin read 0 rows from `analytics_events`; after, 307 (the
+table's real row count at the time) — confirmed via `check:rls` (still
+42 tables, RLS enabled on all) plus a direct admin-vs-non-admin read
+test.
 
 ## Navigation v2, Phase B (2026-10-10)
 
@@ -1214,12 +1219,19 @@ reorder. `Post.mediaUrls` is kept in the schema but **no longer
 written** by new posts — `PostImage` is the only read path, including
 for historical posts (backfilled into a position-0 row by the
 migration, without touching the underlying Storage object). Migration
-**not yet applied** — same Rule 11 permission gate as Phase A/B's
-schema work, and the same drift-check discipline: `prisma migrate
-diff` against the live DB was re-run before writing this migration and
-still shows the `rep-core`-owned columns that must never be touched —
-`supabase/migrations/20261010150000_multi_photo_posts.sql` is
-hand-written to contain only this phase's additive changes.
+(`supabase/migrations/20261010150000_multi_photo_posts.sql`) applied
+live 2026-10-11 on the owner's explicit go-ahead — backfill count
+verified to match exactly (4 posts with non-empty `mediaUrls`, 4
+distinct `post_id` in `post_images`), two-account RLS test passed
+(deny-all for everyone, confirmed for SELECT and for a literal-values
+INSERT — an earlier self-referential `INSERT...SELECT` test attempt
+gave a false "succeeded" reading because its own source SELECT was
+itself RLS-filtered to zero rows, not a real gap; see DECISIONS.md's
+2026-10-11 entry for the full output). Same drift-check discipline as
+Phase A: `prisma migrate diff` against the live DB was re-run before
+writing this migration and still showed the `rep-core`-owned columns
+that must never be touched — this migration is hand-written to
+contain only this phase's additive changes.
 
 **`PostImage.width`/`height` are nullable**, unlike the task's literal
 field list — every backfilled historical row has neither (the old
@@ -1267,9 +1279,11 @@ free), an N-photo post costs N. This is an interpretation, not a
 literal spec (the task doesn't say what a 0-image post should cost),
 flagged here rather than assumed silently.
 
-**Not verified live** — same sandbox constraint as the rest of this
-bundle. `tsc`/`lint`/`build` all clean; the DONE WHEN items needing a
-real session or the applied migration (existing posts rendering
-unchanged, 1/2/3/4-image post behavior, the admin single-image
-soft-delete end to end, the RLS two-account test) are unverified and
-worth a manual pass once the migration is approved and applied.
+**Live verification status (updated 2026-10-11)**: the migration is
+applied and the backfill/RLS checks above passed directly against the
+database. Still unverified — this sandbox has no authenticated session
+against the local dev server (same constraint as the rest of this
+bundle) — are the actual UI/UX DONE WHEN items: existing posts
+rendering unchanged in a real browser, the 1/2/3/4-image composer flow
+end to end, and the admin "Remove Image" button's full round trip
+through `ReportDetail.tsx`. `tsc`/`lint`/`build` all clean.

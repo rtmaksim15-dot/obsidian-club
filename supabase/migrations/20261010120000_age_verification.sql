@@ -1,7 +1,7 @@
 -- 21+ Age Verification Gate, Phase A (2026-10-10, see DECISIONS.md and
--- the Phase A report). NOT YET APPLIED to the live database — Rule 11
--- (CLAUDE.md): any production schema/data change needs explicit,
--- action-naming permission before running. Shown here for review.
+-- the Phase A report). Applied live 2026-10-11 on the owner's explicit
+-- go-ahead per Rule 11 (CLAUDE.md) — see DECISIONS.md's 2026-10-11
+-- entry for the RLS test output.
 
 -- ModerationAction.adminId becomes nullable so a SYSTEM-initiated
 -- action (the Yoti/mock pass that flips a member's ageVerified) can be
