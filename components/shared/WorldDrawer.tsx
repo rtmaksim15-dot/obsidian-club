@@ -22,7 +22,7 @@ function Row({ href, children, external }: { href: string; children: React.React
       href={href}
       target={external ? "_blank" : undefined}
       rel={external ? "noopener noreferrer" : undefined}
-      className="text-body flex items-center gap-1 py-2"
+      className="nav-control text-body flex items-center gap-1 py-2"
     >
       {children}
       {external ? <ArrowUpRight size={14} strokeWidth={1.5} /> : null}

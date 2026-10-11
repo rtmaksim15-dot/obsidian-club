@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { Menu, Search, MessageCircle, Bell } from "lucide-react";
 import LogoMark from "@/components/ui/LogoMark";
 import WorldDrawer, { type WorldDrawerProps } from "./WorldDrawer";
@@ -46,6 +47,19 @@ export default function TopBar({
 }: Props) {
   const [worldOpen, setWorldOpen] = useState(false);
   const [mineOpen, setMineOpen] = useState(false);
+  const pathname = usePathname();
+
+  // Navigation v2 fix pass (2026-10-11, see DECISIONS.md) — item 1.
+  // Same active treatment BottomTabBar's own tabs already use
+  // (accent color + thin gold underline), applied here to Messages/
+  // Notifications. The avatar gets a ring instead of an underline (it
+  // isn't a text+icon tab) on the member's own profile or /keepsakes —
+  // both are "mine" destinations reachable from this same avatar.
+  const messagesActive = pathname.startsWith("/messages");
+  const notificationsActive = pathname.startsWith("/notifications");
+  const avatarActive =
+    (mineMenuProps.username != null && pathname.startsWith(`/profile/${mineMenuProps.username}`)) ||
+    pathname.startsWith("/keepsakes");
 
   return (
     <>
@@ -53,7 +67,7 @@ export default function TopBar({
         className="fixed inset-x-0 top-0 z-20 flex items-center justify-between border-b border-ob-border bg-ob-dark px-4 py-3"
         style={{ paddingTop: "max(env(safe-area-inset-top), 0.75rem)" }}
       >
-        <a href="/feed" aria-label="Feed" className="flex items-center">
+        <a href="/feed" aria-label="Feed" className="nav-control flex items-center">
           <LogoMark size={30} />
         </a>
 
@@ -62,33 +76,62 @@ export default function TopBar({
             type="button"
             aria-label="Open menu"
             onClick={() => setWorldOpen(true)}
+            className="nav-control"
             style={{ color: "var(--color-text-secondary)" }}
           >
             <Menu size={22} strokeWidth={1.5} />
           </button>
 
           {SEARCH_UI_ENABLED ? (
-            <a href="/search" aria-label="Search" style={{ color: "var(--color-text-secondary)" }}>
+            <a href="/search" aria-label="Search" className="nav-control" style={{ color: "var(--color-text-secondary)" }}>
               <Search size={22} strokeWidth={1.5} />
             </a>
           ) : null}
 
-          <a href="/messages" aria-label="Messages" className="relative" style={{ color: "var(--color-text-secondary)" }}>
+          <a
+            href="/messages"
+            aria-label="Messages"
+            aria-current={messagesActive ? "page" : undefined}
+            className="nav-control relative"
+            style={{ color: messagesActive ? "var(--color-accent)" : "var(--color-text-secondary)" }}
+          >
             <MessageCircle size={22} strokeWidth={1.5} />
             <Badge count={unreadDmCount} />
+            {messagesActive ? (
+              <span
+                aria-hidden="true"
+                className="absolute -bottom-[9px] left-1/2 h-[2px] w-6 -translate-x-1/2 rounded-full"
+                style={{ backgroundColor: "var(--color-gold)" }}
+              />
+            ) : null}
           </a>
 
           <a
             href="/notifications"
             aria-label="Notifications"
-            className="relative"
-            style={{ color: "var(--color-text-secondary)" }}
+            aria-current={notificationsActive ? "page" : undefined}
+            className="nav-control relative"
+            style={{ color: notificationsActive ? "var(--color-accent)" : "var(--color-text-secondary)" }}
           >
             <Bell size={22} strokeWidth={1.5} />
             <Badge count={unreadNotificationCount} />
+            {notificationsActive ? (
+              <span
+                aria-hidden="true"
+                className="absolute -bottom-[9px] left-1/2 h-[2px] w-6 -translate-x-1/2 rounded-full"
+                style={{ backgroundColor: "var(--color-gold)" }}
+              />
+            ) : null}
           </a>
 
-          <button type="button" aria-label="Open my menu" onClick={() => setMineOpen(true)} className="avatar h-8 w-8">
+          <button
+            type="button"
+            aria-label="Open my menu"
+            aria-current={avatarActive ? "page" : undefined}
+            onClick={() => setMineOpen(true)}
+            className="nav-control avatar h-8 w-8"
+            style={avatarActive ? { boxShadow: "0 0 0 2px var(--color-gold)" } : undefined}
+          >
             {avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={avatarUrl} alt={displayName} className="h-full w-full object-cover" />

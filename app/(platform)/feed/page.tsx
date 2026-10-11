@@ -50,7 +50,7 @@ export default async function FeedPage() {
   const [{ posts, hasMore }, veilEnabled] = await Promise.all([getFeedPosts(user), getVeilEnabled(user.id)]);
 
   return (
-    <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
+    <main className="min-h-screen bg-ob-black px-6 pb-16 pt-4 text-ob-text">
       <div className="mx-auto max-w-2xl">
         <FeedList
           initialPosts={posts}

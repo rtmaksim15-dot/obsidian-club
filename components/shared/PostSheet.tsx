@@ -25,7 +25,7 @@ export default function PostSheet({ open, onOpenChange }: Props) {
         >
           <Dialog.Title className="font-cinzel text-sm uppercase tracking-brand text-ob-text mb-4">Post</Dialog.Title>
 
-          <a href="/compose" className="flex items-center gap-3 py-3 text-body">
+          <a href="/compose" className="nav-control flex items-center gap-3 py-3 text-body">
             <Camera size={20} strokeWidth={1.5} />
             Post a photo
           </a>

@@ -24,17 +24,21 @@ type Props = MineMenuProps & {
 
 function Row({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <a href={href} className="text-body block py-2">
+    <a href={href} className="nav-control text-body block py-2">
       {children}
     </a>
   );
 }
 
+// "Soon" label matches PostSheet.tsx's own disabled rows exactly
+// (Navigation v2 fix pass, item 7, 2026-10-11, see DECISIONS.md) — a
+// plain <p>, never a link/button, so it was already untappable; this
+// just adds the same visible label PostSheet already uses.
 function SoonRow({ children }: { children: React.ReactNode }) {
   return (
     <p className="text-body flex items-center gap-2 py-2" style={{ color: "var(--color-text-muted)" }}>
       <Lock size={14} strokeWidth={1.5} />
-      {children}
+      {children} <span className="text-caption">Soon</span>
     </p>
   );
 }
@@ -127,7 +131,6 @@ export default function MineMenu({
       </div>
       <div className="mt-3 flex items-center gap-4">
         {username ? <Row href={`/profile/${username}`}>View my profile</Row> : null}
-        <SignOutButton />
       </div>
 
       {CIRCLES_UI_ENABLED ? <Row href="/circles">My Circle</Row> : null}
@@ -136,7 +139,11 @@ export default function MineMenu({
       {BOUNDARIES_UI_ENABLED ? <Row href="/boundaries">My Boundaries</Row> : <SoonRow>My Boundaries</SoonRow>}
 
       <SectionTitle>Invitations</SectionTitle>
-      <p className="text-body">{inviteAllowance > 0 ? `You hold ${inviteAllowance} invitations.` : "No invitations remain."}</p>
+      <p className="text-body">
+        {inviteAllowance > 0
+          ? `You hold ${inviteAllowance} ${inviteAllowance === 1 ? "invitation" : "invitations"}.`
+          : "No invitations remain."}
+      </p>
       {!hasOutstandingMemberInvite && inviteAllowance > 0 ? (
         <div className="mt-2">
           <button
@@ -181,6 +188,10 @@ export default function MineMenu({
       </div>
       <Row href="/notifications">Notifications</Row>
       <Row href="/profile/edit">Account</Row>
+
+      <div className="mt-6 border-t pt-4" style={{ borderColor: "var(--color-border-subtle)" }}>
+        <SignOutButton variant="quiet" />
+      </div>
     </SideSheet>
   );
 }

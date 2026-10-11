@@ -2707,3 +2707,120 @@ fixed" to fixed, with this verification.
 **Not pushed to origin** — matches the explicit instruction to stop
 and report rather than push. All four steps above are committed to
 `main` locally only.
+
+### 2026-10-11 — Navigation v2 fix pass (founder's iPhone Safari testing)
+
+Nine fixes from live testing on `obsidianclub.online` (commit `fbefe0f`).
+No schema/migration changes. `npx tsc --noEmit`, `npm run lint`, `npm
+run build` all clean.
+
+**1. Top bar active states** — `TopBar.tsx` now reads `usePathname()`
+and applies the same treatment `BottomTabBar.tsx`'s tabs already use
+(accent color + thin gold underline) to Messages/Notifications when
+the route starts with `/messages`/`/notifications`, plus
+`aria-current="page"`. The avatar gets a gold ring (`box-shadow`, not
+an underline — it isn't a text+icon tab) on the member's own
+`/profile/<username>` or `/keepsakes`, both "mine" destinations behind
+that same avatar.
+
+**2. Community tab restored, unconditional** — `COMMUNITY_UI_ENABLED`
+removed entirely from `lib/config/feature-flags.ts` (confirmed
+unused anywhere else first) rather than left as dead code gating
+nothing. `BottomTabBar.tsx`'s `ITEMS` now always includes Community,
+linking to `/rooms` — the existing community/live-chat route from
+before nav v2 (the task's own ASSUMPTION): with exactly one active
+room today (Newcomers), `app/(platform)/rooms/page.tsx`'s own
+`rooms.length === 1` check redirects straight to `/rooms/newcomers`,
+so the tab opens live chat directly, not a list-of-one.
+
+**3. Per-image delete moved off the image itself** — `PostCarousel.tsx`
+no longer renders a trash icon or owns any delete/confirm/error state
+at all; it now just reports which image is currently on screen via a
+new `onActiveImageChange(imageId)` callback (fired on mount and every
+swipe). `PostCard.tsx` (now a client component — it was already pure
+presentation with no server-only work, so this cost nothing) holds
+that id in its own state and passes a new `deleteImage={{ postId,
+imageId }}` prop to `ContentMenu.tsx` — but only when
+`isOwn && post.images.length >= 2`, so a single-image post never shows
+the option at all (relies on the existing whole-post Delete instead,
+exactly as specified). `ContentMenu` gained a "Delete this image" menu
+item and its own confirm dialog ("Remove this image? This cannot be
+undone." / "Remove"), calling the existing `DELETE /api/posts/:id/
+images/:imageId` from Phase C — no API change needed, only the UI
+trigger moved.
+
+**4. Invitations pluralization fixed** — `MineMenu.tsx`:
+`${inviteAllowance} ${inviteAllowance === 1 ? "invitation" :
+"invitations"}`. The "Vouch for someone" button and its hide-at-0
+condition (`!hasOutstandingMemberInvite && inviteAllowance > 0`) were
+already correct from Phase B — nothing else needed there.
+
+**5. Focus styling** — new `.nav-control` utility class in
+`globals.css` (`outline: none` by default, `outline: 1px solid
+var(--color-gold); outline-offset: 2px` on `:focus-visible` only — no
+new color, `--color-gold` already existed). Applied to every TopBar
+icon, every BottomTabBar tab + the Post button, SideSheet's close
+button, every WorldDrawer/MineMenu row link, PostSheet's "Post a
+photo" link, and the new quiet "Leave" link. **Deliberately not**
+applied to `.btn-primary`/`.btn-secondary`/`.btn-danger`, the Veil
+toggle switch, or the "Vouch for someone" button — those are action
+buttons inside a menu, not navigation controls, and the task's own
+scope was "all nav controls," not every interactive element
+site-wide; they still show the browser's default focus ring, flagged
+in TECH_DEBT.md as a related but out-of-scope observation rather than
+silently expanded into.
+
+**6. Feed top spacing** — root cause: `PlatformShell.tsx`'s `pt-20`
+(reserving space for the now-universal fixed TopBar, correct and
+necessary) was stacking with each page's own `py-16` top padding
+(leftover from before TopBar existed, now redundant), totaling ~144px
+of empty space above content. Fixed on the four pages named
+(`feed`, `notifications`, `vault` — both its teaser and real-content
+branches, `components/shared/MessagesInbox.tsx` for `/messages`) by
+splitting `py-16` into `pb-16 pt-4` — keeps the existing 64px of
+bottom breathing room, drops the top to 16px as asked. The identical
+double-padding exists on roughly 19 other platform pages (`hall`,
+`profile/[username]`, `profile/edit`, `posts/[id]`, `houses`,
+`houses/[slug]`, `keepsakes`, `members`, `codex`, `library`,
+`compose`, `account/security`, `rooms`, and the `/admin/*` pages) —
+not touched, since the task named exactly four pages to check; flagged
+in TECH_DEBT.md rather than silently expanded to everything. (Ritual/
+antechamber pages are correctly unaffected either way — they're
+reached before `fullAccess` is true, so `PlatformShell` never adds
+`pt-20` for them in the first place.)
+
+**7. Locked MINE rows get the "Soon" label** — `MineMenu.tsx`'s
+`SoonRow` now renders `{children} <span className="text-caption">Soon
+</span>`, matching `PostSheet.tsx`'s disabled rows exactly. Both rows
+were already a plain `<p>`, never a link/button, so "must not be
+tappable" was already true — this only adds the missing visible label.
+
+**8. Veil verified across every post-photo surface** — re-confirmed
+(not re-built; all six were already correct from Phase B/C and
+survived unchanged): `feed`, `posts/[id]`, `profile/[username]`,
+`keepsakes`, `hall`, `houses/[slug]` all thread `viewerVeilEnabled`
+through `PostList`/`FeedList` into `PostCard` into `PostCarousel`.
+The carousel's first image is veiled exactly like every other image
+in it (no special-case in `PostCarousel.tsx` — the single-image branch
+and the mapped multi-image branch both pass `veiled={veiled}` to every
+`VeiledPhoto`). Avatars (TopBar's button, MineMenu's header, PostCard's
+own author avatar) are **not** veiled, by design, not a gap — avatars
+are an identity element, not content, per the original Phase B
+decision; nothing about this fix pass changes that.
+
+**9. Sign-out moved to a quiet "Leave" link at the bottom of MINE** —
+`SignOutButton.tsx` gained a `variant?: "button" | "quiet"` prop (default
+`"button"`, so every other existing call site — `/hall`, `/profile/edit`,
+`/ritual/layout.tsx`, `/antechamber` — is pixel-for-pixel unchanged);
+`variant="quiet"` renders a plain muted text link labeled "Leave"
+instead of the `btn-danger` button, same confirm dialog either way.
+`MineMenu.tsx`'s header row now has only "View my profile"; the quiet
+link sits after Account, below a divider.
+
+**Not verified live** — same sandbox constraint as the rest of this
+project's work: no authenticated session reachable against the local
+dev server. Confirmed only that the dev server itself boots cleanly
+and `/feed` still redirects an unauthenticated request with no server
+error. A real on-device pass (the founder's own iPhone Safari, which
+is what caught all nine issues in the first place) is the only way to
+confirm these visually.

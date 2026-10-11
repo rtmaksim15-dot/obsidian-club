@@ -33,7 +33,7 @@ export default async function VaultPage() {
   // destination, not an internal panel that should stay undiscoverable.
   if (!VAULT_UI_ENABLED) {
     return (
-      <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
+      <main className="min-h-screen bg-ob-black px-6 pb-16 pt-4 text-ob-text">
         <div className="mx-auto max-w-3xl">
           <p className="text-label mb-2">Access</p>
           <h1 className="text-h1 mb-2">The Vault</h1>
@@ -76,7 +76,7 @@ export default async function VaultPage() {
   );
 
   return (
-    <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
+    <main className="min-h-screen bg-ob-black px-6 pb-16 pt-4 text-ob-text">
       <div className="mx-auto max-w-3xl">
         <p className="text-label mb-2">Access</p>
         <h1 className="text-h1 mb-2">The Vault</h1>

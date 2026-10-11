@@ -33,7 +33,7 @@ export default async function NotificationsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
+    <main className="min-h-screen bg-ob-black px-6 pb-16 pt-4 text-ob-text">
       <div className="mx-auto max-w-2xl">
         <h1 className="text-h1 mb-6">Notifications</h1>
         {notifications.length === 0 ? (

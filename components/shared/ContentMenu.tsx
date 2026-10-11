@@ -34,6 +34,16 @@ type Props = {
   // in here instead of a second inline control (item 2).
   blockUserId?: string;
   blockInitialBlocked?: boolean;
+  // Navigation v2 fix pass (2026-10-11, see DECISIONS.md) — "Delete
+  // this image," moved here from an always-visible trash icon on the
+  // image itself (founder feedback: too easy to tap by accident).
+  // Only passed by PostCard when the viewer is the author AND the post
+  // currently has 2+ live images — a single-image post relies on the
+  // existing whole-post Delete above instead, by design (C6 already
+  // blocks removing the only image from a photo-only post server-side;
+  // this UI-level restriction just keeps the option from ever showing
+  // for a single image at all, matching this fix pass's own spec).
+  deleteImage?: { postId: string; imageId: string };
 };
 
 /**
@@ -54,11 +64,12 @@ export default function ContentMenu({
   onDeleted,
   blockUserId,
   blockInitialBlocked,
+  deleteImage,
 }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [reporting, setReporting] = useState(false);
-  const [confirming, setConfirming] = useState<"delete" | "block" | null>(null);
+  const [confirming, setConfirming] = useState<"delete" | "block" | "delete_image" | null>(null);
   const [busy, setBusy] = useState(false);
   const [blocked, setBlocked] = useState(blockInitialBlocked ?? false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -97,6 +108,22 @@ export default function ContentMenu({
     else router.refresh();
   }
 
+  function handleDeleteImage() {
+    if (!deleteImage || busy) return;
+    setOpen(false);
+    setConfirming("delete_image");
+  }
+
+  async function performDeleteImage() {
+    if (!deleteImage) return;
+    setBusy(true);
+    setConfirming(null);
+    const res = await fetch(`/api/posts/${deleteImage.postId}/images/${deleteImage.imageId}`, { method: "DELETE" });
+    setBusy(false);
+    if (!res.ok) return;
+    router.refresh();
+  }
+
   async function performBlock() {
     if (!blockUserId) return;
     setBusy(true);
@@ -125,7 +152,7 @@ export default function ContentMenu({
     setConfirming("block");
   }
 
-  if (!canReport && !deletePostId && !blockUserId) return null;
+  if (!canReport && !deletePostId && !blockUserId && !deleteImage) return null;
 
   return (
     <div className="relative" ref={rootRef}>
@@ -171,6 +198,18 @@ export default function ContentMenu({
               Delete
             </button>
           ) : null}
+          {deleteImage ? (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={handleDeleteImage}
+              disabled={busy}
+              className="block w-full px-3 py-2 text-left text-caption"
+              style={{ color: "var(--color-btn-border)" }}
+            >
+              Delete this image
+            </button>
+          ) : null}
           {canReport ? (
             <button
               type="button"
@@ -211,6 +250,15 @@ export default function ContentMenu({
           confirmLabel="Block"
           busy={busy}
           onConfirm={performBlock}
+          onCancel={() => setConfirming(null)}
+        />
+      ) : null}
+      {confirming === "delete_image" ? (
+        <ConfirmDialog
+          title="Remove this image? This cannot be undone."
+          confirmLabel="Remove"
+          busy={busy}
+          onConfirm={performDeleteImage}
           onCancel={() => setConfirming(null)}
         />
       ) : null}

@@ -4,19 +4,27 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { Home, Users, Plus, BookOpen, Archive } from "lucide-react";
 import { isDmThreadRoute } from "@/lib/config/nav";
-import { COMMUNITY_UI_ENABLED, LIBRARY_UI_ENABLED } from "@/lib/config/feature-flags";
+import { LIBRARY_UI_ENABLED } from "@/lib/config/feature-flags";
 import PostSheet from "./PostSheet";
 
 // Navigation v2, B2 (2026-10-10, see DECISIONS.md) — replaces the old
-// BottomNav.tsx entirely. Feed - [Community] - [+] (center, accent,
+// BottomNav.tsx entirely. Feed - Community - [+] (center, accent,
 // opens PostSheet instead of linking straight to /compose) - [Library]
 // - Vault. Messages and Profile both moved off this bar: Messages is
 // now top-bar only (B1), Profile is reached via the avatar -> MINE menu
 // (B5) instead of a tab. Min 44px tap target on every item (py-3 + a
 // 22px icon comfortably clears that).
+//
+// Navigation v2 fix pass (2026-10-11, see DECISIONS.md) — item 2:
+// Community is no longer behind COMMUNITY_UI_ENABLED (founder's own
+// explicit instruction: "must not be behind any flag"). Links to
+// /rooms, the existing community/live-chat route — with exactly one
+// active room today (Newcomers), /rooms itself redirects straight
+// there (app/(platform)/rooms/page.tsx's own `rooms.length === 1`
+// check), so this tab opens live chat directly, not a list-of-one.
 const ITEMS = [
   { href: "/feed", label: "Feed", icon: Home },
-  ...(COMMUNITY_UI_ENABLED ? [{ href: "/rooms", label: "Community", icon: Users }] : []),
+  { href: "/rooms", label: "Community", icon: Users },
 ] as const;
 
 const TRAILING_ITEMS = [
@@ -40,7 +48,7 @@ export default function BottomTabBar() {
         href={href}
         aria-label={label}
         aria-current={active ? "page" : undefined}
-        className="relative flex flex-1 flex-col items-center justify-center gap-0.5 py-3"
+        className="nav-control relative flex flex-1 flex-col items-center justify-center gap-0.5 py-3"
         style={{ color: active ? "var(--color-accent)" : "var(--color-text-muted)" }}
       >
         <Icon size={22} strokeWidth={1.5} />
@@ -67,7 +75,7 @@ export default function BottomTabBar() {
           type="button"
           aria-label="Post"
           onClick={() => setPostSheetOpen(true)}
-          className="flex flex-1 flex-col items-center justify-center py-3"
+          className="nav-control flex flex-1 flex-col items-center justify-center py-3"
         >
           <span
             className="flex h-9 w-9 items-center justify-center rounded-full"

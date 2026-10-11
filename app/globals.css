@@ -393,6 +393,23 @@
     outline: 2px solid var(--color-text-primary);
     outline-offset: 2px;
   }
+
+  /* ==========================================================
+     NAV CONTROLS (Navigation v2 fix pass, 2026-10-11, see
+     DECISIONS.md) — item 5: the browser's default blue focus ring
+     was showing on every drawer/menu close button and top/bottom bar
+     control on touch. :focus-visible only (keyboard/assistive-tech
+     navigation, never a mouse/touch tap) gets a 1px gold outline
+     instead, offset 2px — no new color, --color-gold already exists
+     for awards/achievements elsewhere.
+     ========================================================== */
+  .nav-control {
+    outline: none;
+  }
+  .nav-control:focus-visible {
+    outline: 1px solid var(--color-gold);
+    outline-offset: 2px;
+  }
 }
 
 /* ============================================================

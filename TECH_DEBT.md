@@ -1287,3 +1287,27 @@ bundle) — are the actual UI/UX DONE WHEN items: existing posts
 rendering unchanged in a real browser, the 1/2/3/4-image composer flow
 end to end, and the admin "Remove Image" button's full round trip
 through `ReportDetail.tsx`. `tsc`/`lint`/`build` all clean.
+
+## Navigation v2 fix pass (2026-10-11)
+
+Full report in DECISIONS.md. Two things found while fixing this pass's
+named items, deliberately left alone because the task scoped each fix
+narrower than the underlying pattern:
+
+**The `pt-20`/`py-16` double-top-padding bug (item 6) exists on ~19
+more platform pages**, not just the four named (`feed`,
+`notifications`, `vault`, `messages`): `hall`, `profile/[username]`,
+`profile/edit`, `posts/[id]`, `houses`, `houses/[slug]`, `keepsakes`,
+`members`, `codex`, `library`, `compose`, `account/security`, `rooms`,
+and the `/admin/*` pages all have the same `main className="min-h-
+screen bg-ob-black px-6 py-16 text-ob-text"` wrapper stacking with
+`PlatformShell.tsx`'s `pt-20`. Same one-line fix each time (`py-16` ->
+`pb-16 pt-4`) once there's a go-ahead to touch them.
+
+**The default blue focus ring is still showing on `.btn-primary`/
+`.btn-secondary`/`.btn-danger`, the MINE menu's Veil toggle switch,
+and its "Vouch for someone" button** (item 5 only asked for "nav
+controls," and those three are action buttons, not navigation — the
+new `.nav-control` class was scoped accordingly). A sitewide pass
+would need its own `outline: none` + `:focus-visible` rule added to
+the `.btn-*` block in `globals.css`, same pattern as `.nav-control`.

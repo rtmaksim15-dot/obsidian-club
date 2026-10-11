@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import type { PostType } from "@prisma/client";
 import LikeButton from "./LikeButton";
 import ContentMenu from "./ContentMenu";
@@ -69,6 +72,13 @@ export default function PostCard({
   onDeleted,
   viewerVeilEnabled = false,
 }: Props) {
+  // Navigation v2 fix pass (2026-10-11, see DECISIONS.md) — tracks
+  // whichever image the carousel currently has on screen, so "Delete
+  // this image" in the "..." menu below acts on the right one. Lives
+  // here (not inside PostCarousel) because ContentMenu renders in the
+  // header, above the carousel in the DOM — this is the lowest common
+  // ancestor of both.
+  const [activeImageId, setActiveImageId] = useState<string | null>(null);
   const isOwn = viewerId != null && post.author.id === viewerId;
   const canDelete = isOwn || (viewerId != null && viewerIsAdmin);
   const canReport = viewerId != null && !isOwn;
@@ -121,6 +131,7 @@ export default function PostCard({
             deletePostId={canDelete ? post.id : undefined}
             deleteRedirectTo={deleteRedirectTo}
             onDeleted={onDeleted}
+            deleteImage={isOwn && post.images.length >= 2 && activeImageId ? { postId: post.id, imageId: activeImageId } : undefined}
           />
         </div>
       </div>
@@ -132,10 +143,9 @@ export default function PostCard({
       {post.content ? <p className="text-body mt-1 whitespace-pre-wrap">{post.content}</p> : null}
 
       <PostCarousel
-        postId={post.id}
         images={post.images}
         veiled={viewerVeilEnabled}
-        canManage={isOwn}
+        onActiveImageChange={setActiveImageId}
         className="mt-3 max-h-[480px] w-full rounded-ob object-cover"
       />
 

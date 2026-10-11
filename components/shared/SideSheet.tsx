@@ -59,7 +59,7 @@ export default function SideSheet({ open, onOpenChange, side, title, children }:
             <Dialog.Title className="font-cinzel text-sm uppercase tracking-brand text-ob-text">{title}</Dialog.Title>
             <Dialog.Close
               aria-label="Close"
-              className="flex h-9 w-9 items-center justify-center rounded-full"
+              className="nav-control flex h-9 w-9 items-center justify-center rounded-full"
               style={{ color: "var(--color-text-muted)" }}
             >
               <X size={20} strokeWidth={1.5} />
