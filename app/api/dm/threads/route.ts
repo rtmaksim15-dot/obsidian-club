@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
+import { requireAgeVerifiedApi } from "@/lib/age-verification/gate";
 import { resolveAvatarUrl } from "@/lib/storage/resolve-media";
 
 // GET /api/dm/threads — the current user's active conversations (an
@@ -13,6 +14,8 @@ export async function GET() {
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 403 });
   }
+  const ageBlocked = requireAgeVerifiedApi(user);
+  if (ageBlocked) return ageBlocked;
 
   const participations = await prisma.threadParticipant.findMany({
     where: { userId: user.id, leftAt: null },

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
+import { requireAgeVerifiedApi } from "@/lib/age-verification/gate";
 import { track } from "@/lib/analytics/track";
 import { resolveAvatarUrl, resolveAvatarUrls } from "@/lib/storage/resolve-media";
 import { isBlockedEitherWay, getBlockedEitherWayUserIds } from "@/lib/moderation/block";
@@ -35,6 +36,8 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 403 });
   }
+  const ageBlocked = requireAgeVerifiedApi(user);
+  if (ageBlocked) return ageBlocked;
 
   const post = await prisma.post.findUnique({ where: { id: params.id } });
   if (!post || !post.isPublished || post.minLevel > user.level) {
@@ -75,6 +78,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 403 });
   }
+  const ageBlocked = requireAgeVerifiedApi(user);
+  if (ageBlocked) return ageBlocked;
 
   const rateLimit = await checkRateLimit(`comment:${user.id}`, COMMENT_CREATE_LIMIT);
   if (!rateLimit.allowed) {

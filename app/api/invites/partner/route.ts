@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
+import { requireAgeVerifiedApi } from "@/lib/age-verification/gate";
 import { generateInviteToken } from "@/lib/utils/codes";
 
 // POST /api/invites/partner — creates a single-use partner link for the
@@ -14,6 +15,8 @@ export async function POST() {
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 403 });
   }
+  const ageBlocked = requireAgeVerifiedApi(user);
+  if (ageBlocked) return ageBlocked;
 
   const withPartner = await prisma.user.findUnique({
     where: { id: user.id },

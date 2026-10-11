@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
+import { requireAgeVerifiedApi } from "@/lib/age-verification/gate";
 import { canAccessRoom } from "@/lib/rating/room-access";
 
 // GET /api/rooms/:slug — room detail. ARCHITECTURE.md §4 shows this as
@@ -11,6 +12,8 @@ export async function GET(_request: Request, { params }: { params: { slug: strin
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 403 });
   }
+  const ageBlocked = requireAgeVerifiedApi(user);
+  if (ageBlocked) return ageBlocked;
 
   const room = await prisma.room.findUnique({ where: { slug: params.slug } });
   if (!room || !room.isActive) {

@@ -180,8 +180,8 @@ enum MarketplaceType {
 // ============================================================
 
 model User {
-  id                String      @id @default(uuid()) @db.Uuid
-  email             String      @unique
+  id                   String      @id @default(uuid()) @db.Uuid
+  email                String      @unique
   // Nullable (2026-09-25, see DECISIONS.md): auto-generated
   // email-derived usernames were removed at registration — deriving a
   // handle from someone's email leaked both the email and often their
@@ -189,7 +189,7 @@ model User {
   // with no username at all and must pick one themselves in
   // ProfileEditForm before the ritual's profile step can complete.
   // Existing members' real usernames are untouched by this change.
-  username          String?     @unique
+  username             String?     @unique
   // Username-in-the-Ritual (2026-08-06): null means "never deliberately
   // changed" — still allowed to set/change it once. Non-null means
   // they've used their one lifetime change (see
@@ -199,19 +199,19 @@ model User {
   // there's no separate "free first pick" concept, which is what lets
   // existing members' grandfathered one-time courtesy change (see
   // DECISIONS.md) reuse the exact same mechanism with no special-casing.
-  usernameChangedAt DateTime?   @map("username_changed_at")
-  displayName       String      @map("display_name")
-  avatarUrl         String?     @map("avatar_url")
-  bio               String?
-  locationCity      String?     @map("location_city")
-  locationCountry   String?     @map("location_country")
-  age               Int?
+  usernameChangedAt    DateTime?   @map("username_changed_at")
+  displayName          String      @map("display_name")
+  avatarUrl            String?     @map("avatar_url")
+  bio                  String?
+  locationCity         String?     @map("location_city")
+  locationCountry      String?     @map("location_country")
+  age                  Int?
   // Age Verification (2026-08-03): field first, no enforcement gate yet —
   // enforcement policy comes with the first wave (see DECISIONS.md).
   // Toggled manually by an admin in /admin/members or at application
   // approval; not derived from the self-reported `age` above.
-  ageVerified       Boolean     @default(false) @map("age_verified")
-  ageVerifiedAt     DateTime?   @map("age_verified_at")
+  ageVerified          Boolean     @default(false) @map("age_verified")
+  ageVerifiedAt        DateTime?   @map("age_verified_at")
   // Which numeric threshold this ageVerified flip was actually checked
   // against (2026-09-24, membership eligibility raised to
   // MIN_MEMBER_AGE — see lib/legal/eligibility.ts, DECISIONS.md). Null
@@ -220,34 +220,34 @@ model User {
   // this null rather than backfilling 18 keeps that history honest.
   // Only a real verification event (manual or, eventually, a provider)
   // should ever set this, alongside ageVerified/ageVerifiedAt.
-  ageVerifiedThreshold Int?     @map("age_verified_threshold")
-  level             Int         @default(1) // 1-6
-  reputation        Decimal     @default(0) @db.Decimal(3, 2) // 0.00 - 5.00, peer-review star average — independent of REP as of the 2026-07-05 CLAUDE.md migration (see ADR-0015)
-  rep               Int         @default(0) // "REP" — a discrete point ledger (CLAUDE.md's earn/lose tables), replaces the old weighted `rating` score; see ADR-0015. Sum of RepHistory.delta
-  trustScore        Int         @default(100) @map("trust_score")
-  status            UserStatus  @default(pending)
-  isAdmin           Boolean     @default(false) @map("is_admin") // not in ARCHITECTURE.md's User table — see ADR-0011
-  role              MemberRole? // chosen at onboarding, CLAUDE.md's registration flow — see ADR-0015
-  interests         String[]    @default([]) // chosen at onboarding; not yet used to rank the Feed — see TECH_DEBT.md
-  currentStreak     Int         @default(0) @map("current_streak") // consecutive days logged in, for the daily-login REP bonus
-  longestStreak     Int         @default(0) @map("longest_streak")
-  lastLoginDate     DateTime?   @map("last_login_date") // date-only (not datetime) touch point for streak computation — see lib/rating/rep-engine.ts#touchDailyLogin
-  invitedById       String?     @map("invited_by") @db.Uuid
-  referralCode      String?     @unique @map("referral_code")
-  referralCount     Int         @default(0) @map("referral_count")
+  ageVerifiedThreshold Int?        @map("age_verified_threshold")
+  level                Int         @default(1) // 1-6
+  reputation           Decimal     @default(0) @db.Decimal(3, 2) // 0.00 - 5.00, peer-review star average — independent of REP as of the 2026-07-05 CLAUDE.md migration (see ADR-0015)
+  rep                  Int         @default(0) // "REP" — a discrete point ledger (CLAUDE.md's earn/lose tables), replaces the old weighted `rating` score; see ADR-0015. Sum of RepHistory.delta
+  trustScore           Int         @default(100) @map("trust_score")
+  status               UserStatus  @default(pending)
+  isAdmin              Boolean     @default(false) @map("is_admin") // not in ARCHITECTURE.md's User table — see ADR-0011
+  role                 MemberRole? // chosen at onboarding, CLAUDE.md's registration flow — see ADR-0015
+  interests            String[]    @default([]) // chosen at onboarding; not yet used to rank the Feed — see TECH_DEBT.md
+  currentStreak        Int         @default(0) @map("current_streak") // consecutive days logged in, for the daily-login REP bonus
+  longestStreak        Int         @default(0) @map("longest_streak")
+  lastLoginDate        DateTime?   @map("last_login_date") // date-only (not datetime) touch point for streak computation — see lib/rating/rep-engine.ts#touchDailyLogin
+  invitedById          String?     @map("invited_by") @db.Uuid
+  referralCode         String?     @unique @map("referral_code")
+  referralCount        Int         @default(0) @map("referral_count")
   // Invitation & Partner system v1 (2026-08-01) — how many personal
   // member-invite links this member may still create. Redeeming one
   // decrements it; generating one does not (see DECISIONS.md). Partners
   // get 0 here by default, set explicitly at redemption — the schema
   // default of 1 only applies to purchase-card/member-invite joins.
-  inviteAllowance   Int         @default(1) @map("invite_allowance")
+  inviteAllowance      Int         @default(1) @map("invite_allowance")
   // One partner per member, symmetric: whichever side redeemed the
   // partner-source InviteToken has `partnerId` pointing at the other;
   // read "my partner" as `partner ?? partnerOf` from either side.
-  partnerId         String?     @unique @map("partner_id") @db.Uuid
-  joinedAt          DateTime?   @map("joined_at")
-  lastActiveAt      DateTime?   @map("last_active_at")
-  createdAt         DateTime    @default(now()) @map("created_at")
+  partnerId            String?     @unique @map("partner_id") @db.Uuid
+  joinedAt             DateTime?   @map("joined_at")
+  lastActiveAt         DateTime?   @map("last_active_at")
+  createdAt            DateTime    @default(now()) @map("created_at")
 
   // self-referential invites
   invitedBy User?  @relation("UserInvites", fields: [invitedById], references: [id])
@@ -261,33 +261,33 @@ model User {
   messages                   Message[]
   posts                      Post[]
   eventAttendees             EventAttendee[]
-  reviewsGiven               Review[]          @relation("ReviewsGiven")
-  reviewsReceived            Review[]          @relation("ReviewsReceived")
-  referralsSent              Referral[]        @relation("ReferralInviter")
-  referralsReceived          Referral[]        @relation("ReferralInvited")
+  reviewsGiven               Review[]           @relation("ReviewsGiven")
+  reviewsReceived            Review[]           @relation("ReviewsReceived")
+  referralsSent              Referral[]         @relation("ReferralInviter")
+  referralsReceived          Referral[]         @relation("ReferralInvited")
   userAchievements           UserAchievement[]
   repHistory                 RepHistory[]
   notifications              Notification[]
   marketplaceItems           MarketplaceItem[]
-  memberInviteTokensCreated  InviteToken[]     @relation("MemberInviteTokens")
-  partnerInviteTokensCreated InviteToken[]     @relation("PartnerInviteTokens")
-  redeemedInviteToken        InviteToken?      @relation("RedeemedInviteToken")
+  memberInviteTokensCreated  InviteToken[]      @relation("MemberInviteTokens")
+  partnerInviteTokensCreated InviteToken[]      @relation("PartnerInviteTokens")
+  redeemedInviteToken        InviteToken?       @relation("RedeemedInviteToken")
   likes                      Like[]
   comments                   Comment[]
   houseMemberships           HouseMembership[]
   analyticsEvents            AnalyticsEvent[]
-  following                  Follow[]          @relation("Following")
-  followers                  Follow[]          @relation("Followers")
-  reportsFiled               Report[]          @relation("ReportsFiled")
-  reportsReviewed            Report[]          @relation("ReportsReviewed")
-  blocksInitiated            Block[]           @relation("BlocksInitiated")
-  blocksReceived             Block[]           @relation("BlocksReceived")
+  following                  Follow[]           @relation("Following")
+  followers                  Follow[]           @relation("Followers")
+  reportsFiled               Report[]           @relation("ReportsFiled")
+  reportsReviewed            Report[]           @relation("ReportsReviewed")
+  blocksInitiated            Block[]            @relation("BlocksInitiated")
+  blocksReceived             Block[]            @relation("BlocksReceived")
   moderationActions          ModerationAction[]
   legalConsents              LegalConsent[]
-  deletedComments            Comment[]         @relation("CommentDeletedBy")
-  deletedMessages            Message[]         @relation("MessageDeletedBy")
-  adminNotesAboutMe          AdminNote[]       @relation("AdminNotesAboutMember")
-  adminNotesAuthored         AdminNote[]       @relation("AdminNotesAuthored")
+  deletedComments            Comment[]          @relation("CommentDeletedBy")
+  deletedMessages            Message[]          @relation("MessageDeletedBy")
+  adminNotesAboutMe          AdminNote[]        @relation("AdminNotesAboutMember")
+  adminNotesAuthored         AdminNote[]        @relation("AdminNotesAuthored")
 
   // Direct Messages (2026-09-14, see DECISIONS.md)
   conversationRequestsSent     ConversationRequest[] @relation("ConversationRequestsSent")
@@ -300,6 +300,9 @@ model User {
 
   // Admin access hardening (2026-09-17, see DECISIONS.md)
   adminAuthEvents AdminAuthEvent[]
+
+  // 21+ Age Verification Gate, Phase A (2026-10-10, see DECISIONS.md)
+  ageVerifications AgeVerification[]
 
   @@map("users")
 }
@@ -384,20 +387,20 @@ model Room {
 }
 
 model Message {
-  id        String   @id @default(uuid()) @db.Uuid
-  roomId    String   @map("room_id") @db.Uuid
-  userId    String   @map("user_id") @db.Uuid
-  content   String
-  mediaUrl  String?  @map("media_url")
-  replyToId String?  @map("reply_to") @db.Uuid
-  isDeleted Boolean  @default(false) @map("is_deleted")
-  createdAt DateTime @default(now()) @map("created_at")
+  id                   String    @id @default(uuid()) @db.Uuid
+  roomId               String    @map("room_id") @db.Uuid
+  userId               String    @map("user_id") @db.Uuid
+  content              String
+  mediaUrl             String?   @map("media_url")
+  replyToId            String?   @map("reply_to") @db.Uuid
+  isDeleted            Boolean   @default(false) @map("is_deleted")
+  createdAt            DateTime  @default(now()) @map("created_at")
   // Moderation gap 1 (2026-09-08, see DECISIONS.md): admin-only
   // soft-delete attribution — who removed it and when. `isDeleted` alone
   // (pre-existing) never actually got set by any code path; this pair
   // is added alongside the first real writer of that flag.
-  deletedAt   DateTime? @map("deleted_at")
-  deletedById String?   @map("deleted_by_id") @db.Uuid
+  deletedAt            DateTime? @map("deleted_at")
+  deletedById          String?   @map("deleted_by_id") @db.Uuid
   // Security package 4, FIX 13 (2026-10-05, see DECISIONS.md) — set at
   // the moment of soft-deletion (never re-derived later) from
   // lib/moderation/retention.ts#MANDATORY_RETENTION_CATEGORIES, using
@@ -405,13 +408,13 @@ model Message {
   // content-scrub cleanup never blanks this row's `content`. Decided
   // once, here, on the row itself — deliberately not cross-referenced
   // from the removal's ModerationAction row at cleanup time.
-  preserveIndefinitely Boolean @default(false) @map("preserve_indefinitely")
+  preserveIndefinitely Boolean   @default(false) @map("preserve_indefinitely")
 
-  room     Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  user     User      @relation(fields: [userId], references: [id])
-  replyTo  Message?  @relation("MessageReplies", fields: [replyToId], references: [id])
-  replies  Message[] @relation("MessageReplies")
-  deletedBy User?    @relation("MessageDeletedBy", fields: [deletedById], references: [id])
+  room      Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id])
+  replyTo   Message?  @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies   Message[] @relation("MessageReplies")
+  deletedBy User?     @relation("MessageDeletedBy", fields: [deletedById], references: [id])
 
   @@index([roomId])
   @@map("messages")
@@ -422,19 +425,19 @@ model Message {
 // ============================================================
 
 model Post {
-  id          String    @id @default(uuid()) @db.Uuid
-  authorId    String    @map("author_id") @db.Uuid
-  title       String?
-  content     String?
-  mediaUrls   Json      @default("[]") @map("media_urls")
-  type        PostType
-  minLevel    Int       @default(1) @map("min_level")
-  isPublished Boolean   @default(false) @map("is_published")
-  viewsCount  Int       @default(0) @map("views_count")
-  likesCount  Int       @default(0) @map("likes_count")
-  houseId     String?   @map("house_id") @db.Uuid
-  createdAt   DateTime  @default(now()) @map("created_at")
-  publishedAt DateTime? @map("published_at")
+  id             String    @id @default(uuid()) @db.Uuid
+  authorId       String    @map("author_id") @db.Uuid
+  title          String?
+  content        String?
+  mediaUrls      Json      @default("[]") @map("media_urls")
+  type           PostType
+  minLevel       Int       @default(1) @map("min_level")
+  isPublished    Boolean   @default(false) @map("is_published")
+  viewsCount     Int       @default(0) @map("views_count")
+  likesCount     Int       @default(0) @map("likes_count")
+  houseId        String?   @map("house_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at")
+  publishedAt    DateTime? @map("published_at")
   // Member protection mechanics (pre-launch legal package, 2026-08-09).
   // imageConsentAt: set only when the composer actually had a photo
   // attached and the "all depicted are adults who consented to this
@@ -447,7 +450,7 @@ model Post {
   // (already the feed-visibility gate) so preserved content is
   // invisible everywhere ordinary queries look, without a second
   // visibility check to keep in sync.
-  isPreserved Boolean   @default(false) @map("is_preserved")
+  isPreserved    Boolean   @default(false) @map("is_preserved")
 
   author   User      @relation(fields: [authorId], references: [id])
   house    House?    @relation(fields: [houseId], references: [id])
@@ -476,19 +479,19 @@ model Like {
 }
 
 model Comment {
-  id        String   @id @default(uuid()) @db.Uuid
-  postId    String   @map("post_id") @db.Uuid
-  authorId  String   @map("author_id") @db.Uuid
-  content   String
-  isDeleted Boolean  @default(false) @map("is_deleted")
-  createdAt DateTime @default(now()) @map("created_at")
+  id                   String    @id @default(uuid()) @db.Uuid
+  postId               String    @map("post_id") @db.Uuid
+  authorId             String    @map("author_id") @db.Uuid
+  content              String
+  isDeleted            Boolean   @default(false) @map("is_deleted")
+  createdAt            DateTime  @default(now()) @map("created_at")
   // Moderation gap 1 (2026-09-08, see DECISIONS.md) — see Message's
   // identical pair for why this is added now, not when isDeleted was.
-  deletedAt   DateTime? @map("deleted_at")
-  deletedById String?   @map("deleted_by_id") @db.Uuid
+  deletedAt            DateTime? @map("deleted_at")
+  deletedById          String?   @map("deleted_by_id") @db.Uuid
   // Security package 4, FIX 13 (2026-10-05, see DECISIONS.md) — see
   // Message's identical field for the full reasoning.
-  preserveIndefinitely Boolean @default(false) @map("preserve_indefinitely")
+  preserveIndefinitely Boolean   @default(false) @map("preserve_indefinitely")
 
   post      Post  @relation(fields: [postId], references: [id], onDelete: Cascade)
   author    User  @relation(fields: [authorId], references: [id])
@@ -705,37 +708,37 @@ model Notification {
 // ============================================================
 
 model Waitlist {
-  id                String         @id @default(uuid()) @db.Uuid
-  email             String         @unique
-  name              String?
+  id                   String         @id @default(uuid()) @db.Uuid
+  email                String         @unique
+  name                 String?
   // age/city/source are additive to ARCHITECTURE.md §10's minimal column
   // list — they capture what the DESIGN.md §6 application form actually
   // collects (age is also a compliance checkpoint per ARCHITECTURE.md §9).
-  age               Int?
-  city              String?
-  source            String?
+  age                  Int?
+  city                 String?
+  source               String?
   // "Why you belong here" — free-text from the full application form
   // (Landing Page redesign, 2026-07). Optional: the hero-only email
   // capture never sets it.
-  reason            String?
-  referralCode      String?        @map("referral_code")
-  invitedBy         String?        @map("invited_by") @db.Uuid
+  reason               String?
+  referralCode         String?        @map("referral_code")
+  invitedBy            String?        @map("invited_by") @db.Uuid
   // Status tracking + a minimal review audit trail — additive beyond
   // ARCHITECTURE.md §10's documented columns, needed to implement the
   // application review flow PRODUCT.md §1 already specifies. See ADR-0012.
-  status            WaitlistStatus @default(pending)
-  reviewedAt        DateTime?      @map("reviewed_at")
-  reviewedBy        String?        @map("reviewed_by") @db.Uuid
+  status               WaitlistStatus @default(pending)
+  reviewedAt           DateTime?      @map("reviewed_at")
+  reviewedBy           String?        @map("reviewed_by") @db.Uuid
   // Age Verification (2026-08-03): set by the admin at approval time,
   // staged here since the `User` row doesn't exist yet — copied onto
   // User.ageVerified/ageVerifiedAt when the invite is redeemed (see
   // app/api/invite/[token]/route.ts). Independent of the self-reported
   // `age` field above.
-  ageVerified       Boolean        @default(false) @map("age_verified")
-  ageVerifiedAt     DateTime?      @map("age_verified_at")
+  ageVerified          Boolean        @default(false) @map("age_verified")
+  ageVerifiedAt        DateTime?      @map("age_verified_at")
   // See User.ageVerifiedThreshold's comment — same reasoning, copied
   // across at redemption alongside ageVerified/ageVerifiedAt.
-  ageVerifiedThreshold Int?        @map("age_verified_threshold")
+  ageVerifiedThreshold Int?           @map("age_verified_threshold")
   // Closed Registration & Invite System (2026-07-17): approving no
   // longer creates the account immediately — it generates this token,
   // shown to the admin to copy and send manually (see DECISIONS.md for
@@ -743,9 +746,9 @@ model Waitlist {
   // account itself is only created when the token is redeemed at
   // /invite/[token]. `inviteTokenUsedAt` is the completion marker — a
   // null value with a non-null token means "approved, not yet claimed."
-  inviteToken       String?        @unique @map("invite_token")
-  inviteTokenUsedAt DateTime?      @map("invite_token_used_at")
-  createdAt         DateTime       @default(now()) @map("created_at")
+  inviteToken          String?        @unique @map("invite_token")
+  inviteTokenUsedAt    DateTime?      @map("invite_token_used_at")
+  createdAt            DateTime       @default(now()) @map("created_at")
 
   // ---- Invitation Panel flow (2026-08-2x) — see DECISIONS.md ----
   // `origin`: which public entry point this application came in
@@ -931,10 +934,10 @@ model InviteToken {
   clientExpiresAt  DateTime?         @map("client_expires_at")
   revokedAt        DateTime?         @map("revoked_at")
 
-  batch      InviteBatch? @relation(fields: [batchId], references: [id])
-  inviter    User?        @relation("MemberInviteTokens", fields: [inviterId], references: [id])
-  partnerOf  User?        @relation("PartnerInviteTokens", fields: [partnerOfId], references: [id])
-  redeemedBy User?        @relation("RedeemedInviteToken", fields: [redeemedById], references: [id])
+  batch               InviteBatch? @relation(fields: [batchId], references: [id])
+  inviter             User?        @relation("MemberInviteTokens", fields: [inviterId], references: [id])
+  partnerOf           User?        @relation("PartnerInviteTokens", fields: [partnerOfId], references: [id])
+  redeemedBy          User?        @relation("RedeemedInviteToken", fields: [redeemedById], references: [id])
   // application source only — the Waitlist row that minted this token.
   waitlistApplication Waitlist?
 
@@ -1088,14 +1091,25 @@ model Block {
 // growing action taxonomy shouldn't require a schema migration per
 // entry.
 model ModerationAction {
-  id         String   @id @default(uuid()) @db.Uuid
-  adminId    String   @map("admin_id") @db.Uuid
-  action     String
-  targetType String?  @map("target_type")
-  targetId   String?  @map("target_id") @db.Uuid
-  aupSection String?  @map("aup_section")
-  note       String?
-  createdAt  DateTime @default(now()) @map("created_at")
+  id                   String   @id @default(uuid()) @db.Uuid
+  // Age Verification Gate, Phase A (2026-10-10, see DECISIONS.md) —
+  // made nullable so this log can record a SYSTEM-initiated action
+  // (the Yoti/mock pass that flips ageVerified=true has no admin
+  // behind it) without inventing a second logging table. Every
+  // existing call site still always passes a real admin.id — this is
+  // additive, not a behavior change for the admin-triggered path.
+  adminId              String?  @map("admin_id") @db.Uuid
+  // Set only when adminId is null — a short, human-readable actor tag
+  // ("system:yoti", "system:mock") so the admin UI and ModerationAction
+  // history can still say who/what did this. Same shape as
+  // AdminAuthEvent's nullable userId + plain-string fallback column.
+  actorLabel           String?  @map("actor_label")
+  action               String
+  targetType           String?  @map("target_type")
+  targetId             String?  @map("target_id") @db.Uuid
+  aupSection           String?  @map("aup_section")
+  note                 String?
+  createdAt            DateTime @default(now()) @map("created_at")
   // Security package 4, FIX 13 (2026-10-05, see DECISIONS.md) — set once,
   // at creation, by lib/moderation/log.ts#logModerationAction from
   // lib/moderation/retention.ts#MANDATORY_RETENTION_CATEGORIES. When
@@ -1104,12 +1118,64 @@ model ModerationAction {
   // time from `aupSection` — the owner's choice: a later edit to the
   // category taxonomy must never retroactively change what an
   // already-created row is exempt from.
-  preserveIndefinitely Boolean @default(false) @map("preserve_indefinitely")
+  preserveIndefinitely Boolean  @default(false) @map("preserve_indefinitely")
 
-  admin User @relation(fields: [adminId], references: [id])
+  admin User? @relation(fields: [adminId], references: [id])
 
   @@index([targetType, targetId])
   @@map("moderation_actions")
+}
+
+enum AgeVerificationProvider {
+  yoti
+  mock
+}
+
+enum AgeVerificationStatus {
+  pending
+  passed
+  failed
+  expired
+  cancelled
+}
+
+// 21+ Age Verification Gate, Phase A (2026-10-10, see DECISIONS.md and
+// the Phase A report). One row per verification ATTEMPT, not per user —
+// a user who fails and retries gets a new row each time (attemptNumber
+// increments), so the full history of attempts is preserved rather than
+// overwritten. On a `passed` result, User.ageVerified/ageVerifiedAt/
+// ageVerifiedThreshold are set via the existing admin-toggle code path
+// (lib/moderation/log.ts), attributed to "system:<provider>" — see
+// ModerationAction.actorLabel above. Never stores DOB, images, or any
+// raw provider payload — only the outcome.
+model AgeVerification {
+  id                String                  @id @default(uuid()) @db.Uuid
+  userId            String                  @map("user_id") @db.Uuid
+  provider          AgeVerificationProvider
+  // Unique per attempt — also how the webhook/return-page result lookup
+  // finds "which of this user's (possibly several) attempts is this."
+  providerSessionId String                  @unique @map("provider_session_id")
+  status            AgeVerificationStatus   @default(pending)
+  // Which method actually completed the check: "age_estimation" |
+  // "doc_scan" | "digital_id" (Yoti's own naming) or "mock". Null while
+  // pending.
+  method            String?
+  // The threshold this specific attempt was actually checked against —
+  // MIN_MEMBER_AGE (21) for doc_scan/digital_id, AGE_ESTIMATION_THRESHOLD
+  // (default 25) for age_estimation. Recorded per-attempt, same
+  // reasoning as User.ageVerifiedThreshold: a later env-var change must
+  // never retroactively change what an already-completed attempt was
+  // actually checked against.
+  threshold         Int
+  attemptNumber     Int                     @map("attempt_number")
+  createdAt         DateTime                @default(now()) @map("created_at")
+  completedAt       DateTime?               @map("completed_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@map("age_verifications")
 }
 
 // Admin Console -- Notes (2026-09-11, see DECISIONS.md), the one new

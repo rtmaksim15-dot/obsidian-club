@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
+import { requireAgeVerifiedApi } from "@/lib/age-verification/gate";
 import { createAdminClient } from "@/lib/auth/supabase-admin";
 import { detectImageSignature } from "@/lib/utils/validateImageBytes";
 import { stripExifIfPresent } from "@/lib/utils/stripExif";
@@ -36,6 +37,8 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 403 });
   }
+  const ageBlocked = requireAgeVerifiedApi(user);
+  if (ageBlocked) return ageBlocked;
 
   const formData = await request.formData();
   const file = formData.get("file");

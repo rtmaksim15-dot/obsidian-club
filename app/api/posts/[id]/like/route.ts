@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
+import { requireAgeVerifiedApi } from "@/lib/age-verification/gate";
 import { errCode } from "@/lib/utils/safe-error";
 
 // POST /api/posts/:id/like — toggles the caller's like on a post.
@@ -11,6 +12,8 @@ export async function POST(_request: Request, { params }: { params: { id: string
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 403 });
   }
+  const ageBlocked = requireAgeVerifiedApi(user);
+  if (ageBlocked) return ageBlocked;
 
   const post = await prisma.post.findUnique({ where: { id: params.id } });
   if (!post || !post.isPublished) {

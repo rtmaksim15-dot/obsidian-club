@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { needsLegalReconsent } from "@/lib/legal/reconsent";
+import { needsAgeVerification } from "@/lib/age-verification/gate";
 import { isRitualComplete } from "@/lib/auth/ritual";
 import { getDoorsState, bypassesDoors } from "@/lib/config/doors";
 import { hasUnreadDm } from "@/lib/dm/unread";
@@ -21,6 +22,17 @@ export default async function PlatformLayout({ children }: { children: React.Rea
 
   if (user && (await needsLegalReconsent(user.id))) {
     redirect("/legal-reconsent");
+  }
+
+  // 21+ Age Verification Gate, Phase A (2026-10-10, see DECISIONS.md) —
+  // same centralized shape as the legal-reconsent check right above it
+  // (covers every one of middleware.ts's protected prefixes from one
+  // place), checked before the ritual/Doors gates below since the task
+  // explicitly wants this "before the ritual." /verify and
+  // /verify/return live outside `(platform)` (in `(auth)`, next to
+  // /legal-reconsent) for the same loop-avoidance reason.
+  if (user && needsAgeVerification(user)) {
+    redirect("/verify");
   }
 
   // Desktop nav gap (2026-09-12) — DesktopNav's five destinations are

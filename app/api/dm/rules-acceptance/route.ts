@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/session";
+import { requireAgeVerifiedApi } from "@/lib/age-verification/gate";
 import { recordDmRulesAcceptance } from "@/lib/legal/dm-rules";
 import { getClientIp } from "@/lib/security/rate-limit";
 
@@ -10,6 +11,8 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 403 });
   }
+  const ageBlocked = requireAgeVerifiedApi(user);
+  if (ageBlocked) return ageBlocked;
 
   await recordDmRulesAcceptance(user.id, getClientIp(request));
   return NextResponse.json({ ok: true });

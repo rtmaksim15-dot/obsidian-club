@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/session";
+import { requireAgeVerifiedApi } from "@/lib/age-verification/gate";
 import { getFeedPosts } from "@/lib/feed/query";
 
 // GET /api/feed?skip=N — "load more" pagination for /feed (Block 5,
@@ -11,6 +12,8 @@ export async function GET(request: Request) {
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 403 });
   }
+  const ageBlocked = requireAgeVerifiedApi(user);
+  if (ageBlocked) return ageBlocked;
 
   const { searchParams } = new URL(request.url);
   const skip = Number(searchParams.get("skip") ?? "0");

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
+import { requireAgeVerifiedApi } from "@/lib/age-verification/gate";
 import { grantAchievement } from "@/lib/utils/achievements";
 import { checkRateLimit } from "@/lib/security/rate-limit";
 
@@ -22,6 +23,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (!reviewer) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 403 });
   }
+  const ageBlocked = requireAgeVerifiedApi(reviewer);
+  if (ageBlocked) return ageBlocked;
 
   if (reviewer.id === params.id) {
     return NextResponse.json({ error: "You can't review yourself." }, { status: 422 });

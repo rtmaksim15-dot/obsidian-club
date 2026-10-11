@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { MemberRole, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
+import { requireAgeVerifiedApi } from "@/lib/age-verification/gate";
 import { checkProfileCompleteBonus } from "@/lib/rating/rep-engine";
 import { errCode } from "@/lib/utils/safe-error";
 
@@ -28,6 +29,8 @@ export async function PATCH(request: Request) {
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 403 });
   }
+  const ageBlocked = requireAgeVerifiedApi(user);
+  if (ageBlocked) return ageBlocked;
 
   let body: Body;
   try {

@@ -12,6 +12,7 @@ import { createAdminClient } from "@/lib/auth/supabase-admin";
 import { resolveAvatarUrl, resolveAvatarUrls, resolvePostMediaUrls } from "@/lib/storage/resolve-media";
 import { getBlockedEitherWayUserIds } from "@/lib/moderation/block";
 import { checkRateLimit } from "@/lib/security/rate-limit";
+import { requireAgeVerifiedApi } from "@/lib/age-verification/gate";
 import { errCode } from "@/lib/utils/safe-error";
 
 const PAGE_SIZE = 20;
@@ -52,6 +53,8 @@ export async function GET(request: Request) {
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 403 });
   }
+  const ageBlocked = requireAgeVerifiedApi(user);
+  if (ageBlocked) return ageBlocked;
 
   const { searchParams } = new URL(request.url);
   const typeParam = searchParams.get("type");
@@ -105,6 +108,8 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 403 });
   }
+  const ageBlocked = requireAgeVerifiedApi(user);
+  if (ageBlocked) return ageBlocked;
 
   const rateLimit = await checkRateLimit(`post:${user.id}`, POST_CREATE_LIMIT);
   if (!rateLimit.allowed) {

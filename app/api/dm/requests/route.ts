@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
+import { requireAgeVerifiedApi } from "@/lib/age-verification/gate";
 import { getRequestEligibility } from "@/lib/dm/eligibility";
 import { checkDailyRequestLimit } from "@/lib/dm/limits";
 import { effectiveRequestStatus, isRequestExpired } from "@/lib/dm/lifecycle";
@@ -24,6 +25,8 @@ export async function GET() {
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 403 });
   }
+  const ageBlocked = requireAgeVerifiedApi(user);
+  if (ageBlocked) return ageBlocked;
 
   const rows = await prisma.conversationRequest.findMany({
     where: { recipientId: user.id, status: "pending" },
@@ -67,6 +70,8 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 403 });
   }
+  const ageBlocked = requireAgeVerifiedApi(user);
+  if (ageBlocked) return ageBlocked;
 
   let body: Body;
   try {

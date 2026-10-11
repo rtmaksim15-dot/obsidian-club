@@ -108,6 +108,20 @@ export default function PersonDetail({
         <p className="text-data">
           {person.ageVerified ? `Verified${person.ageVerifiedAt ? ` — ${formatDate(person.ageVerifiedAt)}` : ""}` : "Not verified"}
         </p>
+        {/* A9 — Age Verification Gate, Phase A (2026-10-10, see
+            DECISIONS.md). 0 attempts means every existing AgeVerification
+            row was created after this shipped — a member whose
+            ageVerified flip predates it (or who was only ever flipped by
+            this same manual toggle) has none, which is expected, not a
+            bug. */}
+        {person.ageVerificationAttempts > 0 ? (
+          <p className="text-caption mt-1" style={{ color: "var(--color-text-secondary)" }}>
+            {person.ageVerificationProvider ?? "—"}
+            {person.ageVerificationMethod ? ` · ${person.ageVerificationMethod}` : ""} · {person.ageVerificationAttempts}{" "}
+            {person.ageVerificationAttempts === 1 ? "attempt" : "attempts"}
+            {person.ageVerificationLastAt ? ` · last ${formatDate(person.ageVerificationLastAt)}` : ""}
+          </p>
+        ) : null}
         <button type="button" className="btn-secondary mt-3" disabled={pending} onClick={toggleAgeVerified}>
           {pending ? "…" : person.ageVerified ? "Remove age verification" : "Mark age-verified"}
         </button>

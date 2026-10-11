@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
+import { requireAgeVerifiedApi } from "@/lib/age-verification/gate";
 import { generateInviteToken } from "@/lib/utils/codes";
 
 // POST /api/invites/member — creates a personal single-use member-invite
@@ -15,6 +16,8 @@ export async function POST() {
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 403 });
   }
+  const ageBlocked = requireAgeVerifiedApi(user);
+  if (ageBlocked) return ageBlocked;
   if (user.inviteAllowance <= 0) {
     return NextResponse.json({ error: "You have no invitations left." }, { status: 422 });
   }

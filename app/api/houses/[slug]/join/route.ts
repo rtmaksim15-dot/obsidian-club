@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
+import { requireAgeVerifiedApi } from "@/lib/age-verification/gate";
 import { awardRep, REP_TABLE } from "@/lib/rating/rep-engine";
 import { HOUSES_UI_ENABLED } from "@/lib/config/feature-flags";
 
@@ -21,6 +22,8 @@ export async function POST(_request: Request, { params }: { params: { slug: stri
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
   }
+  const ageBlocked = requireAgeVerifiedApi(user);
+  if (ageBlocked) return ageBlocked;
 
   const house = await prisma.house.findUnique({ where: { slug: params.slug } });
   if (!house || house.status !== "active") {

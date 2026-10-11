@@ -103,6 +103,15 @@ export type Person = {
   reputation: number;
   ageVerified: boolean;
   ageVerifiedAt: string | null;
+  // A9 — Age Verification Gate, Phase A (2026-10-10, see DECISIONS.md):
+  // latest attempt's provider/method, total attempt count, and when
+  // that latest attempt was made — null/0 for a member with no
+  // AgeVerification rows at all (every existing member before this
+  // shipped, plus anyone only ever flipped by the manual admin toggle).
+  ageVerificationProvider: "yoti" | "mock" | null;
+  ageVerificationMethod: string | null;
+  ageVerificationAttempts: number;
+  ageVerificationLastAt: string | null;
   joinedAt: string | null;
   postCount: number;
   commentCount: number;

@@ -205,6 +205,13 @@ export default async function AdminConsolePage() {
         joinedAt: true,
         invitedById: true,
         partnerId: true,
+        // A9 — Age Verification Gate, Phase A (2026-10-10, see
+        // DECISIONS.md): latest attempt's provider/method, plus a
+        // total attempt count, for the People zone's Age Verification
+        // section. One extra query per row would be wasteful at 50
+        // rows; this piggybacks on the existing findMany instead.
+        ageVerifications: { orderBy: { createdAt: "desc" }, take: 1 },
+        _count: { select: { ageVerifications: true } },
       },
     }),
     prisma.report.findMany({
@@ -672,6 +679,10 @@ export default async function AdminConsolePage() {
         reputation: Number(p.reputation),
         ageVerified: p.ageVerified,
         ageVerifiedAt: p.ageVerifiedAt ? p.ageVerifiedAt.toISOString() : null,
+        ageVerificationProvider: p.ageVerifications[0]?.provider ?? null,
+        ageVerificationMethod: p.ageVerifications[0]?.method ?? null,
+        ageVerificationAttempts: p._count.ageVerifications,
+        ageVerificationLastAt: p.ageVerifications[0] ? p.ageVerifications[0].createdAt.toISOString() : null,
         joinedAt: p.joinedAt ? p.joinedAt.toISOString() : null,
         postCount: postCountById.get(p.id) ?? 0,
         commentCount: commentCountById.get(p.id) ?? 0,
@@ -699,7 +710,11 @@ export default async function AdminConsolePage() {
           action: m.action,
           note: m.note,
           createdAt: m.createdAt.toISOString(),
-          adminName: nameById.get(m.adminId) ?? null,
+          // Age Verification Gate, Phase A (2026-10-10, see DECISIONS.md)
+          // — adminId is now nullable (a system-initiated action has
+          // none); falls back to the row's own actorLabel ("system:yoti")
+          // so this still shows SOMETHING for who/what did it.
+          adminName: (m.adminId ? nameById.get(m.adminId) : m.actorLabel) ?? null,
         })),
         notes: (adminNotesByMember.get(p.id) ?? []).map((n) => ({
           id: n.id,
@@ -838,7 +853,7 @@ export default async function AdminConsolePage() {
             action: m.action,
             note: m.note,
             createdAt: m.createdAt.toISOString(),
-            adminName: nameById.get(m.adminId) ?? null,
+            adminName: (m.adminId ? nameById.get(m.adminId) : m.actorLabel) ?? null,
           })),
         };
       })}

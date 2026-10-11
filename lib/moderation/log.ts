@@ -5,17 +5,21 @@ import { maybeRunRetentionCleanup, requiresMandatoryRetention } from "./retentio
 // ModerationAction comment for why this is separate from RepHistory/
 // AnalyticsEvent). "Who, when, what, which AUP section" — evidence of
 // good-faith moderation for a future dispute, not analytics.
-export async function logModerationAction(params: {
-  adminId: string;
-  action: string;
-  targetType?: string;
-  targetId?: string;
-  aupSection?: string;
-  note?: string;
-}) {
+//
+// Age Verification Gate, Phase A (2026-10-10, see DECISIONS.md) —
+// `adminId` is now optional: pass `actorLabel` instead ("system:yoti",
+// "system:mock") for a system-initiated action with no admin behind
+// it. Every pre-existing call site still always passes a real
+// `adminId` and no `actorLabel` — unchanged behavior for those.
+export async function logModerationAction(
+  params:
+    | { adminId: string; actorLabel?: never; action: string; targetType?: string; targetId?: string; aupSection?: string; note?: string }
+    | { adminId?: never; actorLabel: string; action: string; targetType?: string; targetId?: string; aupSection?: string; note?: string },
+) {
   await prisma.moderationAction.create({
     data: {
-      adminId: params.adminId,
+      adminId: params.adminId ?? null,
+      actorLabel: params.actorLabel ?? null,
       action: params.action,
       targetType: params.targetType,
       targetId: params.targetId,

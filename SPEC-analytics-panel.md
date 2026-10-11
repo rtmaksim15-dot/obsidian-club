@@ -94,6 +94,11 @@ invite.accepted          entity: invite, meta: { inviterId, daysToAccept }
 
 search.performed         meta: { query, resultsCount }            // ключевое
 profile.viewed           entity: user
+
+age_verification.started meta: { provider, attemptNumber }        // Phase A, 2026-10-10
+age_verification.passed  meta: { provider }
+age_verification.failed  meta: { provider }
+age_verification.locked  meta: { provider }
 ```
 
 Два типа помечены как ключевые — `vault.item_locked_hit` и `search.performed`.

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
+import { requireAgeVerifiedApi } from "@/lib/age-verification/gate";
 import { errCode } from "@/lib/utils/safe-error";
 
 // POST /api/users/:id/follow — toggles the caller's follow relationship
@@ -13,6 +14,8 @@ export async function POST(_request: Request, { params }: { params: { id: string
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 403 });
   }
+  const ageBlocked = requireAgeVerifiedApi(user);
+  if (ageBlocked) return ageBlocked;
   if (user.id === params.id) {
     return NextResponse.json({ error: "You can't follow yourself." }, { status: 422 });
   }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
+import { requireAgeVerifiedApi } from "@/lib/age-verification/gate";
 import { isBlockedEitherWay } from "@/lib/moderation/block";
 import { resolveAvatarUrl, resolveAvatarUrls } from "@/lib/storage/resolve-media";
 import { checkRateLimit } from "@/lib/security/rate-limit";
@@ -45,6 +46,8 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 403 });
   }
+  const ageBlocked = requireAgeVerifiedApi(user);
+  if (ageBlocked) return ageBlocked;
 
   if (!(await requireActiveParticipant(params.id, user.id))) {
     return NextResponse.json({ error: "Conversation not found." }, { status: 404 });
@@ -71,6 +74,8 @@ export async function POST(request: Request, { params }: { params: { id: string 
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 403 });
   }
+  const ageBlocked = requireAgeVerifiedApi(user);
+  if (ageBlocked) return ageBlocked;
 
   if (!(await requireActiveParticipant(params.id, user.id))) {
     return NextResponse.json({ error: "Conversation not found." }, { status: 404 });

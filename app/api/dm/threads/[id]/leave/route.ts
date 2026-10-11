@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
+import { requireAgeVerifiedApi } from "@/lib/age-verification/gate";
 
 // POST /api/dm/threads/:id/leave — item 6: "Leaving is silent and needs
 // no explanation." Sets leftAt on the caller's own ThreadParticipant row
@@ -11,6 +12,8 @@ export async function POST(_request: Request, { params }: { params: { id: string
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 403 });
   }
+  const ageBlocked = requireAgeVerifiedApi(user);
+  if (ageBlocked) return ageBlocked;
 
   const updated = await prisma.threadParticipant.updateMany({
     where: { threadId: params.id, userId: user.id, leftAt: null },

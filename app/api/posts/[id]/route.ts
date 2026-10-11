@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
+import { requireAgeVerifiedApi } from "@/lib/age-verification/gate";
 import { resolveAvatarUrl, resolvePostMediaUrls } from "@/lib/storage/resolve-media";
 import { isBlockedEitherWay } from "@/lib/moderation/block";
 
@@ -40,6 +41,8 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 403 });
   }
+  const ageBlocked = requireAgeVerifiedApi(user);
+  if (ageBlocked) return ageBlocked;
 
   const post = await prisma.post.findUnique({ where: { id: params.id }, select: postSelect });
   if (!post || !post.author) {
@@ -77,6 +80,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 403 });
   }
+  const ageBlocked = requireAgeVerifiedApi(user);
+  if (ageBlocked) return ageBlocked;
 
   const post = await prisma.post.findUnique({ where: { id: params.id } });
   if (!post) {
@@ -145,6 +150,8 @@ export async function DELETE(_request: Request, { params }: { params: { id: stri
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 403 });
   }
+  const ageBlocked = requireAgeVerifiedApi(user);
+  if (ageBlocked) return ageBlocked;
 
   const post = await prisma.post.findUnique({ where: { id: params.id } });
   if (!post) {

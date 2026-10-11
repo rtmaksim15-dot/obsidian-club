@@ -1062,3 +1062,69 @@ its rate limit, RLS, consent+ritual side effects) **was** verified live
 end-to-end against a `test-`-prefixed `QA-TEST` batch (10 `partner`
 tokens), then fully deleted along with the accounts it created — see
 DECISIONS.md (2026-08-14) for the full scenario list and results.
+
+## 21+ Age Verification Gate, Phase A (2026-10-10)
+
+New `AgeVerification` model, `lib/age-verification/` adapter (`yoti.ts`
++ `mock.ts`), `/verify`/`/verify/return` pages, three API routes,
+`app/(platform)/layout.tsx` gate, and API-route guards. Migration
+written but **not yet applied** to the live database — Rule 11
+(CLAUDE.md) requires separate, explicit, action-naming permission
+before `psql`/`supabase db push`ing `supabase/migrations/20261010120000_
+age_verification.sql`. Nothing in this feature is reachable in
+production until `AGE_VERIFICATION_ENABLED=true`, which is also unset
+by default. See DECISIONS.md (2026-10-10) for the full report.
+
+**Three real gaps in Yoti's Age Verification API aren't resolvable from
+public documentation** (confirmed via live doc fetches this session,
+not from memory — see `lib/age-verification/yoti.ts`'s header comment
+for the exact citations and reasoning):
+- The `notification_url` webhook's payload field names.
+- The webhook's real signature-verification mechanism (header name,
+  algorithm, secret source). `verifyWebhook()` fails CLOSED
+  (`YOTI_WEBHOOK_SECRET` + a literal shared-secret header check) until
+  this is confirmed against a real Yoti Hub account — **do not loosen
+  this without that confirmation.**
+- The exact JSON key (if any) to request/confirm liveness during
+  session creation — omitted from the request body rather than guessed.
+
+The hosted-portal redirect URL (`https://age.yoti.com?sessionId=...&
+sdkId=...`) and the real result-status enum (`PENDING/IN_PROGRESS/FAIL/
+COMPLETE/ERROR/CANCELLED/EXPIRED`, translated in `mapYotiStatus()`)
+*were* confirmed from live docs — only the three items above remain
+open. **Nothing here has been exercised against a real Yoti sandbox
+session** — only `AGE_VERIFICATION_PROVIDER=mock` was exercised, via
+`/verify/mock/[sessionId]`'s local stand-in. Before setting
+`AGE_VERIFICATION_PROVIDER=yoti` in any real environment: get a Yoti
+Hub account, confirm the three gaps above, and run at least one real
+session end-to-end.
+
+**API-route age-verification guards (`requireAgeVerifiedApi`) were
+added to 24 of the 63 route files under `app/api/`** — every real
+content/action route a verified member would use (feed, posts,
+comments, likes, photo/avatar upload, profile edit, rooms, DMs,
+reports, ritual progress, invites, house-join, block/follow/review).
+Deliberately **not** added to: every `app/api/admin/*` route (already
+gated by `requireAdmin()`; age-gating an admin action would be
+nonsensical), auth routes (sign-in/out, MFA), `account/close`,
+`legal/reconsent`, `csp-report`, `email-capture`, `applications`,
+`waiting-list`/`waitlist`, `join/[token]`, `join/resolve-code`, and
+`profile/username-check` — all pre-membership, sign-out, or
+account-deletion paths the task's own A6 explicitly keeps open while
+unverified. Worth a second pass if a new member-facing route is added
+later without remembering this convention.
+
+**A pre-existing RLS bug was found while researching this feature's own
+RLS policy, not introduced by it, and was deliberately NOT fixed
+here** (out of scope for Phase A): `analytics_events_admin_read`
+(`supabase/migrations/20260726120000_analytics_events_rls.sql`) joins
+`public.users` directly inside the policy body to check `is_admin`.
+Since `users` itself has RLS enabled with zero SELECT policies
+(deny-all), that join is itself denied for the calling role, so this
+policy likely returns nothing for every admin, not just non-admins —
+the exact bug `20260923030000_fix_messages_select_policy.sql` already
+found and fixed for `messages`, just never re-checked on this other
+table. This migration's own new `age_verifications_admin_read` policy
+uses the SECURITY DEFINER `is_admin_caller()` function instead, to not
+repeat it. Flagged for the owner's awareness; fixing
+`analytics_events_admin_read` itself is a separate, standalone task.
