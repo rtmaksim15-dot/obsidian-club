@@ -18,7 +18,7 @@ export default async function HousesPage() {
   // minimal teaser instead of the real list, same shape as /vault's.
   if (!HOUSES_UI_ENABLED) {
     return (
-      <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
+      <main className="min-h-screen bg-ob-black px-6 pb-16 pt-4 text-ob-text">
         <div className="mx-auto max-w-2xl">
           <p className="text-label mb-2">Community</p>
           <h1 className="text-h1 mb-2">Houses</h1>
@@ -31,7 +31,7 @@ export default async function HousesPage() {
   const houses = await prisma.house.findMany({ orderBy: { name: "asc" } });
 
   return (
-    <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
+    <main className="min-h-screen bg-ob-black px-6 pb-16 pt-4 text-ob-text">
       <div className="mx-auto max-w-2xl">
         <p className="text-label mb-2">Community</p>
         <h1 className="text-h1 mb-10">Houses</h1>

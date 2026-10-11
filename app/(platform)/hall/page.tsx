@@ -187,7 +187,7 @@ export default async function HallPage() {
   );
 
   return (
-    <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
+    <main className="min-h-screen bg-ob-black px-6 pb-16 pt-4 text-ob-text">
       <div className="mx-auto max-w-2xl">
         {/* Nullable username (2026-09-25, see DECISIONS.md): the ritual
             gate above means an ordinary member can't reach /hall

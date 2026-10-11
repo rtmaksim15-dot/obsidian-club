@@ -184,7 +184,19 @@
     border: 1px solid var(--color-btn-border);
     border-radius: 2px;
     cursor: pointer;
+    outline: none;
     transition: border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.1s;
+  }
+  /* Nav v2 fix pass, item 2 follow-up (2026-10-11, see DECISIONS.md) —
+     same focus-visible-only gold outline as .nav-control, extended to
+     every button sitewide (not just navigation) at this one shared
+     rule, so no per-component change was needed to cover
+     "Vouch for someone" (already .btn-secondary) or any other button. */
+  .btn-primary:focus-visible,
+  .btn-secondary:focus-visible,
+  .btn-danger:focus-visible {
+    outline: 1px solid var(--color-gold);
+    outline-offset: 2px;
   }
   .btn-primary:hover,
   .btn-secondary:hover,

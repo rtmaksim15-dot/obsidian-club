@@ -1291,23 +1291,31 @@ through `ReportDetail.tsx`. `tsc`/`lint`/`build` all clean.
 ## Navigation v2 fix pass (2026-10-11)
 
 Full report in DECISIONS.md. Two things found while fixing this pass's
-named items, deliberately left alone because the task scoped each fix
-narrower than the underlying pattern:
+named items, deliberately left for a follow-up go-ahead rather than
+silently expanded into — **both since resolved, same day, on that
+go-ahead** (see DECISIONS.md's "spacing + focus-visible across
+platform" entry):
 
-**The `pt-20`/`py-16` double-top-padding bug (item 6) exists on ~19
-more platform pages**, not just the four named (`feed`,
-`notifications`, `vault`, `messages`): `hall`, `profile/[username]`,
-`profile/edit`, `posts/[id]`, `houses`, `houses/[slug]`, `keepsakes`,
-`members`, `codex`, `library`, `compose`, `account/security`, `rooms`,
-and the `/admin/*` pages all have the same `main className="min-h-
-screen bg-ob-black px-6 py-16 text-ob-text"` wrapper stacking with
-`PlatformShell.tsx`'s `pt-20`. Same one-line fix each time (`py-16` ->
-`pb-16 pt-4`) once there's a go-ahead to touch them.
+**The `pt-20`/`py-16` double-top-padding bug (item 6) existed on 16
+more platform pages** beyond the four originally named (`feed`,
+`notifications`, `vault`, `messages`): `hall`, `profile/[username]`
+(2 occurrences), `profile/edit`, `posts/[id]`, `houses` (2
+occurrences), `houses/[slug]`, `keepsakes`, `members`, `codex`,
+`library`, `compose`, `account/security`, `rooms`, and the three
+`/admin/*` pages (`invite-batches`, `invite-batches/[id]`, `rep`). All
+fixed with the same `py-16` -> `pb-16 pt-4` change. `ritual/*` and
+`antechamber` were deliberately left untouched throughout — they're
+reached before `fullAccess` is true, so `PlatformShell` never adds
+`pt-20` for them, and their original `py-16` is already correct.
 
-**The default blue focus ring is still showing on `.btn-primary`/
-`.btn-secondary`/`.btn-danger`, the MINE menu's Veil toggle switch,
-and its "Vouch for someone" button** (item 5 only asked for "nav
-controls," and those three are action buttons, not navigation — the
-new `.nav-control` class was scoped accordingly). A sitewide pass
-would need its own `outline: none` + `:focus-visible` rule added to
-the `.btn-*` block in `globals.css`, same pattern as `.nav-control`.
+**The default blue focus ring on `.btn-primary`/`.btn-secondary`/
+`.btn-danger` and the MINE menu's Veil toggle** is fixed at the shared
+style level: a `.btn-primary:focus-visible, .btn-secondary:focus-
+visible, .btn-danger:focus-visible` rule added directly to the
+existing button block in `globals.css` (same 1px gold outline, 2px
+offset, as `.nav-control`) — no component changes needed, since every
+button already uses one of those three classes, "Vouch for someone"
+included. The Veil toggle itself had no shared class to hook the fix
+onto, so it got `.nav-control` added to its own className (the CSS
+rule itself stays centralized; only that one usage needed a class
+added).

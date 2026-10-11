@@ -177,7 +177,7 @@ export default function MineMenu({
           aria-label="Veil"
           disabled={veilPending}
           onClick={toggleVeil}
-          className="relative h-6 w-11 rounded-full transition-colors"
+          className="nav-control relative h-6 w-11 rounded-full transition-colors"
           style={{ backgroundColor: veil ? "var(--color-accent)" : "var(--color-border)" }}
         >
           <span

@@ -2824,3 +2824,43 @@ and `/feed` still redirects an unauthenticated request with no server
 error. A real on-device pass (the founder's own iPhone Safari, which
 is what caught all nine issues in the first place) is the only way to
 confirm these visually.
+
+### 2026-10-11 — Spacing + focus-visible across platform
+
+Follow-up go-ahead to finish the two items the nav v2 fix pass
+deliberately flagged rather than expanded into on its own.
+
+**Top spacing, all remaining pages.** Re-grepped for the exact
+`min-h-screen bg-ob-black px-6 py-16 text-ob-text` wrapper across
+`app/(platform)/` before touching anything, to work from the real
+current list rather than the fix pass's own slightly-rounded "~19" —
+16 files, 18 occurrences (`houses/page.tsx` and
+`profile/[username]/page.tsx` each have two): `compose`, `houses`
+(×2), `posts/[id]`, `houses/[slug]`, `admin/invite-batches/[id]`,
+`codex`, `admin/invite-batches`, `admin/rep`, `library`, `keepsakes`,
+`profile/edit`, `members`, `profile/[username]` (×2),
+`account/security`, `hall`, `rooms`. Same mechanical change as
+`feed`/`notifications`/`vault` already got: `py-16` -> `pb-16 pt-4`.
+`ritual/*` and `antechamber` were re-confirmed (not just assumed) to
+still need their original `py-16` — grepped again after the change to
+verify they were the *only* five files still showing the old pattern,
+and that the new pattern's total count (22) matched exactly: the 4
+already fixed in the previous pass plus these 18.
+
+**Focus-visible, at the shared style level.** `.btn-primary`/
+`.btn-secondary`/`.btn-danger` gained their own `:focus-visible` rule
+in the same `globals.css` block that already defines them (`outline:
+none` added to the base rule, `outline: 1px solid var(--color-gold);
+outline-offset: 2px` added on `:focus-visible` only) — zero component
+changes, since "Vouch for someone" and every other button in the app
+already carries one of those three classes. The Veil toggle switch is
+the one exception: it had no shared class of its own to attach a rule
+to (just ad-hoc utility classes), so it got `.nav-control` added to
+its `className` — the rule itself stays defined once, centrally; only
+that single usage needed a class reference added, which is what "at
+the shared style level, not per component" asked for (not "zero
+markup touched anywhere").
+
+`npx tsc --noEmit`, `npx next lint`, `npm run build` all clean.
+Pushed to `origin/main` immediately after, per this go-ahead's own
+instruction — see the commit hash reported back in chat.

@@ -15,7 +15,7 @@ export default async function ProfileEditPage() {
   const avatarUrl = await resolveAvatarUrl(user.avatarUrl);
 
   return (
-    <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
+    <main className="min-h-screen bg-ob-black px-6 pb-16 pt-4 text-ob-text">
       <div className="mx-auto max-w-lg">
         <p className="text-label mb-2">Profile</p>
         <h1 className="text-h1 mb-10">Edit</h1>

@@ -80,7 +80,7 @@ export default async function HouseDetailPage({ params }: { params: { slug: stri
   );
 
   return (
-    <main className="min-h-screen bg-ob-black px-6 py-16 text-ob-text">
+    <main className="min-h-screen bg-ob-black px-6 pb-16 pt-4 text-ob-text">
       <div className="mx-auto max-w-2xl">
         <p className="text-label mb-2">House</p>
         <h1 className="text-h1 mb-2">{house.name}</h1>
