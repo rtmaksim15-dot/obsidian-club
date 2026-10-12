@@ -38,7 +38,11 @@ export default function ConfirmDialog({ title, confirmLabel, onConfirm, onCancel
       }}
     >
       <div className="w-full max-w-sm rounded-ob bg-ob-black p-6" style={{ border: "1px solid var(--color-border)" }}>
-        <p className="text-body">{title}</p>
+        {/* whitespace-pre-line (PWA hardening, Package 3, 2026-10-11,
+            see DECISIONS.md): a few admin confirms (e.g. ApplicationDetail's
+            approve/decline) pass a two-line message with a literal "\n\n" —
+            this renders that line break; a plain one-line title is unaffected. */}
+        <p className="text-body whitespace-pre-line">{title}</p>
         <div className="mt-6 flex justify-end gap-3">
           <button type="button" className="btn-secondary" onClick={onCancel} disabled={busy}>
             Cancel

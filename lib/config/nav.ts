@@ -10,3 +10,17 @@
 export function isDmThreadRoute(pathname: string): boolean {
   return pathname.startsWith("/messages/") && pathname !== "/messages/rules";
 }
+
+// PWA hardening, Package 3 (2026-10-11, see DECISIONS.md) — the four
+// destinations BottomTabBar.tsx's own ITEMS/TRAILING_ITEMS link to
+// (Library included even though it's currently hidden behind
+// LIBRARY_UI_ENABLED — the route still exists and still shouldn't grow
+// a back button the moment that flag flips). TopBar.tsx uses this to
+// decide whether to show its back button in place of the OC monogram:
+// a tab-bar root is reached by tapping a tab, not by drilling in, so
+// there's nothing above it to go back to.
+const BOTTOM_TAB_ROOT_PATHS = ["/feed", "/rooms", "/vault", "/library"];
+
+export function isBottomTabRoot(pathname: string): boolean {
+  return BOTTOM_TAB_ROOT_PATHS.includes(pathname);
+}

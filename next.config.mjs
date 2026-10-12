@@ -54,6 +54,17 @@ const nextConfig = {
           { key: "Content-Security-Policy-Report-Only", value: CSP_REPORT_ONLY },
         ],
       },
+      // PWA hardening, Package 3 (2026-10-11, see DECISIONS.md) — the
+      // whole update mechanism depends on registration.update() (called
+      // on focus/visibilitychange by PwaUpdateManager.tsx) actually
+      // fetching this deploy's real sw.js bytes rather than a browser-
+      // or CDN-cached older copy; no-cache forces that revalidation
+      // every time, same as a normal script, only without the implicit
+      // same-request-lifetime caching service worker scripts otherwise get.
+      {
+        source: "/sw.js",
+        headers: [{ key: "Cache-Control", value: "no-cache" }],
+      },
     ];
   },
 };

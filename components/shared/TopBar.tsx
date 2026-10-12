@@ -6,7 +6,9 @@ import { Menu, Search, MessageCircle, Bell } from "lucide-react";
 import LogoMark from "@/components/ui/LogoMark";
 import WorldDrawer, { type WorldDrawerProps } from "./WorldDrawer";
 import MineMenu, { type MineMenuProps } from "./MineMenu";
+import BackButton from "./BackButton";
 import { SEARCH_UI_ENABLED } from "@/lib/config/feature-flags";
+import { isBottomTabRoot } from "@/lib/config/nav";
 
 function Badge({ count }: { count: number }) {
   if (count <= 0) return null;
@@ -61,15 +63,26 @@ export default function TopBar({
     (mineMenuProps.username != null && pathname.startsWith(`/profile/${mineMenuProps.username}`)) ||
     pathname.startsWith("/keepsakes");
 
+  // PWA hardening, Package 3 (2026-10-11, see DECISIONS.md) — on a
+  // bottom-tab-bar root (reached by tapping a tab, nothing to go back
+  // to), the left slot stays the OC monogram; everywhere else it
+  // becomes a back button, since standalone mode has no browser chrome
+  // to fall back on.
+  const showBackButton = !isBottomTabRoot(pathname);
+
   return (
     <>
       <nav
         className="fixed inset-x-0 top-0 z-20 flex items-center justify-between border-b border-ob-border bg-ob-dark px-4 py-3"
         style={{ paddingTop: "max(env(safe-area-inset-top), 0.75rem)" }}
       >
-        <a href="/feed" aria-label="Feed" className="nav-control flex items-center">
-          <LogoMark size={30} />
-        </a>
+        {showBackButton ? (
+          <BackButton />
+        ) : (
+          <a href="/feed" aria-label="Feed" className="nav-control flex items-center">
+            <LogoMark size={30} />
+          </a>
+        )}
 
         <div className="flex items-center gap-4">
           <button

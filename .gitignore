@@ -13,6 +13,10 @@
 /.next/
 /out/
 
+# PWA service worker — generated at build time from scripts/sw-template.js
+# (see scripts/generate-sw.js, package.json's "postbuild"); never hand-edited.
+/public/sw.js
+
 # production
 /build
 

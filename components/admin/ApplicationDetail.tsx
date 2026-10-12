@@ -3,6 +3,7 @@
 import { forwardRef, useImperativeHandle, useState } from "react";
 import type { Application } from "./AdminConsole";
 import { formatAdminDateTime as formatDate } from "@/lib/admin/format-date";
+import ConfirmDialog from "@/components/shared/ConfirmDialog";
 
 export type ApplicationDetailHandle = {
   approve: () => void;
@@ -53,6 +54,16 @@ const ApplicationDetail = forwardRef<ApplicationDetailHandle, {
   const [holding, setHolding] = useState(false);
   const [holdReason, setHoldReason] = useState("");
   const [holdNote, setHoldNote] = useState("");
+  // Confirmed via ConfirmDialog.tsx, not window.confirm() (PWA
+  // hardening, Package 3, 2026-10-11, see DECISIONS.md) — iOS Safari
+  // suppresses window.confirm()/alert()/prompt() entirely in standalone
+  // (installed) mode, so Approve/Decline here previously did nothing
+  // on the founder's installed app. The A/H/D keyboard shortcuts below
+  // go through this same state (review() -> confirming -> the dialog's
+  // onConfirm -> performReview()) instead of calling the old
+  // window.confirm()-gated logic directly, so clicking and pressing A/D
+  // both now open the same confirmation step.
+  const [confirming, setConfirming] = useState<"approve" | "decline" | null>(null);
 
   const a = application;
   const name = a.name || a.email;
@@ -87,8 +98,12 @@ const ApplicationDetail = forwardRef<ApplicationDetailHandle, {
     }
   }
 
-  async function review(action: "approve" | "decline") {
-    if (!window.confirm(CONFIRM_MESSAGE[action](name))) return;
+  function review(action: "approve" | "decline") {
+    setConfirming(action);
+  }
+
+  async function performReview(action: "approve" | "decline") {
+    setConfirming(null);
     try {
       const now = new Date().toISOString();
       const body = action === "approve" ? { action, ageVerified: ageVerifiedChecked } : { action };
@@ -259,6 +274,16 @@ const ApplicationDetail = forwardRef<ApplicationDetailHandle, {
         <p className="text-caption mt-4" style={{ color: "var(--color-error)" }}>
           {error}
         </p>
+      ) : null}
+
+      {confirming ? (
+        <ConfirmDialog
+          title={CONFIRM_MESSAGE[confirming](name)}
+          confirmLabel={confirming === "approve" ? "Approve" : "Decline"}
+          busy={pending}
+          onConfirm={() => performReview(confirming)}
+          onCancel={() => setConfirming(null)}
+        />
       ) : null}
     </div>
   );

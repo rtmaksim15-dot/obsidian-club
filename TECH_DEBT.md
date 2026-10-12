@@ -1319,3 +1319,28 @@ included. The Veil toggle itself had no shared class to hook the fix
 onto, so it got `.nav-control` added to its own className (the CSS
 rule itself stays centralized; only that one usage needed a class
 added).
+
+## PWA hardening, Package 3 (2026-10-11)
+
+Full report in DECISIONS.md. Two things deliberately left unverified:
+
+**Admin console fixes (ConfirmDialog replacements, new header) weren't
+clicked through live.** Logging into the real admin account
+(`lord.obsidian.oc@gmail.com`) would touch real production state
+(the daily-login REP-streak side effect, a real auth session) without
+the specific action-naming go-ahead CLAUDE.md's rule 11 requires for a
+production account, and no `test-` prefixed admin account exists to
+use instead. Verified instead by code review, a grep proof that zero
+`window.confirm`/`alert`/`prompt`/`target="_blank"`/`window.open` calls
+remain live in `app/(platform)/admin/` or `components/admin/`, and
+`tsc`/`lint`/`build`/`npm test` passing. A real click-through (ideally
+on the founder's own installed app, the same way the original three
+findings were reported) is the only way to fully confirm.
+
+**The manifest's `start_url` is still `/hall`**, noticed while reading
+`public/manifest.json` for this package but out of scope for it —
+`/hall` was the old primary tab before Navigation v2 made `/feed` the
+primary destination (2026-10-10). Worth revisiting whether a freshly
+launched installed app should land on `/feed` instead, but that's a
+product decision, not something this package's own DONE WHEN criteria
+touched.

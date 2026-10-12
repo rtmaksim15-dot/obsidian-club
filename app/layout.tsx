@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Cinzel, Cormorant_Garamond, Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
 import { getAppUrl } from "@/lib/config/site-url";
+import PwaUpdateManager from "@/components/shared/PwaUpdateManager";
+import NavigationHistoryTracker from "@/components/shared/NavigationHistoryTracker";
 import "./globals.css";
 
 // Brand fonts (DESIGN.md §3). Cinzel — headings/brand; Cormorant — body; Inter — data/UI.
@@ -95,7 +97,9 @@ export default function RootLayout({
       <body
         className={`${cinzel.variable} ${cormorant.variable} ${inter.variable} antialiased`}
       >
+        <NavigationHistoryTracker />
         {children}
+        <PwaUpdateManager />
         {/* Vercel sets VERCEL=1 at build time only when actually deployed
             there; skip elsewhere so the script doesn't 404 in local/non-Vercel dev. */}
         {process.env.VERCEL ? <Analytics /> : null}

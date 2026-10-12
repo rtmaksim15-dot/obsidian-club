@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { formatAdminDateTime as formatDate } from "@/lib/admin/format-date";
+import ConfirmDialog from "@/components/shared/ConfirmDialog";
 
 // Item 1 (2026-09-17): read-only, count + newest first, no actions.
 //
@@ -59,6 +60,13 @@ function CaptureRow({ capture, onUpdate }: { capture: EmailCaptureRow; onUpdate:
   const [holding, setHolding] = useState(false);
   const [holdReason, setHoldReason] = useState("");
   const [holdNote, setHoldNote] = useState("");
+  // Confirmed via ConfirmDialog.tsx, not window.confirm() (PWA
+  // hardening, Package 3, 2026-10-11, see DECISIONS.md) — iOS Safari
+  // suppresses window.confirm()/alert()/prompt() entirely for a page
+  // running in standalone (installed, "Add to Home Screen") mode, so
+  // Accept/Decline here previously just did nothing on the founder's
+  // installed app — the root cause behind finding 3.
+  const [confirming, setConfirming] = useState<"approve" | "decline" | null>(null);
 
   const canDecide = capture.status === "new" || capture.status === "pending" || capture.status === "held";
 
@@ -79,8 +87,12 @@ function CaptureRow({ capture, onUpdate }: { capture: EmailCaptureRow; onUpdate:
     }
   }
 
-  async function review(action: "approve" | "decline") {
-    if (!window.confirm(CONFIRM_MESSAGE[action](capture.email))) return;
+  function review(action: "approve" | "decline") {
+    setConfirming(action);
+  }
+
+  async function performReview(action: "approve" | "decline") {
+    setConfirming(null);
     try {
       const json = await patch(action === "approve" ? { action, ageVerified: ageVerifiedChecked } : { action });
       onUpdate(capture.id, {
@@ -193,6 +205,16 @@ function CaptureRow({ capture, onUpdate }: { capture: EmailCaptureRow; onUpdate:
         <p className="text-caption mt-2" style={{ color: "var(--color-error)" }}>
           {error}
         </p>
+      ) : null}
+
+      {confirming ? (
+        <ConfirmDialog
+          title={CONFIRM_MESSAGE[confirming](capture.email)}
+          confirmLabel={confirming === "approve" ? "Accept" : "Decline"}
+          busy={pending}
+          onConfirm={() => performReview(confirming)}
+          onCancel={() => setConfirming(null)}
+        />
       ) : null}
     </li>
   );

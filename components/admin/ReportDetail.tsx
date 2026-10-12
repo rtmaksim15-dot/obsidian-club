@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { ReportRow } from "./AdminConsole";
 import { levelName } from "@/lib/rating/levels";
 import { formatAdminDateTime as formatDate } from "@/lib/admin/format-date";
+import ConfirmDialog from "@/components/shared/ConfirmDialog";
 
 type Action = "dismiss" | "review" | "preserve" | "remove" | "remove_image";
 
@@ -16,6 +17,14 @@ const CONFIRM_MESSAGE: Record<Action, string> = {
     "Remove this content and mark the report reviewed?\n\nIt will be soft-deleted (never hard-deleted) and shown to other members as removed by a moderator.",
   remove_image:
     "Remove this one image and mark the report reviewed?\n\nOnly the reported image is soft-deleted — the rest of the post (and any other images on it) stays exactly as it is.",
+};
+
+const CONFIRM_LABEL: Record<Action, string> = {
+  dismiss: "Dismiss",
+  review: "Mark Reviewed",
+  preserve: "Preserve & Unpublish",
+  remove: "Remove",
+  remove_image: "Remove Image",
 };
 
 // Zone 3 full depth (2026-09-11, see DECISIONS.md). Reuses the existing
@@ -40,6 +49,14 @@ export default function ReportDetail({
   const [dmContent, setDmContent] = useState<string | null>(null);
   const [dmLoading, setDmLoading] = useState(false);
   const [dmError, setDmError] = useState<string | null>(null);
+  // Confirmed via ConfirmDialog.tsx, not window.confirm() (PWA
+  // hardening, Package 3, 2026-10-11, see DECISIONS.md) — iOS Safari
+  // suppresses window.confirm()/alert()/prompt() entirely in standalone
+  // (installed) mode; this and "restoring" below cover this panel's
+  // two confirm sites (Dismiss/Review/Preserve/Remove/Remove Image, and
+  // Restore).
+  const [confirmingAction, setConfirmingAction] = useState<Action | null>(null);
+  const [confirmingRestore, setConfirmingRestore] = useState(false);
 
   const r = report;
   const canPreserve = r.targetType === "post" && r.isRedLine;
@@ -82,7 +99,7 @@ export default function ReportDetail({
   // stays here to see the "Already removed" note flip away, same as
   // any other detail field updating in place.
   async function restore() {
-    if (!window.confirm("Restore this content? It will be visible to members again.")) return;
+    setConfirmingRestore(false);
     setPending(true);
     setError(null);
     try {
@@ -98,8 +115,12 @@ export default function ReportDetail({
     }
   }
 
-  async function act(action: Action) {
-    if (!window.confirm(CONFIRM_MESSAGE[action])) return;
+  function act(action: Action) {
+    setConfirmingAction(action);
+  }
+
+  async function performAct(action: Action) {
+    setConfirmingAction(null);
     setPending(true);
     setError(null);
     try {
@@ -174,8 +195,14 @@ export default function ReportDetail({
             </p>
           ) : null}
           {r.target.contextHref ? (
-            <a href={r.target.contextHref} target="_blank" rel="noreferrer" className="text-caption mt-2 inline-block" style={{ color: "var(--color-accent)" }}>
-              View in context ↗
+            // Same-window navigation, not target="_blank" (PWA hardening,
+            // Package 3, 2026-10-11, see DECISIONS.md) — this always
+            // points at a page within this same app (a post/profile/room),
+            // and an installed standalone app has no browser chrome to
+            // manage a second window/tab with; opening one would strand
+            // the admin on a window they can't easily get back from.
+            <a href={r.target.contextHref} className="text-caption mt-2 inline-block" style={{ color: "var(--color-accent)" }}>
+              View in context →
             </a>
           ) : null}
           {r.targetType === "direct_message" && !r.target.isDeleted ? (
@@ -255,7 +282,7 @@ export default function ReportDetail({
             ) : null}
           </>
         ) : canRestore ? (
-          <button type="button" className="btn-primary" disabled={pending} onClick={restore}>
+          <button type="button" className="btn-primary" disabled={pending} onClick={() => setConfirmingRestore(true)}>
             Restore
           </button>
         ) : null}
@@ -265,6 +292,26 @@ export default function ReportDetail({
         <p className="text-caption mt-4" style={{ color: "var(--color-error)" }}>
           {error}
         </p>
+      ) : null}
+
+      {confirmingAction ? (
+        <ConfirmDialog
+          title={CONFIRM_MESSAGE[confirmingAction]}
+          confirmLabel={CONFIRM_LABEL[confirmingAction]}
+          busy={pending}
+          onConfirm={() => performAct(confirmingAction)}
+          onCancel={() => setConfirmingAction(null)}
+        />
+      ) : null}
+
+      {confirmingRestore ? (
+        <ConfirmDialog
+          title="Restore this content? It will be visible to members again."
+          confirmLabel="Restore"
+          busy={pending}
+          onConfirm={restore}
+          onCancel={() => setConfirmingRestore(false)}
+        />
       ) : null}
     </div>
   );

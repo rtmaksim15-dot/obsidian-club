@@ -2955,3 +2955,153 @@ markup touched anywhere").
 `npx tsc --noEmit`, `npx next lint`, `npm run build` all clean.
 Pushed to `origin/main` immediately after, per this go-ahead's own
 instruction — see the commit hash reported back in chat.
+
+### 2026-10-11 — PWA hardening (Package 3): auto-update, back navigation, admin standalone fixes
+
+Three founder-reported problems with the installed ("Add to Home
+Screen") app: stale builds after a deploy, legal pages trapping a
+standalone visitor with no way back, and unresponsive admin buttons.
+Full report in chat; summarized here for the record. Not pushed, per
+this package's own instruction.
+
+**Finding 1 — there was no service worker at all.** `next-pwa` was a
+`package.json` dependency but never wired into `next.config.mjs` —
+zero service worker, zero registration call, anywhere in the repo.
+Built one from scratch instead of fixing an existing one:
+`scripts/sw-template.js` (source, tracked) is stamped with the real
+`next build` BUILD_ID at build time by `scripts/generate-sw.js`
+(`package.json`'s new `postbuild` script) into `public/sw.js`, which
+is gitignored — its bytes have to change every deploy, since that's
+the only thing that makes a browser notice there's a new worker to
+install at all. Strategy: network-first for navigations (HTML always
+fresh when online; cache is a last-resort offline fallback only),
+cache-first for `/_next/static/` (safe — content-hashed filenames),
+versioned cache names (`oc-static-<buildId>`/`oc-pages-<buildId>`)
+cleaned up on `activate`. Never auto-`skipWaiting()` — waits for the
+visitor to tap "Refresh" on the new update bar
+(`components/shared/PwaUpdateManager.tsx`), which also checks for
+updates via `registration.update()` on focus/visibilitychange (not
+just load), and separately catches `ChunkLoadError` globally
+(`lib/pwa/chunk-error.ts`) for a tab that was already open across a
+deploy — one automatic hard reload, then stops (a sessionStorage flag
+prevents a loop). `/sw.js` gets its own `Cache-Control: no-cache`
+header in `next.config.mjs` so `registration.update()` always
+revalidates against the real file. The update-bar state machine (`lib/
+pwa/update-bar.ts`, "none"/"waiting"/"reloading") is pure and unit
+tested; empirically verified live against a production build
+(`next build && next start`) — registers, activates, claims the page
+(confirmed via `navigator.serviceWorker.controller`).
+
+**Finding 2 — legal pages had zero auth awareness.** `app/(legal)/
+layout.tsx` never called `getCurrentUser()` at all. Now: a `fullAccess`
+visitor (same definition `app/(platform)/layout.tsx` already used,
+extracted verbatim into `lib/auth/full-access.ts#computeFullAccess` so
+both layouts share one definition) gets the real member shell —
+`TopBar`, which now renders a back button in place of the OC monogram
+on any page that isn't a bottom-tab-bar root
+(`lib/config/nav.ts#isBottomTabRoot`: `/feed`, `/rooms`, `/vault`,
+`/library`) — instead of the public header. An authenticated-but-not-
+yet-`fullAccess` visitor (mid-ritual/antechamber) is deliberately
+treated the same as logged-out below: those pages already have their
+own persistent sign-out, and a half-populated TopBar (no invite
+allowance/Veil state to show yet) would contradict that existing
+design decision. Logged-out visitors keep the public header, now with
+an explicit "← Back" text link to `/`. `codex` needed no layout change
+— it was already under `(platform)`, so it already got the full shell;
+"Help" is a `mailto:` link in `WorldDrawer.tsx`, not a real page,
+nothing to wrap. `/hall`'s `getMemberShellData` Promise.all was also
+extracted verbatim into `lib/nav/shell-data.ts` so the legal layout
+doesn't duplicate it.
+
+**The back button's actual logic (`lib/navigation/back-target.ts`)
+turned out to need a specific design once checked against the
+codebase: this app has `next/link` nowhere — confirmed, zero imports
+across `app/` and `components/` — every internal link is a plain
+`<a>`, so every navigation is a full page load, never an SPA route
+change.** That ruled out the first design (tracking an "internal nav"
+flag by diffing `usePathname()` across renders — a fresh full-page
+load only ever sees its own single path, so a diff like that can never
+fire). Fixed with a read-then-write pair against `sessionStorage`,
+called once per page load by a new always-mounted
+`NavigationHistoryTracker.tsx` (root layout): read what the previous
+page already recorded as this page's own "can I go back" answer, then
+record this page's own visit for whichever page comes next.
+`history.back()` fires only once that flag says yes; otherwise
+`router.push("/feed")`. Verified live end to end against a production
+build: landing page (`canBack=0`, nothing to go back to) → clicked
+through to `/terms` (`canBack=1`) → the page's own "← Back" correctly
+targeted `/`, matching the logged-out case's own fixed destination (a
+plain footer/header link, not the dynamic `BackButton` — that one
+only renders inside TopBar for a `fullAccess` visitor, which this
+sandbox's no-authenticated-session constraint — same one noted in
+every other entry in this file — couldn't reach to click directly;
+its logic is unit tested instead, see below).
+
+**Finding 3 — admin's "old header" no longer exists in the code.**
+Grepped `components/admin/AdminConsole.tsx` for `<nav`/`<header`/
+`BottomNav`/`DesktopNav`/`TopBar`/`BottomTabBar`, and for the literal
+strings "Create Post"/"ADMIN" — zero matches. `DesktopNav.tsx`/
+`BottomNav.tsx` don't exist in the repo at all; they were already
+deleted when Navigation v2 shipped (2026-10-10). Admin pages are under
+`(platform)`, so they already get only the current global `TopBar`/
+`BottomTabBar`, same as every other platform page. **If the founder is
+still seeing the old header on his installed app, that's the SAME root
+cause as finding 1** (a stale cached build, now fixed by the service
+worker above) — not a separate leftover to clean up in the code. Added
+a real header anyway, since the task explicitly asked for one
+regardless: OC wordmark · "Admin Console" · "← Back to the club" (→
+`/feed`), in `AdminConsole.tsx`.
+
+**The "unresponsive buttons" themselves, independent of finding 1:**
+every `window.confirm()` in `components/admin/` (`EmailCapturesPanel.
+tsx`, `ApplicationDetail.tsx`, `ReportDetail.tsx` ×2) replaced with the
+existing `ConfirmDialog.tsx` (already the established pattern —
+`TokenDetail.tsx` was already using it, with a comment citing exactly
+this reasoning from 2026-09-30); `ReportDetail.tsx`'s one `target=
+"_blank"` link (View in context) changed to same-window navigation.
+`ConfirmDialog.tsx`'s title paragraph gained `whitespace-pre-line` (a
+few of these confirms pass a two-line `"...\n\n..."` message — every
+existing single-line caller is unaffected). Grepped afterward for
+`window\.confirm|window\.alert|window\.prompt|target="_blank"|window\.
+open\(` across `app/(platform)/admin/` and `components/admin/`,
+excluding comment lines — zero live matches (the only hits left are
+comments documenting the fix). **Root cause, stated plainly: iOS
+WebKit silently no-ops `window.confirm()`/`alert()`/`prompt()` for a
+page running in `display-mode: standalone` (installed, "Add to Home
+Screen") — a well-documented platform limitation, not something that
+reproduces in desktop Chrome at all** (Chrome's `display-mode` is only
+a CSS media feature there; it doesn't change what the JS dialog APIs
+actually do). The task asked for reproduction via Chrome DevTools
+standalone emulation specifically — honestly: the browser-automation
+tooling available in this session doesn't expose CDP's display-mode
+media-feature emulation, and even if it did, Chrome wouldn't reproduce
+an iOS-only suppression. `ConfirmDialog.tsx` is a fully custom, non-
+native UI, so it works identically in every environment including iOS
+standalone mode regardless of the precise reproduction mechanism — the
+grep proof above is what stands behind "fixed," not a Chrome repro.
+CSV/QR exports (`app/(platform)/admin/invite-batches/[id]/page.tsx`)
+were already a plain `<a download>` against a server route sending
+`Content-Disposition: attachment` — already same-window-safe, no Blob/
+`window.open` code existed to fix.
+
+**Not verified live (admin console specifically)**: same sandbox
+constraint as the rest of this project's work, with one additional
+reason this time — the admin account (`lord.obsidian.oc@gmail.com`) is
+the founder's real account, and logging into it would touch real
+production state (`touchDailyLogin`'s REP-streak side effect, a real
+auth session) without the specific go-ahead Rule 11 requires for a
+production account's data. No `test-` prefixed admin account existed
+to use instead, and creating one wasn't asked for. The admin-specific
+fixes above are verified by code review, the grep proof, and `tsc`/
+`lint`/`build`/`npm test` passing — not by clicking the actual buttons
+in standalone mode.
+
+New tests: `lib/navigation/back-target.test.ts` (5 — the pure decision
+plus the `sessionStorage` read-then-write pair against a minimal
+in-memory mock, since `vitest.config.ts`'s `node` environment has no
+real `sessionStorage`), `lib/pwa/update-bar.test.ts` (6), `lib/pwa/
+chunk-error.test.ts` (7) — 94 tests total, all passing. `npx tsc
+--noEmit`, `npx next lint` (one pre-existing, unrelated warning on
+`AdminConsole.tsx`'s `moveSelection` dependency — not introduced by
+this package), `npm run build` all clean. Committed locally, not
+pushed, per this package's own instruction.

@@ -12,6 +12,7 @@ import CommandPalette from "./CommandPalette";
 import EmailCapturesPanel, { type EmailCaptureRow } from "./EmailCapturesPanel";
 import { levelName } from "@/lib/rating/levels";
 import { formatAdminDateTime } from "@/lib/admin/format-date";
+import LogoMark from "@/components/ui/LogoMark";
 
 export type Zone = "applications" | "people" | "arbitration" | "invitations" | "security";
 export type Filter = "pending" | "held" | "failedSend" | "notAgeVerified" | "acceptedNotJoined" | null;
@@ -461,7 +462,23 @@ export default function AdminConsole({
           renders exactly as an overlay; nothing here changes for it. */}
       <div className="mx-auto max-w-4xl lg:flex lg:max-w-6xl lg:items-start lg:gap-8">
         <div className="lg:min-w-0 lg:flex-1">
-          <p className="text-label mb-6">Admin Console</p>
+          {/* PWA hardening, Package 3 (2026-10-11, see DECISIONS.md) —
+              its own clearly-branded header, separate from the global
+              TopBar (which already renders above this page and already
+              has its own back button here, per lib/config/nav.ts). Not
+              a reinstatement of the old pre-nav-v2 header (that one's
+              gone from the codebase entirely — see DECISIONS.md) but a
+              deliberate, explicit "you're in the admin console, here's
+              how to leave" for a zone with real destructive actions. */}
+          <div className="mb-6 flex items-center justify-between border-b border-ob-border pb-4">
+            <div className="flex items-center gap-2">
+              <LogoMark size={20} />
+              <span className="text-label">Admin Console</span>
+            </div>
+            <a href="/feed" className="nav-control text-caption" style={{ color: "var(--color-text-secondary)" }}>
+              ← Back to the club
+            </a>
+          </div>
 
           <StatusBar counts={counts} activeZone={zone} activeFilter={filter} onSelect={selectStat} />
 

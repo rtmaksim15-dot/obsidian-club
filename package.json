@@ -6,6 +6,7 @@
     "dev": "next dev",
     "prebuild": "npm run check:legal",
     "build": "next build",
+    "postbuild": "node scripts/generate-sw.js",
     "start": "next start",
     "lint": "next lint",
     "postinstall": "prisma generate",

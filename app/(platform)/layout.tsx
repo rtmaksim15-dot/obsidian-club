@@ -1,14 +1,9 @@
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import { needsLegalReconsent } from "@/lib/legal/reconsent";
 import { needsAgeVerification } from "@/lib/age-verification/gate";
-import { isRitualComplete } from "@/lib/auth/ritual";
-import { getDoorsState, bypassesDoors } from "@/lib/config/doors";
-import { getUnreadDmCount } from "@/lib/dm/unread";
-import { getUnreadNotificationCount } from "@/lib/notifications/unread";
-import { getVeilEnabled } from "@/lib/profile/veil";
-import { resolveAvatarUrl } from "@/lib/storage/resolve-media";
+import { computeFullAccess } from "@/lib/auth/full-access";
+import { getMemberShellData } from "@/lib/nav/shell-data";
 import TopBar from "@/components/shared/TopBar";
 import BottomTabBar from "@/components/shared/BottomTabBar";
 import PlatformShell from "@/components/shared/PlatformShell";
@@ -42,21 +37,13 @@ export default async function PlatformLayout({ children }: { children: React.Rea
   // Desktop nav gap (2026-09-12) — DesktopNav's five destinations are
   // exactly the pages the ritual gate (feed/compose/members/hall) and
   // the doors gate (same four) bounce a non-admin member back from
-  // while incomplete/waiting. `fullAccess` mirrors those pages' own gate
-  // logic so the bar only ever appears once it can't dead-end: admins
-  // always pass (same founder exception as those pages), everyone else
-  // needs both ritual.complete and doors open. Mid-ritual and
-  // antechamber members keep their existing sign-out (ritual/layout.tsx,
+  // while incomplete/waiting. `fullAccess` (lib/auth/full-access.ts,
+  // extracted 2026-10-11 for app/(legal)/layout.tsx to share — see
+  // DECISIONS.md) mirrors those pages' own gate logic so the bar only
+  // ever appears once it can't dead-end. Mid-ritual and antechamber
+  // members keep their existing sign-out (ritual/layout.tsx,
   // antechamber/page.tsx) instead of a second one from this bar.
-  //
-  // Launch preview (2026-09-18, see DECISIONS.md): a PREVIEW_USER_IDS
-  // account is not an admin exception — it still has to finish the
-  // ritual like a real member — it only skips the doors half of the
-  // check, via the same bypassesDoors() every gated page now uses.
-  let fullAccess = false;
-  if (user) {
-    fullAccess = user.isAdmin || ((await isRitualComplete(user)) && (bypassesDoors(user) || !getDoorsState().active));
-  }
+  const fullAccess = user ? await computeFullAccess(user) : false;
 
   // Navigation v2 (Phase B, 2026-10-10, see DECISIONS.md) — TopBar and
   // BottomTabBar replace DesktopNav/BottomNav entirely, on EVERY
@@ -67,37 +54,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
   // their own persistent sign-out on those pages (ritual/layout.tsx,
   // antechamber/page.tsx) and showing them "Invitations: you hold N"
   // or a Veil toggle before they're actually inside doesn't make sense.
-  let navData: {
-    avatarUrl: string | null;
-    unreadDmCount: number;
-    unreadNotificationCount: number;
-    title: string | null;
-    inviteAllowance: number;
-    hasOutstandingMemberInvite: boolean;
-    veilEnabled: boolean;
-  } | null = null;
-
-  if (fullAccess) {
-    const [avatarUrl, unreadDmCount, unreadNotificationCount, profile, memberInviteTokens, veilEnabled] =
-      await Promise.all([
-        resolveAvatarUrl(user!.avatarUrl),
-        getUnreadDmCount(user!.id),
-        getUnreadNotificationCount(user!.id),
-        prisma.userProfile.findUnique({ where: { userId: user!.id }, select: { title: true } }),
-        prisma.inviteToken.findMany({ where: { source: "member", inviterId: user!.id }, select: { redeemedAt: true } }),
-        getVeilEnabled(user!.id),
-      ]);
-
-    navData = {
-      avatarUrl,
-      unreadDmCount,
-      unreadNotificationCount,
-      title: profile?.title ?? null,
-      inviteAllowance: user!.inviteAllowance,
-      hasOutstandingMemberInvite: memberInviteTokens.some((t) => !t.redeemedAt),
-      veilEnabled,
-    };
-  }
+  const navData = fullAccess ? await getMemberShellData(user!) : null;
 
   return (
     <>
