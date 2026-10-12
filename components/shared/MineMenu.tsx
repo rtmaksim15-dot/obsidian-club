@@ -6,6 +6,7 @@ import { Lock } from "lucide-react";
 import SideSheet from "./SideSheet";
 import SignOutButton from "./SignOutButton";
 import { CIRCLES_UI_ENABLED, SEAL_UI_ENABLED, BOUNDARIES_UI_ENABLED } from "@/lib/config/feature-flags";
+import { formatInvitationCount } from "@/lib/invitations/format";
 
 export type MineMenuProps = {
   displayName: string;
@@ -139,11 +140,7 @@ export default function MineMenu({
       {BOUNDARIES_UI_ENABLED ? <Row href="/boundaries">My Boundaries</Row> : <SoonRow>My Boundaries</SoonRow>}
 
       <SectionTitle>Invitations</SectionTitle>
-      <p className="text-body">
-        {inviteAllowance > 0
-          ? `You hold ${inviteAllowance} ${inviteAllowance === 1 ? "invitation" : "invitations"}.`
-          : "No invitations remain."}
-      </p>
+      <p className="text-body">{formatInvitationCount(inviteAllowance)}</p>
       {!hasOutstandingMemberInvite && inviteAllowance > 0 ? (
         <div className="mt-2">
           <button

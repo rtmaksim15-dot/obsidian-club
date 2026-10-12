@@ -98,9 +98,9 @@ function buildSessionBody() {
   };
 }
 
-type YotiStatus = "PENDING" | "IN_PROGRESS" | "FAIL" | "COMPLETE" | "ERROR" | "CANCELLED" | "EXPIRED";
+export type YotiStatus = "PENDING" | "IN_PROGRESS" | "FAIL" | "COMPLETE" | "ERROR" | "CANCELLED" | "EXPIRED";
 
-interface YotiResultResponse {
+export interface YotiResultResponse {
   status: YotiStatus;
   method?: string;
   age?: number;
@@ -128,7 +128,9 @@ function mapYotiMethod(method: string | undefined): SessionResult["method"] {
 // "passed" when at least one method explicitly says `allowed: true`;
 // everything else — including an ambiguous COMPLETE with no readable
 // signal — fails closed to "failed" rather than risking a false pass.
-function mapYotiStatus(result: YotiResultResponse): AgeVerificationResultStatus {
+// Exported for yoti.test.ts (Package 2 reconcile, 2026-10-11, see
+// DECISIONS.md) — pure function, no behavior change.
+export function mapYotiStatus(result: YotiResultResponse): AgeVerificationResultStatus {
   switch (result.status) {
     case "PENDING":
     case "IN_PROGRESS":
