@@ -3105,3 +3105,54 @@ chunk-error.test.ts` (7) — 94 tests total, all passing. `npx tsc
 `AdminConsole.tsx`'s `moveSelection` dependency — not introduced by
 this package), `npm run build` all clean. Committed locally, not
 pushed, per this package's own instruction.
+
+### 2026-10-11 — PWA follow-up: SW kill switch + manifest start_url
+
+Two additions on top of Package 3, then pushed.
+
+**SW kill switch.** `NEXT_PUBLIC_SW_ENABLED` (new env var, unset =
+enabled — only the literal string `"false"` disables it; decision
+logic in `lib/pwa/sw-config.js`, deliberately plain `.js` rather than
+`.ts` so `scripts/generate-sw.js` — a plain `node` script, no tsx —
+can `require()` it with zero build step, while
+`components/shared/PwaUpdateManager.tsx` imports the same file via
+`tsconfig.json`'s existing `allowJs`). When disabled:
+`scripts/generate-sw.js` emits `scripts/sw-killswitch-template.js`
+instead of the real service worker — on `activate`, it deletes every
+cache, calls `self.registration.unregister()`, then
+`client.navigate(client.url)` on every open window client, and (unlike
+the real worker) calls `self.skipWaiting()` immediately in `install`
+rather than waiting for a visitor to confirm, since this is urgent,
+unattended cleanup, not a routine update. `PwaUpdateManager.tsx`
+registers nothing at all when disabled — not even the kill-switch
+script itself — relying instead on the browser's own periodic update
+check for an *already-registered* real service worker, which
+`/sw.js`'s existing `Cache-Control: no-cache` header (`next.config.mjs`)
+forces to actually revalidate instead of serving a cached copy.
+
+**Emergency procedure**, for when a bad service worker (a caching bug,
+a bad network-first navigation, anything serving the installed app
+something wrong) needs to be pulled: (1) set
+`NEXT_PUBLIC_SW_ENABLED=false` in Vercel's production environment
+variables; (2) redeploy (Vercel env var changes need a new deploy to
+take effect — this doesn't hot-apply to the already-running build);
+(3) every installed app with the old, real service worker still
+registered picks up the self-destruct version the next time its
+browser revalidates `/sw.js` (on navigation, forced by the no-cache
+header above — no fixed wait, but typically the very next time the app
+is opened) and cleans itself back to "no service worker at all," the
+same baseline as before this package existed. To re-enable later: unset
+`NEXT_PUBLIC_SW_ENABLED` (or set it to anything other than `"false"`)
+and redeploy again — a fresh real service worker installs normally
+from there, exactly as if this were the first deploy of Package 3.
+
+**manifest.json's `start_url`**: `/hall` → `/feed` — `/hall` was the
+old primary tab before Navigation v2 made `/feed` the primary
+destination (2026-10-10); flagged as leftover tech debt in this
+package's own first pass, now fixed.
+
+New test: `lib/pwa/sw-config.test.ts` (3 — unset defaults to enabled,
+`"false"` disables, any other value including a typo stays enabled).
+`tsc`/`lint`/`npm test`/`npm run build` all clean. Pushed to
+`origin/main` immediately after, per this go-ahead's own instruction
+— see the commit hash reported back in chat.

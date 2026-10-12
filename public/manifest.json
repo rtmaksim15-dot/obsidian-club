@@ -2,7 +2,7 @@
   "name": "Obsidian Club",
   "short_name": "Obsidian",
   "description": "Private Membership Platform",
-  "start_url": "/hall",
+  "start_url": "/feed",
   "display": "standalone",
   "background_color": "#0A0908",
   "theme_color": "#0A0908",

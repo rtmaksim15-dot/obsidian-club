@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { nextUpdateBarState, type UpdateBarState } from "@/lib/pwa/update-bar";
 import { isChunkLoadError, shouldAutoReloadForChunkError } from "@/lib/pwa/chunk-error";
+import { isServiceWorkerEnabled } from "@/lib/pwa/sw-config";
 
 const CHUNK_RELOAD_FLAG_KEY = "oc-chunk-reload-attempted";
 
@@ -30,7 +31,9 @@ function handlePossibleChunkError(error: unknown) {
 // once a new worker is waiting, and separately catches ChunkLoadError
 // globally (unrelated to the service worker itself — see
 // lib/pwa/chunk-error.ts) for a tab that was already open across a
-// deploy and tries a stale client-side navigation.
+// deploy and tries a stale client-side navigation. Registers nothing
+// at all when NEXT_PUBLIC_SW_ENABLED=false (the emergency kill switch
+// — see lib/pwa/sw-config.ts and DECISIONS.md).
 export default function PwaUpdateManager() {
   const [state, setState] = useState<UpdateBarState>("none");
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
@@ -51,6 +54,14 @@ export default function PwaUpdateManager() {
   }, []);
 
   useEffect(() => {
+    // SW kill switch (2026-10-11, see DECISIONS.md): when disabled,
+    // this registers nothing at all — not even the self-destruct
+    // worker scripts/generate-sw.js emits for that case. An
+    // already-installed app with a real, older service worker cleans
+    // itself up on its own via the browser's own periodic/no-cache-
+    // forced revalidation of /sw.js (next.config.mjs), not via this
+    // code calling register() again.
+    if (!isServiceWorkerEnabled(process.env.NEXT_PUBLIC_SW_ENABLED)) return;
     if (!("serviceWorker" in navigator)) return;
 
     let registration: ServiceWorkerRegistration | null = null;
