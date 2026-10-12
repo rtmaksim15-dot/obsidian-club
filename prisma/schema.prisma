@@ -520,18 +520,30 @@ model Post {
 // field, since image deletion isn't a red-line-adjacent action the way
 // message/comment removal can be.
 model PostImage {
-  id          String   @id @default(uuid()) @db.Uuid
+  // id/createdAt annotations and the relation's onUpdate below describe
+  // what's actually live (reconcile-rep, 2026-10-11, see DECISIONS.md) —
+  // this table was created by hand-written SQL, not `prisma migrate
+  // dev`, so its real DB-level default/type/FK-action differ slightly
+  // from what this field's bare declaration would otherwise imply. No
+  // database change made or needed; schema-only, to match reality.
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   postId      String   @map("post_id") @db.Uuid
   position    Int
   storagePath String   @map("storage_path")
   width       Int?
   height      Int?
   isDeleted   Boolean  @default(false) @map("is_deleted")
-  createdAt   DateTime @default(now()) @map("created_at")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([postId, position])
+  // Declared explicitly (reconcile-rep, 2026-10-11, see DECISIONS.md)
+  // to match a real, already-live standalone index the hand-written
+  // migration created — technically redundant with the unique index
+  // above (postId is already its leading column), but it exists live
+  // and this package doesn't touch the database, so the schema says so.
+  @@index([postId])
   @@map("post_images")
 }
 
@@ -1234,7 +1246,11 @@ model ModerationAction {
   // already-created row is exempt from.
   preserveIndefinitely Boolean  @default(false) @map("preserve_indefinitely")
 
-  admin User? @relation(fields: [adminId], references: [id])
+  // onDelete/onUpdate made explicit (reconcile-rep, 2026-10-11, see
+  // DECISIONS.md) to match the real, already-live FK action from this
+  // column's hand-written `ALTER COLUMN ... DROP NOT NULL` migration —
+  // schema-only, no database change.
+  admin User? @relation(fields: [adminId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([targetType, targetId])
   @@map("moderation_actions")
@@ -1263,7 +1279,11 @@ enum AgeVerificationStatus {
 // ModerationAction.actorLabel above. Never stores DOB, images, or any
 // raw provider payload — only the outcome.
 model AgeVerification {
-  id                String                  @id @default(uuid()) @db.Uuid
+  // Same reconcile-rep schema-only fix as PostImage above (2026-10-11,
+  // see DECISIONS.md) — id/createdAt/completedAt annotations and the
+  // relation's onDelete/onUpdate describe the real, already-live
+  // DB-level default/type/FK-action from this table's hand-written SQL.
+  id                String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId            String                  @map("user_id") @db.Uuid
   provider          AgeVerificationProvider
   // Unique per attempt — also how the webhook/return-page result lookup
@@ -1282,10 +1302,10 @@ model AgeVerification {
   // actually checked against.
   threshold         Int
   attemptNumber     Int                     @map("attempt_number")
-  createdAt         DateTime                @default(now()) @map("created_at")
-  completedAt       DateTime?               @map("completed_at")
+  createdAt         DateTime                @default(now()) @map("created_at") @db.Timestamptz
+  completedAt       DateTime?               @map("completed_at") @db.Timestamptz
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([userId, createdAt])
   @@index([status])
