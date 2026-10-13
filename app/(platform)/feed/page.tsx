@@ -6,6 +6,8 @@ import { getDoorsState, bypassesDoors } from "@/lib/config/doors";
 import { getFeedPosts } from "@/lib/feed/query";
 import { getVeilEnabled } from "@/lib/profile/veil";
 import FeedList from "@/components/shared/FeedList";
+import NewcomerPathCard from "@/components/shared/NewcomerPathCard";
+import { syncNewcomerPath, allStepsComplete, filledSegments, isDismissed } from "@/lib/newcomer-path/status";
 
 /**
  * Feed (`/feed`) — CLAUDE.md's (2026-07-05) nav tab 1: "community posts,
@@ -49,9 +51,24 @@ export default async function FeedPage() {
 
   const [{ posts, hasMore }, veilEnabled] = await Promise.all([getFeedPosts(user), getVeilEnabled(user.id)]);
 
+  // Newcomer Path (Package 5, Phase A, 2026-10-14, see DECISIONS.md) —
+  // admins skip this entirely, same exception as the ritual/Doors gates
+  // above: an admin never actually completes the ritual (isAdmin bypasses
+  // it outright), so "crossed the threshold" never applies to begin with.
+  const newcomerPath = user.isAdmin ? null : await syncNewcomerPath(user.id);
+  const newcomerPathDone = newcomerPath ? allStepsComplete(newcomerPath.completion) : true;
+
   return (
     <main className="min-h-screen bg-ob-black px-6 pb-16 pt-4 text-ob-text">
       <div className="mx-auto max-w-2xl">
+        {newcomerPath && (!newcomerPathDone || newcomerPath.justCompleted) ? (
+          <NewcomerPathCard
+            completion={newcomerPath.completion}
+            filled={filledSegments(newcomerPath.completion)}
+            initiallyDismissed={isDismissed(newcomerPath.settings)}
+            justCompleted={newcomerPath.justCompleted}
+          />
+        ) : null}
         <FeedList
           initialPosts={posts}
           initialHasMore={hasMore}

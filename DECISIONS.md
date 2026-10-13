@@ -3600,3 +3600,114 @@ Final `prisma migrate diff --from-url ... --to-schema-datamodel
 prisma/schema.prisma --script`: **"-- This is an empty migration."**
 `schema.prisma`'s drift fixes committed together with this entry
 (schema-only — no further database change).
+
+### 2026-10-14 — Package 5, Phase A: Newcomer Path
+
+**No migration needed** — same situation as Package 4's Phase A.
+Every input the four steps need already exists: `User.avatarUrl`/
+`.bio` (B1), `UserProfile.settings.boundaries`'s mere presence (B2,
+Package 4 Phase A), `UserPractice` rows with `kind: "limit"` (B3,
+Package 4 Phase B), `Message` rows in the newcomers room (B4, pre-
+existing). REP goes through the existing ledger
+(`lib/rep/ledger.ts#awardRep`, `rep_history`) with four new
+`REASON_CATALOG` entries (`lib/rep/config.ts`) — pure TS config, no
+schema change. Dismiss-until / completion-acknowledged / the
+grandfather-baseline marker all live on the same `UserProfile.settings`
+JSON field, nested under a new `newcomerPath` key (read-merge-write,
+CLAUDE.md rule 9 — same pattern as Veil/Boundaries/Practices-
+visibility). "Migration(s) written, not applied" in this task's own
+DONE WHEN doesn't apply to this phase; only Phase B needs one.
+
+**A2 — REP amount.** 20 per step (80 total for the whole path), the
+task's own explicit ASSUMPTION, implemented as a single constant
+(`min: 20, max: 20` on each of the four new `REASON_CATALOG` entries —
+`awardRep` requires an explicit value per reason, there's no separate
+"amount constant" concept in this engine beyond the catalog entry
+itself). **Against current title thresholds**
+(`lib/rep/config.ts#REP_TITLES`: Initiate 0 → Keeper 1000 → Steward
+2500 → Warden 5000 → Master 10000): 80 REP is 8% of the distance from
+Initiate to Keeper — the path alone never moves anyone's title.
+**Against this catalog's own adjacent entries**: every other
+onboarding-shaped reason already in it is priced at 100
+(`profile_verified`, `profile_complete`, `first_community_intro`) —
+5x this path's 20-per-step. Not reconciled; implemented exactly as
+instructed and flagged here, same as Phase A's own rate-limit-number
+discrepancy in Package 4.
+
+**A1/step 4 overlap with the Initiation Ritual, worth knowing.**
+`lib/auth/ritual.ts#isRitualComplete` already requires "introduce
+yourself in the newcomers' room" (`Message` count > 0 in that room) as
+one of its five completion criteria — and finishing the ritual is a
+hard prerequisite for ever reaching `/feed` at all (every non-admin
+gets redirected to `/ritual` otherwise). So step 4 ("Speak in the
+Newcomers' Hall") is, by construction, **already true for 100% of
+anyone who can see the card in the first place** — it was never a
+real "step to complete" post-release, only ever a pre-filled
+checkbox. Implemented literally as specified (same underlying check
+the ritual already uses) rather than inventing a second, different
+newcomers-room condition not asked for; flagged rather than silently
+"fixed."
+
+**A3 — the endowed segment.** 5 total segments: segment 1 ("You
+crossed the threshold") is a pure UI constant, always filled — nothing
+to compute, since reaching `/feed` at all already proves ritual
+completion. Segments 2–5 are the four steps. `lib/newcomer-path/
+core.ts#filledSegments` = `1 + (completed step count)`.
+
+**A5 — backfill + no retro-award.** `lib/newcomer-path/core.ts
+#decideNewcomerPathUpdate` is the whole rule as one pure function: the
+first time it ever runs for a given member (`settings.newcomerPath.
+baselineComputedAt` unset), every step that's *already* true gets
+added to `awardedSteps` with **zero** `awardRep` calls — grandfathered
+in silently; only a step that transitions false→true on some *later*
+run actually triggers an award. Called from `/feed`'s own render (not
+a separate backfill script — matches A5's own "on first render"
+wording literally), awaited inline rather than fire-and-forget, since
+the same render also needs the fresh completion state to draw the
+card. Admins are skipped entirely (same exception as the ritual/Doors
+gates on this same page) — an admin never actually completes the
+ritual, so "crossed the threshold" doesn't apply.
+
+Deliberately **pull-based** (computed fresh on every `/feed` render),
+not push-triggered from each action's own save route — a departure
+from this codebase's existing pattern (`checkProfileCompleteBonus` is
+called from `PATCH /api/profile` itself). Four different data sources
+(profile, boundaries, practices, messages) would otherwise need the
+same completion-check logic duplicated across four separate API
+routes; centralizing it where the card is actually shown was judged
+simpler and no less correct, at the cost of a step's REP landing on
+the member's *next* `/feed` visit rather than the instant they finish
+it — immaterial for a non-time-sensitive reward at this app's scale.
+
+**Live count, read-only query (no data touched)**: of the 5 non-
+founder users, one (**"Тома2"**, `status: "inactive"` — the task's own
+named example test account, B6's concern, not filtered by this phase
+at all) was excluded from "active" scope; of the remaining **4 active
+members (Max, Andrii, Toma, Oll), all 4 currently see the card** —
+none has saved Boundaries or named a limit yet (both features are
+brand new, shipped this same week in Package 4), even though two of
+the four (Toma, Oll) already clear the profile step (avatar + ≥40-char
+About) and all four already clear the intro step (confirming the
+ritual-overlap finding above).
+
+**What shipped**: `lib/newcomer-path/core.ts` (pure: step rules,
+segment math, the award/backfill decision, dismiss-expiry check),
+`lib/newcomer-path/status.ts` (`"server-only"` wrapper: `syncNewcomerPath`
+reads real data + calls `awardRep` + persists settings;
+`dismissNewcomerPath` for "Later"), `components/shared/
+NewcomerPathCard.tsx`, `app/api/newcomer-path/dismiss/route.ts`, wired
+into `app/(platform)/feed/page.tsx` above `FeedList`.
+
+**Tests** (`lib/newcomer-path/core.test.ts`, 13): each of the four
+triggers independently (including the profile step's AND-not-OR
+avatar/bio-length rule), the endowed segment at zero and full
+completion, first-run grandfathering with zero award (both with
+everything already true and with nothing true yet), a later run
+awarding exactly what's newly true, true no-op re-runs (same object
+reference returned — the caller can skip the write), an
+already-awarded step never re-firing, and the 24h dismiss-expiry
+check in both directions.
+
+`npx tsc --noEmit`, `npx next lint` (same one pre-existing
+`AdminConsole.tsx` warning), `npm test` (142 passing), `npm run build`
+all clean. Committed locally, not pushed.

@@ -147,6 +147,19 @@ export const REASON_CATALOG: Record<string, ReasonDef> = {
   first_community_intro: { category: "ACTIVITY", min: 100, max: 100 }, // unchanged — already matched
   invitee_level_2: { category: "INVITED", min: 200, max: 200 }, // was 500 — "invitee reached Level II" (the reviews/level system, not titleLevel); now matches invitee_reached_keeper above
   invitee_active_90d: { category: "INVITED", min: 200, max: 200 }, // was 1000 — trigger window (90 days, lib/rating/referral-lifecycle.ts) unchanged here; package 2 reconciles the 90d/30d naming
+
+  // Newcomer Path (Package 5, Phase A, 2026-10-14, see DECISIONS.md) —
+  // the four steps in lib/newcomer-path/core.ts#STEPS. ASSUMPTION per
+  // this task's own instruction: 20 REP each (80 total for the whole
+  // path). Flagged in that package's report: this is 5x lower than the
+  // adjacent, thematically-similar onboarding reasons already in this
+  // catalog (profile_complete=100, first_community_intro=100) and only
+  // 8% of the distance from Initiate to Keeper (1000) — a deliberate
+  // number taken as given, not reconciled against those siblings.
+  newcomer_profile: { category: "ACTIVITY", min: 20, max: 20 },
+  newcomer_boundaries: { category: "ACTIVITY", min: 20, max: 20 },
+  newcomer_limits: { category: "ACTIVITY", min: 20, max: 20 },
+  newcomer_intro: { category: "ACTIVITY", min: 20, max: 20 },
 };
 
 export type ReasonCode = keyof typeof REASON_CATALOG;
