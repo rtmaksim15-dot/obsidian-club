@@ -36,6 +36,9 @@ export default function PersonDetail({
   const [removeAvatarReason, setRemoveAvatarReason] = useState("");
   const [confirmingRemoveAvatar, setConfirmingRemoveAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
+  // Clean Hall, B6 (Package 5, Phase B, 2026-10-14, see DECISIONS.md)
+  const [testPending, setTestPending] = useState(false);
+  const [testError, setTestError] = useState<string | null>(null);
 
   async function addNote() {
     const text = noteDraft.trim();
@@ -76,6 +79,27 @@ export default function PersonDetail({
       setError(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
       setPending(false);
+    }
+  }
+
+  // Clean Hall, B6 (Package 5, Phase B, 2026-10-14, see DECISIONS.md)
+  async function toggleIsTest() {
+    const next = !person.isTest;
+    setTestPending(true);
+    setTestError(null);
+    try {
+      const res = await fetch(`/api/admin/members/${person.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isTest: next }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || "Something went wrong.");
+      onUpdate(person.id, { isTest: next });
+    } catch (e) {
+      setTestError(e instanceof Error ? e.message : "Something went wrong.");
+    } finally {
+      setTestPending(false);
     }
   }
 
@@ -226,6 +250,27 @@ export default function PersonDetail({
           onCancel={() => setConfirmingRemoveAvatar(false)}
         />
       ) : null}
+
+      {/* Clean Hall, B6 (Package 5, Phase B, 2026-10-14, see
+          DECISIONS.md) — a non-admin never sees this account (or
+          anything it authored) anywhere; this account's own data is
+          never touched by the toggle itself. */}
+      <div className="mt-6 border-t border-ob-border pt-4">
+        <p className="text-label mb-2">Test Account</p>
+        <p className="text-caption mb-3" style={{ color: "var(--color-text-secondary)" }}>
+          {person.isTest
+            ? "Hidden from every non-admin member — room chats, feed, member lists, and this profile."
+            : "Visible to everyone, like any real member."}
+        </p>
+        <button type="button" className="btn-secondary" disabled={testPending} onClick={toggleIsTest}>
+          {testPending ? "…" : person.isTest ? "Unmark as test account" : "Mark as test account"}
+        </button>
+        {testError ? (
+          <p className="text-caption mt-2" style={{ color: "var(--color-error)" }}>
+            {testError}
+          </p>
+        ) : null}
+      </div>
 
       {person.invitedByName || person.inviteeNames.length > 0 || person.partnerName ? (
         <div className="mt-6 border-t border-ob-border pt-4">

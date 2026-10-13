@@ -105,6 +105,7 @@ export type Person = {
   reputation: number;
   ageVerified: boolean;
   ageVerifiedAt: string | null;
+  isTest: boolean;
   // A9 — Age Verification Gate, Phase A (2026-10-10, see DECISIONS.md):
   // latest attempt's provider/method, total attempt count, and when
   // that latest attempt was made — null/0 for a member with no
@@ -564,7 +565,19 @@ export default function AdminConsole({
               {zone === "people" &&
                 visiblePeople.map((p) => (
                   <li key={p.id} className="card cursor-pointer" onClick={() => setOpenId(p.id)}>
-                    <p className="text-data">{p.displayName}</p>
+                    <p className="text-data">
+                      {p.displayName}
+                      {/* Clean Hall, B6 (Package 5, Phase B, 2026-10-14,
+                          see DECISIONS.md) */}
+                      {p.isTest ? (
+                        <span
+                          className="text-caption ml-2 rounded-ob border px-1.5 py-0.5 uppercase tracking-brand"
+                          style={{ borderColor: "var(--color-warning)", color: "var(--color-warning)" }}
+                        >
+                          Test
+                        </span>
+                      ) : null}
+                    </p>
                     <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
                       REP {p.rep} · {levelName(p.level)} · {p.ageVerified ? "Age-verified" : "Not age-verified"}
                     </p>

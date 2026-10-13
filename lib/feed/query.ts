@@ -3,6 +3,7 @@ import type { PostType, User } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { resolveAvatarUrls, resolvePostImages } from "@/lib/storage/resolve-media";
 import { getBlockedEitherWayUserIds } from "@/lib/moderation/block";
+import { getTestAccountUserIds } from "@/lib/moderation/test-accounts";
 
 export const FEED_TYPES: PostType[] = ["post", "story"];
 export const FEED_PAGE_SIZE = 20;
@@ -14,7 +15,7 @@ export const feedPostSelect = {
   type: true,
   likesCount: true,
   createdAt: true,
-  author: { select: { id: true, username: true, displayName: true, avatarUrl: true, level: true, rep: true } },
+  author: { select: { id: true, username: true, displayName: true, avatarUrl: true, level: true, rep: true, isTest: true } },
   house: { select: { id: true, name: true, slug: true } },
   _count: { select: { comments: true } },
   // Multi-photo posts, Phase C (2026-10-10, see DECISIONS.md).
@@ -34,12 +35,17 @@ export const feedPostSelect = {
  * ceiling on the whole feed).
  */
 export async function getFeedPosts(user: User, { skip = 0 }: { skip?: number } = {}) {
-  const [memberships, blockedUserIds] = await Promise.all([
+  const [memberships, blockedUserIds, testAccountIds] = await Promise.all([
     prisma.houseMembership.findMany({
       where: { userId: user.id },
       select: { house: { select: { id: true } } },
     }),
     getBlockedEitherWayUserIds(user.id),
+    // Clean Hall, B6 (Package 5, Phase B, 2026-10-14, see DECISIONS.md)
+    // — a non-admin viewer never sees a test account's posts at all;
+    // an admin sees everything (the query below skips this exclusion
+    // for them entirely, not just re-including the ids).
+    user.isAdmin ? Promise.resolve([]) : getTestAccountUserIds(),
   ]);
   const joinedHouseIds = memberships.map((m) => m.house.id);
 
@@ -54,7 +60,7 @@ export async function getFeedPosts(user: User, { skip = 0 }: { skip?: number } =
     minLevel: { lte: user.level },
     type: { in: FEED_TYPES },
     OR: [{ houseId: null }, { houseId: { in: joinedHouseIds } }],
-    authorId: { notIn: blockedUserIds },
+    authorId: { notIn: [...blockedUserIds, ...testAccountIds] },
   };
 
   const [posts, total] = await Promise.all([

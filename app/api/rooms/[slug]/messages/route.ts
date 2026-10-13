@@ -5,6 +5,7 @@ import { requireAgeVerifiedApi } from "@/lib/age-verification/gate";
 import { canAccessRoom } from "@/lib/rating/room-access";
 import { resolveAvatarUrl, resolveAvatarUrls } from "@/lib/storage/resolve-media";
 import { checkRateLimit } from "@/lib/security/rate-limit";
+import { getTestAccountUserIds } from "@/lib/moderation/test-accounts";
 import { errCode } from "@/lib/utils/safe-error";
 
 const PAGE_SIZE = 50;
@@ -24,7 +25,7 @@ const messageSelect = {
   mediaUrl: true,
   replyToId: true,
   createdAt: true,
-  user: { select: { id: true, username: true, displayName: true, avatarUrl: true, level: true } },
+  user: { select: { id: true, username: true, displayName: true, avatarUrl: true, level: true, isTest: true } },
 };
 
 // GET /api/rooms/:slug/messages — latest PAGE_SIZE messages, oldest-first
@@ -51,8 +52,12 @@ export async function GET(_request: Request, { params }: { params: { slug: strin
     return NextResponse.json({ error: "This room isn't open to you yet." }, { status: 403 });
   }
 
+  // Clean Hall, B6 (Package 5, Phase B, 2026-10-14, see DECISIONS.md) —
+  // a non-admin never sees a test account's messages at all.
+  const testAccountIds = user.isAdmin ? [] : await getTestAccountUserIds();
+
   const messages = await prisma.message.findMany({
-    where: { roomId: room.id },
+    where: { roomId: room.id, userId: { notIn: testAccountIds } },
     orderBy: { createdAt: "desc" },
     take: PAGE_SIZE,
     select: messageSelect,

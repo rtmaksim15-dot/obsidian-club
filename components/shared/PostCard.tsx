@@ -20,7 +20,7 @@ export type FeedPost = {
   images: CarouselImage[];
   likesCount: number;
   createdAt: string | Date;
-  author: { id: string; username: string | null; displayName: string; avatarUrl: string | null; level: number; rep: number };
+  author: { id: string; username: string | null; displayName: string; avatarUrl: string | null; level: number; rep: number; isTest?: boolean };
   house: { id: string; name: string; slug: string } | null;
   likes: { userId: string }[];
   _count: { comments: number };
@@ -108,6 +108,17 @@ export default function PostCard({
             // of a link to a broken/empty URL.
             <span className="text-data">{post.author.displayName}</span>
           )}
+          {/* Clean Hall, B6 (Package 5, Phase B, 2026-10-14, see
+              DECISIONS.md) — admin-only, never shown to an ordinary
+              member (who never sees a test account's posts at all). */}
+          {viewerIsAdmin && post.author.isTest ? (
+            <span
+              className="text-caption rounded-ob border px-1.5 py-0.5 uppercase tracking-brand"
+              style={{ borderColor: "var(--color-warning)", color: "var(--color-warning)" }}
+            >
+              Test
+            </span>
+          ) : null}
           <span className="text-caption" style={{ color: "var(--color-text-muted)" }}>
             {timestamp}
           </span>

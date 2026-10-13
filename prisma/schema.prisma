@@ -278,6 +278,13 @@ model User {
   repExempt            Boolean     @default(false) @map("rep_exempt")
   status               UserStatus  @default(pending)
   isAdmin              Boolean     @default(false) @map("is_admin") // not in ARCHITECTURE.md's User table — see ADR-0011
+  // Clean Hall, B6 (Package 5, Phase B, 2026-10-14, see DECISIONS.md) —
+  // admin-only flag, toggled in the People zone. For a non-admin
+  // viewer, this account and everything it authored is excluded from
+  // room chats/feed/member lists/profiles; an admin still sees it, with
+  // a small "TEST" tag. Never deletes or alters the account's data —
+  // see that entry for exactly what this does and doesn't touch.
+  isTest               Boolean     @default(false) @map("is_test")
   role                 MemberRole? // chosen at onboarding, CLAUDE.md's registration flow — see ADR-0015
   interests            String[]    @default([]) // chosen at onboarding; not yet used to rank the Feed — see TECH_DEBT.md
   currentStreak        Int         @default(0) @map("current_streak") // consecutive days logged in, for the daily-login REP bonus
@@ -438,6 +445,11 @@ model Room {
   houseId     String?  @map("house_id") @db.Uuid
   isActive    Boolean  @default(true) @map("is_active")
   createdAt   DateTime @default(now()) @map("created_at")
+  // Clean Hall, B4 (Package 5, Phase B, 2026-10-14, see DECISIONS.md) —
+  // a pinned note rendered at the top of the room's chat, styled as a
+  // Lord Obsidian note, not a chat message (no author, no reply, not
+  // itself a Message row). Admin-editable only. Null = nothing pinned.
+  pinnedNote  String?  @map("pinned_note")
 
   house    House?    @relation(fields: [houseId], references: [id])
   messages Message[]

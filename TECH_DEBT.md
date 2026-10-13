@@ -1403,3 +1403,30 @@ exposure), but the fully correct fix is a database-level partial
 unique index — `unique(sender_id, recipient_id) where status =
 'pending'` — which needs its own explicit rule-11 go-ahead (a schema
 change) rather than being bundled into an infrastructure bug fix.
+
+## Package 5, Phase B — Clean Hall (2026-10-14)
+
+Full report in DECISIONS.md.
+
+**A member can't delete their own room message.** `app/api/admin/
+messages/[id]/route.ts` was already admin-only with "no member-facing
+equivalent" by its own comment, before this package touched it — B3's
+"Delete for own/admin" only implemented the admin half, since a
+genuine self-delete action doesn't exist anywhere to reuse (this
+phase's own instruction was "no new moderation logic"). A member
+wanting a message gone today has to ask an admin.
+
+**No database-level dedupe on the newcomers'-room pinned note across
+rooms**, and no UI yet for an admin to set one on a room *other* than
+newcomers (the field and the route work for any room id; only the
+newcomers room got seed data, and the only place "Edit pinned word"
+is reachable is from inside that room's own chat — an admin visiting
+a different active room would see the same control there too, just
+with nothing pre-filled).
+
+**`is_test` is unexercised against a real database** — same situation
+as every migration this session: written, not applied. No query
+against the new column, and no RLS-relevant behavior change (it's an
+ordinary column on an existing table, not a new one — nothing new to
+add to `scripts/check-rls.ts`'s own concerns), has actually run
+against Postgres yet.

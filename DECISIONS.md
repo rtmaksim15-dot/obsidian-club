@@ -3711,3 +3711,140 @@ check in both directions.
 `npx tsc --noEmit`, `npx next lint` (same one pre-existing
 `AdminConsole.tsx` warning), `npm test` (142 passing), `npm run build`
 all clean. Committed locally, not pushed.
+
+### 2026-10-14 — Package 5, Phase B: Clean Hall + test accounts
+
+Migration **written, NOT applied** (`supabase/migrations/
+20261014120000_newcomer_path_clean_hall.sql`) — awaiting explicit
+rule-11 go-ahead. Two columns, purely additive, confirmed via `prisma
+migrate diff --from-url ... --to-schema-datamodel prisma/schema.prisma
+--script`: `rooms.pinned_note` (nullable) and `users.is_test` (not
+null, default false) — no new tables this time, so none of Package
+4 Phase B's id-default/timestamp/FK-onUpdate drift class applies; the
+diff came back clean on the first try. The migration also **seeds**
+the newcomers room's `pinned_note` with the task's own exact text (not
+a placeholder) — every other room's stays null until an admin sets one.
+
+**B1/B2 — grouping, time, day separators.** `lib/rooms/chat-
+grouping.ts` (pure, used directly from `RoomChat.tsx` — a client
+component, since "Today"/"Yesterday" are inherently relative to the
+viewer's own local clock): `groupConsecutiveMessages` measures the
+5-minute threshold from the *previous message in the same run*, not
+the group's first message — a steady trickle one message every 4
+minutes stays one block indefinitely, the way a real chat client
+groups them, rather than hard-splitting every 5 minutes regardless of
+actual gaps. Day labels use the `"en-GB"` locale specifically —
+`"en-US"` renders `"October 12"` (month before day), which doesn't
+match the task's own `"12 October"` example; `"en-GB"` does.
+
+**B1 — "Title."** Read as the level-name system already surfacing
+elsewhere in this app (`lib/rating/levels.ts#levelName`,
+`LEVELS_UI_ENABLED=true` on `/hall`/`/profile`), not the separate REP
+title system (`lib/rep/config.ts#REP_TITLES`, keyed by `titleLevel`,
+not currently displayed anywhere — only the raw REP number is, under
+`REP_NUMBER_ENABLED`). Both happen to share "Initiate" at their first
+tier, which is what the task's own `"Toma · Initiate"` example shows
+either way — not a coincidence that resolved the ambiguity, just
+confirmed it doesn't matter for that one example.
+
+**B3 — two real gaps between the task's framing and what's actually
+in this codebase, both flagged rather than silently built around:**
+
+1. **"Hide for me" doesn't exist as an action anywhere** (`grep`
+   confirmed zero hits for any shape of it before this phase). The
+   task's own instruction is "use existing actions, no new moderation
+   logic" — implemented as a **pure client-side, localStorage-only
+   filter** (a `Set` of hidden message ids, persisted per-browser, no
+   server write, no new table, no new API route): this is a personal
+   view filter, not a moderation action, so it doesn't contradict "no
+   new moderation logic" the way a new server-side hide mechanism
+   would have.
+2. **A member deleting their own room message has no existing action
+   to reuse.** `app/api/admin/messages/[id]/route.ts`'s own comment
+   says so explicitly: "no member-facing equivalent." "Delete for
+   own/admin" is implemented as **admin-only** (`ContentMenu.tsx`
+   gained a new `deleteMessageId` prop wired to that exact existing
+   route — a new prop plumbing an *existing* server action into a
+   shared UI component, not new moderation logic); self-delete for an
+   ordinary member is not implemented, since building it would mean
+   writing a genuinely new capability, the opposite of this phase's
+   own instruction.
+
+The always-visible "···" is gone from room chat specifically (not
+changed globally in `ContentMenu.tsx` — Posts/Comments/DMs/Profiles
+keep their existing always-visible trigger; changing that everywhere
+was a bigger, unrequested risk than this phase needed to take).
+Revealed on **hover** (desktop, plain CSS `group-hover`, zero JS) or
+**long-press** (touch, a 500ms timer via `onTouchStart`/`onTouchEnd`/
+`onTouchMove`) — in both cases this *reveals the existing trigger
+button*, which the visitor then taps/clicks to actually open the
+Report/Delete menu, rather than the long-press/hover itself
+force-opening the dropdown (`ContentMenu`'s own `open` state is
+internal, not exposed to a parent — forcing it open from outside would
+have meant a bigger change to a component four other surfaces share).
+Explicit right-click-to-open was not wired in separately: the task
+phrases "right-click/hover-button (desktop)" as alternatives, and
+hovering to reveal the already-functional trigger satisfies that
+without needing to intercept and suppress the browser's own
+context menu (which would also block normal text-selection/copy
+behavior on message text).
+
+**B4 — pinned note.** `Room.pinnedNote`, admin-only
+(`PATCH /api/admin/rooms/[id]/pinned-note`, logs a `ModerationAction`),
+rendered by `components/shared/PinnedNote.tsx` above `RoomChat` in the
+page, styled as a quiet italic gold-text block (not a `Message` row —
+no avatar, no author, no reply affordance) with a small "Edit pinned
+word" control for an admin, inline in the room itself rather than
+tucked into the admin console, so an admin sees exactly what members
+see while changing it.
+
+**B5 — header link.** Replaced "Members →" (→ `/members`) with "All
+rooms →" (→ `/rooms`), shown only when more than one room is active —
+`/rooms` itself already redirects straight back to the single room
+when `rooms.length === 1` (confirmed in that page's own code/comment),
+so a link to it in that case would go nowhere new. `/members` stays
+reachable from `MessagesInbox.tsx`'s own "Find members" link (the only
+other place that linked to it) — not orphaned.
+
+**B6 — test accounts.** `User.isTest`, admin-only toggle (People zone
+detail — `PATCH /api/admin/members/[id]` gained a third action
+alongside the existing `ageVerified`/`removeAvatar` ones, same route,
+same pattern), `lib/moderation/test-accounts.ts#getTestAccountUserIds`
+(same shape as `lib/moderation/block.ts#getBlockedEitherWayUserIds` —
+a query's own `where` clause excludes the whole set directly). Applied
+to: the feed (`lib/feed/query.ts`), room chats (both `GET /api/rooms/
+:slug/messages` and the room page's own initial SSR fetch), the
+members directory, and profile pages (`notFound()` — the task's own
+"404-style 'Not found'" wording, not a literal 404 since the row
+genuinely exists). **"search/suggestions" — not applicable**: no
+search feature exists in this codebase at all
+(`SEARCH_UI_ENABLED=false`, confirmed zero `/search` route). A small
+"TEST" tag (admin-only — `viewerIsAdmin && isTest`) was added
+everywhere a test account's name already renders for an admin:
+`PostCard`, room chat, the members directory, the profile page itself,
+and both the admin People row list and its detail view. Never deletes
+or alters a test account's own data — every exclusion is query-level
+(`notIn`) or a `notFound()`, nothing is ever written to or removed
+from the account.
+
+**Live check (read-only, no data touched)**: **"Тома2"
+(`c0bf1643-70d8-4a3d-a84a-c6bdf27fdbfe`) is `member_number` 4** —
+the task's own named example test account, `status: "inactive"`
+already (unrelated to this phase's own flag). **No account was marked
+`is_test` by this work** — the task's own explicit instruction; the
+flag defaults `false` for every existing row, same as any new column
+with a default.
+
+**Tests** (`lib/rooms/chat-grouping.test.ts` 11, `lib/moderation/
+test-accounts-core.test.ts` 3 — 14 new, 156 total): the exact grouping
+boundary (4:59 inside a block, 5:01 starts a new one, measured from the
+previous message not the group's first), an author change always
+splitting regardless of elapsed time, empty input, all three day-label
+cases (Today/Yesterday/older) plus `isSameDay` across a midnight
+boundary, the 24-hour time formatter, and the `is_test` visibility rule
+for both a member and an admin viewer (plus confirming a real account
+is never hidden from anyone).
+
+`npx tsc --noEmit`, `npx next lint` (same one pre-existing
+`AdminConsole.tsx` warning), `npm test` (156 passing), `npm run build`
+all clean. Committed locally, not pushed.

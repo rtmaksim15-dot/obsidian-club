@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/auth/require-admin";
 import { logModerationAction } from "@/lib/moderation/log";
 import { MIN_MEMBER_AGE } from "@/lib/legal/eligibility";
 
-type Body = { ageVerified?: boolean; removeAvatar?: boolean; removeAvatarReason?: string };
+type Body = { ageVerified?: boolean; removeAvatar?: boolean; removeAvatarReason?: string; isTest?: boolean };
 
 // PATCH /api/admin/members/:id — toggle Age Verification on an existing
 // member (2026-08-03). Field first, no enforcement gate yet — see
@@ -56,6 +56,23 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       targetType: "user",
       targetId: member.id,
       note: reason,
+    });
+    return NextResponse.json({ ok: true });
+  }
+
+  // Clean Hall, B6 (Package 5, Phase B, 2026-10-14, see DECISIONS.md) —
+  // a third, distinct action: marks/unmarks a "Test account." Never
+  // deletes or alters anything else about the account — it only flips
+  // this one flag, which every non-admin-facing query then uses to
+  // exclude the account (and everything it authored) from its results.
+  if (typeof body.isTest === "boolean") {
+    await prisma.user.update({ where: { id: params.id }, data: { isTest: body.isTest } });
+    await logModerationAction({
+      adminId: admin.id,
+      action: "member.is_test_changed",
+      targetType: "user",
+      targetId: member.id,
+      note: `isTest: ${member.isTest} -> ${body.isTest}`,
     });
     return NextResponse.json({ ok: true });
   }

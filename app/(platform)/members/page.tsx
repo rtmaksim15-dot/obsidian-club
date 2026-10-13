@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getRitualStatus } from "@/lib/auth/ritual";
 import { getDoorsState, bypassesDoors } from "@/lib/config/doors";
 import { resolveAvatarUrls } from "@/lib/storage/resolve-media";
+import { getTestAccountUserIds } from "@/lib/moderation/test-accounts";
 
 /**
  * Members (`/members`) — OBSIDIAN_ROADMAP_v3.1 "Members and Follows."
@@ -29,10 +30,14 @@ export default async function MembersPage() {
   // antechamber instead of real content while doors.active.
   if (!bypassesDoors(user) && getDoorsState().active) redirect("/antechamber");
 
+  // Clean Hall, B6 (Package 5, Phase B, 2026-10-14, see DECISIONS.md) —
+  // a non-admin never sees a test account in the directory at all.
+  const testAccountIds = user.isAdmin ? [] : await getTestAccountUserIds();
+
   const rawMembers = await prisma.user.findMany({
-    where: { status: "active" },
+    where: { status: "active", id: { notIn: testAccountIds } },
     orderBy: { joinedAt: "asc" },
-    select: { id: true, username: true, displayName: true, avatarUrl: true, bio: true },
+    select: { id: true, username: true, displayName: true, avatarUrl: true, bio: true, isTest: true },
   });
 
   // Private storage (task 2, 2026-09-23, see DECISIONS.md).
@@ -60,7 +65,17 @@ export default async function MembersPage() {
                   )}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-data">{m.displayName}</p>
+                  <p className="text-data">
+                    {m.displayName}
+                    {user.isAdmin && m.isTest ? (
+                      <span
+                        className="text-caption ml-2 rounded-ob border px-1.5 py-0.5 uppercase tracking-brand"
+                        style={{ borderColor: "var(--color-warning)", color: "var(--color-warning)" }}
+                      >
+                        Test
+                      </span>
+                    ) : null}
+                  </p>
                   {m.bio ? (
                     <p className="text-caption truncate" style={{ color: "var(--color-text-muted)" }}>
                       {m.bio}

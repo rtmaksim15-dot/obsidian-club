@@ -44,6 +44,15 @@ type Props = {
   // this UI-level restriction just keeps the option from ever showing
   // for a single image at all, matching this fix pass's own spec).
   deleteImage?: { postId: string; imageId: string };
+  // Clean Hall, B3 (Package 5, Phase B, 2026-10-14, see DECISIONS.md) —
+  // admin-only room-message delete, wired to the existing admin-only
+  // soft-delete route (app/api/admin/messages/[id]/route.ts, which
+  // already had "no member-facing equivalent" — a regular member
+  // deleting their OWN message has no existing action to reuse, so
+  // that part of "Delete for own/admin" isn't implemented; see
+  // DECISIONS.md). Only ever passed by a caller that already confirmed
+  // the viewer is an admin (RoomChat.tsx).
+  deleteMessageId?: string;
 };
 
 /**
@@ -65,11 +74,12 @@ export default function ContentMenu({
   blockUserId,
   blockInitialBlocked,
   deleteImage,
+  deleteMessageId,
 }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [reporting, setReporting] = useState(false);
-  const [confirming, setConfirming] = useState<"delete" | "block" | "delete_image" | null>(null);
+  const [confirming, setConfirming] = useState<"delete" | "block" | "delete_image" | "delete_message" | null>(null);
   const [busy, setBusy] = useState(false);
   const [blocked, setBlocked] = useState(blockInitialBlocked ?? false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -124,6 +134,23 @@ export default function ContentMenu({
     router.refresh();
   }
 
+  function handleDeleteMessage() {
+    if (!deleteMessageId || busy) return;
+    setOpen(false);
+    setConfirming("delete_message");
+  }
+
+  async function performDeleteMessage() {
+    if (!deleteMessageId) return;
+    setBusy(true);
+    setConfirming(null);
+    const res = await fetch(`/api/admin/messages/${deleteMessageId}`, { method: "DELETE" });
+    setBusy(false);
+    if (!res.ok) return;
+    if (onDeleted) onDeleted();
+    else router.refresh();
+  }
+
   async function performBlock() {
     if (!blockUserId) return;
     setBusy(true);
@@ -152,7 +179,7 @@ export default function ContentMenu({
     setConfirming("block");
   }
 
-  if (!canReport && !deletePostId && !blockUserId && !deleteImage) return null;
+  if (!canReport && !deletePostId && !blockUserId && !deleteImage && !deleteMessageId) return null;
 
   return (
     <div className="relative" ref={rootRef}>
@@ -210,6 +237,18 @@ export default function ContentMenu({
               Delete this image
             </button>
           ) : null}
+          {deleteMessageId ? (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={handleDeleteMessage}
+              disabled={busy}
+              className="block w-full px-3 py-2 text-left text-caption"
+              style={{ color: "var(--color-btn-border)" }}
+            >
+              Delete
+            </button>
+          ) : null}
           {canReport ? (
             <button
               type="button"
@@ -259,6 +298,15 @@ export default function ContentMenu({
           confirmLabel="Remove"
           busy={busy}
           onConfirm={performDeleteImage}
+          onCancel={() => setConfirming(null)}
+        />
+      ) : null}
+      {confirming === "delete_message" ? (
+        <ConfirmDialog
+          title="Delete this message? This can't be undone."
+          confirmLabel="Delete"
+          busy={busy}
+          onConfirm={performDeleteMessage}
           onCancel={() => setConfirming(null)}
         />
       ) : null}

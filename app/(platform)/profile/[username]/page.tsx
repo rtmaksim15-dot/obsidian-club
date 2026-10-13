@@ -70,6 +70,13 @@ export default async function ProfilePage({ params }: { params: { username: stri
   const viewer = await getCurrentUser();
   const isOwnProfile = viewer?.id === user.id;
 
+  // Clean Hall, B6 (Package 5, Phase B, 2026-10-14, see DECISIONS.md) —
+  // a test account's profile is unreachable for anyone but an admin or
+  // the account itself ("404-style 'Not found'" — the task's own exact
+  // wording — not a real 404, since the row genuinely exists; same
+  // not-found() call this page already uses when the row truly doesn't).
+  if (user.isTest && !isOwnProfile && !viewer?.isAdmin) notFound();
+
   // Member protection mechanics (pre-launch legal package, 2026-08-09):
   // a block is mutual in effect — neither side sees the other's
   // content. Checked before any other query runs, so a blocked
@@ -347,7 +354,17 @@ export default async function ProfilePage({ params }: { params: { username: stri
           className={`avatar h-24 w-24 ${LEVELS_UI_ENABLED && !isFounder(user.id) ? `avatar-level-${user.level}` : ""}`}
         />
 
-        <h1 className="text-h1 mt-6">{user.displayName}</h1>
+        <h1 className="text-h1 mt-6">
+          {user.displayName}
+          {viewer?.isAdmin && user.isTest ? (
+            <span
+              className="text-caption ml-2 rounded-ob border px-1.5 py-0.5 align-middle uppercase tracking-brand"
+              style={{ borderColor: "var(--color-warning)", color: "var(--color-warning)" }}
+            >
+              Test
+            </span>
+          ) : null}
+        </h1>
         <p className="text-data" style={{ color: "var(--color-text-secondary)" }}>
           @{user.username}
         </p>
