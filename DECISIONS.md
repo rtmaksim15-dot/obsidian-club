@@ -3506,3 +3506,97 @@ Committed as "pkg4 follow-ups." `npx tsc --noEmit`, `npx next lint`
 (same one pre-existing `AdminConsole.tsx` warning), `npm test` (129
 passing), `npm run build` all clean. Not pushed yet — see the next
 entry for the migration apply + push that follow this same go-ahead.
+
+### 2026-10-13 — Package 4, Phase B migration applied live
+
+Backup first: `obsidian-club-backup-2026-10-13T15-07-16-717Z.json`,
+622,183 bytes, `~/obsidian-backups/`, perms 600, confirmed outside any
+git tree (same method as 2026-10-11 — raw `$queryRawUnsafe('SELECT *
+FROM "<table>"')` per table against `information_schema.tables`'s own
+live list, not the typed Prisma Client, for the same client/schema-
+mismatch-immunity reason as before). 42 tables at backup time (the four
+new ones didn't exist yet).
+
+**Applied** `supabase/migrations/20261013120000_profile_lite.sql` — all
+21 statements, run individually via `tx.$executeRawUnsafe` inside one
+`prisma.$transaction` (atomic: any failure would roll back everything,
+no partial-apply risk). Statements were listed explicitly in the apply
+script, copied verbatim from the migration file, after a regex-based
+splitter (semicolon+newline) proved unreliable for this file's
+comment/blank-line shape — it silently dropped the first statement
+(swallowed into a discarded "starts with `--`" comment chunk) and
+several others; caught before running anything by dry-running the
+parse first. `npm run check:rls`: 46 tables now (was 42), **RLS
+enabled on every one**.
+
+**RLS denial, anon + authenticated, all 4 new tables** — the `SET
+ROLE` two-account technique (Bundle 1's own precedent, 2026-10-11).
+First false-positive caught: SELECT under RLS-enabled-zero-policies
+doesn't throw, it just returns zero rows — the real signal is row
+COUNT, not whether the query threw (same class of trap as that
+session's INSERT...SELECT lesson). Made unambiguous by seeding one
+real row into each initially-empty table (`user_practices`/`bonds`/
+`private_notes`; `practice_tags` already had its 23 seeded rows) via
+the elevated connection before testing. Result: **SELECT 0 rows and
+INSERT a real permission error, for both roles, on all 4 tables** —
+deny-all RLS confirmed working as intended. Second catch: the cleanup
+step's own `prisma.*.delete()` calls (outside any `$transaction`)
+initially found "no record" — because the check script's `SET ROLE`
+(not `SET LOCAL ROLE`) persists for the whole Postgres session, not
+just its transaction, and a pooled connection carrying that role
+forward made the plain cleanup delete run as `anon`/`authenticated`
+too, RLS-filtering it to nothing. Re-ran cleanup from a fresh
+`PrismaClient` with an explicit `RESET ROLE` first; confirmed all
+three seeded rows actually existed and were then actually deleted
+(counts back to 0). The task asked to verify "5 new tables" — this
+migration created 4 (`practice_tags`/`user_practices`/`bonds`/
+`private_notes`); all 4 were checked.
+
+**`member_number`**: 5 of 6 users assigned (the 6th is the confirmed
+founder account), max value 5 (matches count — no gaps), zero
+duplicate values, founder's `member_number` is `NULL`.
+
+**`practice_tags`**: exactly 23 rows.
+
+**`prisma migrate diff` live -> schema — real drift found and fixed,
+same class of issue Package 2 hit for `PostImage`/`AgeVerification`**:
+a hand-written migration's actual Postgres defaults/FK actions don't
+always match what a bare Prisma field declaration implies. First diff
+(194 bytes once the id/timestamp/FK issues below were fixed, 2265
+bytes before) was not empty — introspected the live
+`information_schema.columns`/referential constraints directly to
+confirm, then fixed `prisma/schema.prisma` only (no DB change):
+- `PracticeTag.id`/`UserPractice.id`/`Bond.id`: `@default(uuid())` ->
+  `@default(dbgenerated("gen_random_uuid()"))` — the migration's
+  `default gen_random_uuid()` is a database-level default; Prisma's
+  bare `@default(uuid())` means client-side generation, no DB default
+  at all.
+- `UserPractice.createdAt`, `Bond.createdAt`/`respondedAt`,
+  `PrivateNote.updatedAt`: added `@db.Timestamptz` — live columns are
+  `timestamp with time zone`; a bare `DateTime` maps to `timestamp`
+  (no time zone) by Prisma's own connector default.
+- All six new relations (`UserPractice.user`/`.tag`, `Bond.fromUser`/
+  `.toUser`, `PrivateNote.author`/`.subject`): added `onUpdate:
+  NoAction` — the hand-written FKs have no explicit `ON UPDATE` clause,
+  so Postgres defaults that to `NO ACTION`; Prisma's own inferred
+  default for these relations is `Cascade`, which doesn't match.
+- `User.memberNumber`: switched from `@default(dbgenerated("nextval(
+  'member_number_seq'::regclass)"))` (the exact live default string,
+  confirmed via introspection — even the missing `::regclass` cast was
+  tried and ruled out first) to `@default(autoincrement())`. Even
+  byte-identical to the live default, Prisma's migrate-diff/
+  introspection does not reliably recognize a raw `dbgenerated()`
+  `nextval()` string as unchanged — a known limitation around custom
+  sequences, not a real mismatch. `autoincrement()` is Prisma's native
+  representation for exactly this shape (a dedicated sequence, `OWNED
+  BY` the column, used as its default — precisely what the migration's
+  own `CREATE SEQUENCE ... OWNED BY` set up), and resolved it to a
+  genuinely empty diff. Behaviorally identical either way: a
+  `create()` call that omits `memberNumber` still lets the database's
+  sequence default fill it in — confirmed via `tsc`/`lint`/`npm test`/
+  `npm run build` all staying clean after the switch.
+
+Final `prisma migrate diff --from-url ... --to-schema-datamodel
+prisma/schema.prisma --script`: **"-- This is an empty migration."**
+`schema.prisma`'s drift fixes committed together with this entry
+(schema-only — no further database change).

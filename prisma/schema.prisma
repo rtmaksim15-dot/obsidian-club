@@ -195,7 +195,18 @@ model User {
   // sequence the DB fills in automatically whenever a create() omits
   // this field, which that route already does — no application code
   // change needed for new signups to get a number.
-  memberNumber         Int?        @unique @map("member_number") @default(dbgenerated("nextval('member_number_seq')"))
+  // @default(autoincrement()), not a dbgenerated nextval() string —
+  // Prisma's migrate-diff/introspection has first-class understanding
+  // of a sequence-backed integer column in exactly this shape (a
+  // dedicated sequence, OWNED BY this column, used as its DEFAULT —
+  // precisely what the migration's own CREATE SEQUENCE ... OWNED BY
+  // does), where a raw dbgenerated("nextval(...)") string was NOT
+  // recognized as matching even when byte-identical to the live
+  // default (confirmed post-apply, 2026-10-13, see DECISIONS.md) —
+  // a known Prisma limitation around custom sequences, not a real
+  // schema/live mismatch. autoincrement() resolved it to a genuinely
+  // empty `prisma migrate diff`.
+  memberNumber         Int?        @unique @map("member_number") @default(autoincrement())
   // Nullable (2026-09-25, see DECISIONS.md): auto-generated
   // email-derived usernames were removed at registration — deriving a
   // handle from someone's email leaked both the email and often their
@@ -1687,7 +1698,11 @@ model MediaUrlBackfillBackup {
 // recorded against it in UserPractice (no onDelete: Cascade concern
 // either way — nothing ever deletes a row here, only flips `active`).
 model PracticeTag {
-  id     String  @id @default(uuid()) @db.Uuid
+  // dbgenerated (not @default(uuid())) — matches the hand-written
+  // migration's real `default gen_random_uuid()`, confirmed live
+  // post-apply, 2026-10-13, see DECISIONS.md. Same reconcile-rep
+  // pattern this schema already uses for PostImage/AgeVerification.
+  id     String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   slug   String  @unique
   label  String
   sort   Int
@@ -1712,14 +1727,20 @@ enum UserPracticeKind {
 // (UserProfile.settings.practicesVisibility — JSON, no schema change
 // needed, same pattern as Veil/Boundaries), not per-row.
 model UserPractice {
-  id        String            @id @default(uuid()) @db.Uuid
+  // id/createdAt dbgenerated/Timestamptz, and both relations'
+  // onUpdate: NoAction — match what's actually live (confirmed via
+  // information_schema post-apply, 2026-10-13, see DECISIONS.md): the
+  // hand-written migration's FKs have no explicit ON UPDATE clause, so
+  // Postgres defaults that to NO ACTION, not Prisma's own inferred
+  // Cascade.
+  id        String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId    String            @map("user_id") @db.Uuid
   tagId     String            @map("tag_id") @db.Uuid
   kind      UserPracticeKind
-  createdAt DateTime          @default(now()) @map("created_at")
+  createdAt DateTime          @default(now()) @map("created_at") @db.Timestamptz
 
-  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tag  PracticeTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  user User        @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tag  PracticeTag @relation(fields: [tagId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([userId, tagId])
   @@index([userId])
@@ -1750,17 +1771,21 @@ enum BondStatus {
 // constraint — same precedent as every other cross-row business rule
 // in this schema (e.g. the DM two-strike door).
 model Bond {
-  id          String     @id @default(uuid()) @db.Uuid
+  // id/createdAt/respondedAt dbgenerated/Timestamptz, and both
+  // relations' onUpdate: NoAction — match what's actually live
+  // (confirmed post-apply, 2026-10-13, see DECISIONS.md), same
+  // reasoning as UserPractice above.
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   fromUserId  String     @map("from_user_id") @db.Uuid
   toUserId    String     @map("to_user_id") @db.Uuid
   kind        BondKind
   status      BondStatus @default(pending)
   visible     Boolean    @default(true)
-  createdAt   DateTime   @default(now()) @map("created_at")
-  respondedAt DateTime?  @map("responded_at")
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  respondedAt DateTime?  @map("responded_at") @db.Timestamptz
 
-  fromUser User @relation("BondFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
-  toUser   User @relation("BondTo", fields: [toUserId], references: [id], onDelete: Cascade)
+  fromUser User @relation("BondFrom", fields: [fromUserId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  toUser   User @relation("BondTo", fields: [toUserId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([fromUserId])
   @@index([toUserId])
@@ -1778,13 +1803,16 @@ model Bond {
 // note per subject by definition (re-saving overwrites, per the task's
 // "unique pair").
 model PrivateNote {
+  // updatedAt Timestamptz, and both relations' onUpdate: NoAction —
+  // match what's actually live (confirmed post-apply, 2026-10-13, see
+  // DECISIONS.md), same reasoning as UserPractice/Bond above.
   authorId  String   @map("author_id") @db.Uuid
   subjectId String   @map("subject_id") @db.Uuid
   body      String
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  author  User @relation("PrivateNoteAuthor", fields: [authorId], references: [id], onDelete: Cascade)
-  subject User @relation("PrivateNoteSubject", fields: [subjectId], references: [id], onDelete: Cascade)
+  author  User @relation("PrivateNoteAuthor", fields: [authorId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  subject User @relation("PrivateNoteSubject", fields: [subjectId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([authorId, subjectId])
   @@map("private_notes")
