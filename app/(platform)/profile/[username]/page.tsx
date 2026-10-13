@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import ReviewForm from "@/components/shared/ReviewForm";
 import FollowButton from "@/components/shared/FollowButton";
 import ContentMenu from "@/components/shared/ContentMenu";
+import PostCard, { type FeedPost } from "@/components/shared/PostCard";
 import MessageButton from "@/components/shared/MessageButton";
 import ZoomableAvatar from "@/components/shared/ZoomableAvatar";
 import ProfileTabs from "@/components/shared/ProfileTabs";
@@ -16,7 +17,8 @@ import PrivateNoteEditor from "@/components/shared/PrivateNoteEditor";
 import { isBlockedEitherWay } from "@/lib/moderation/block";
 import { isRitualComplete } from "@/lib/auth/ritual";
 import { getMessageButtonState } from "@/lib/dm/relationship";
-import { resolveAvatarUrl, resolvePostImages } from "@/lib/storage/resolve-media";
+import { resolveAvatarUrl, resolveAvatarUrls, resolvePostImages } from "@/lib/storage/resolve-media";
+import { getVeilEnabled } from "@/lib/profile/veil";
 import { getBoundaries } from "@/lib/dm/boundaries";
 import { getVisibleBondsForProfile } from "@/lib/profile/bonds";
 import { canViewPracticesFor, getUserPractices } from "@/lib/profile/practices";
@@ -38,13 +40,14 @@ import { isFounder } from "@/lib/config/founder";
  * Profile lite (Package 4, Phase B, 2026-10-13, see DECISIONS.md) —
  * restructured into a header (avatar/name/Title/Member №/city/bonds)
  * plus tabs "About" (practices rows, About text, reviews/houses/REP
- * history where their own flags allow, invited-by/partner) and
- * "Photos" (a grid of every image from this member's posts — replaces
- * the old flat "Recent Posts" full-card list; a text-only post with no
- * image no longer appears anywhere on a profile under this layout —
- * see DECISIONS.md). Public follower/following counts removed
- * (explicit instruction — reverses the 2026-07-30 "Members & Follows"
- * feature's own public counts).
+ * history where their own flags allow, invited-by/partner), "Posts"
+ * (every published post, text-only included, newest first — the same
+ * PostCard the old flat layout used), and "Photos" (a grid of every
+ * image from this member's posts). The Phase B-only two-tab layout
+ * (About/Photos, with no way to reach a text-only post) was a follow-
+ * up-day correction — see DECISIONS.md. Public follower/following
+ * counts removed (explicit instruction — reverses the 2026-07-30
+ * "Members & Follows" feature's own public counts).
  *
  * "Invited by [name]" / "Partner of [name]" (Invitation & Partner
  * system v1, 2026-08-01) — quiet lines, shown whenever set, for anyone
@@ -127,6 +130,15 @@ export default async function ProfilePage({ params }: { params: { username: stri
         take: 20,
         select: {
           id: true,
+          title: true,
+          content: true,
+          type: true,
+          likesCount: true,
+          createdAt: true,
+          author: { select: { id: true, username: true, displayName: true, avatarUrl: true, level: true, rep: true } },
+          house: { select: { id: true, name: true, slug: true } },
+          likes: { where: { userId: viewer?.id ?? "" }, select: { userId: true } },
+          _count: { select: { comments: true } },
           images: {
             where: { isDeleted: false },
             orderBy: { position: "asc" },
@@ -183,7 +195,19 @@ export default async function ProfilePage({ params }: { params: { username: stri
   // resolved, so its output can be shorter than its input — pairing by
   // the resolved image's own `id` (not by array index) is what keeps
   // each photo matched to the right post despite that.
-  const profileAvatarUrl = await resolveAvatarUrl(user.avatarUrl);
+  const [profileAvatarUrl, postAvatarUrls, veilEnabled] = await Promise.all([
+    resolveAvatarUrl(user.avatarUrl),
+    resolveAvatarUrls(posts.map((p) => p.author.avatarUrl)),
+    viewer ? getVeilEnabled(viewer.id) : Promise.resolve(false),
+  ]);
+  const resolvedPosts = await Promise.all(
+    posts.map(async (post, i) => ({
+      ...post,
+      images: await resolvePostImages(post.images),
+      author: { ...post.author, avatarUrl: postAvatarUrls[i] },
+    })),
+  );
+
   const allImages = posts.flatMap((p) => p.images.map((img) => ({ postId: p.id, image: img })));
   const postIdByImageId = new Map(allImages.map((i) => [i.image.id, i.postId]));
   const resolvedImages = await resolvePostImages(allImages.map((i) => i.image));
@@ -290,6 +314,29 @@ export default async function ProfilePage({ params }: { params: { username: stri
       ) : null}
     </div>
   );
+
+  // "Posts" tab (Package 4, follow-up, 2026-10-13, see DECISIONS.md) —
+  // every published post, text-only included, same PostCard the old
+  // flat layout used. Restores reachability the Phase B-only About/
+  // Photos split had lost for a text-only post.
+  const postsContent =
+    resolvedPosts.length === 0 ? (
+      <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
+        No posts yet.
+      </p>
+    ) : (
+      <div className="space-y-6">
+        {resolvedPosts.map((post) => (
+          <PostCard
+            key={post.id}
+            post={post as FeedPost}
+            viewerId={viewer?.id}
+            viewerIsAdmin={viewer?.isAdmin}
+            viewerVeilEnabled={veilEnabled}
+          />
+        ))}
+      </div>
+    );
 
   return (
     <main className="min-h-screen bg-ob-black px-6 pb-16 pt-4 text-ob-text">
@@ -431,7 +478,7 @@ export default async function ProfilePage({ params }: { params: { username: stri
 
         {isOwnProfile ? <PendingBondRequests initialRequests={pendingBondsResolved} /> : null}
 
-        <ProfileTabs about={aboutContent} photos={<ProfilePhotoGrid photos={photos} />} />
+        <ProfileTabs about={aboutContent} posts={postsContent} photos={<ProfilePhotoGrid photos={photos} />} />
 
         {viewer && !isOwnProfile ? <PrivateNoteEditor subjectId={user.id} initialBody={privateNote} /> : null}
       </div>

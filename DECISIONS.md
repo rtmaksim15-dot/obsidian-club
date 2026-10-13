@@ -3427,3 +3427,82 @@ in this codebase yet); verified by code review only. See TECH_DEBT.md.
 `npx tsc --noEmit`, `npx next lint` (same one pre-existing
 `AdminConsole.tsx` warning), `npm test` (127 passing), `npm run build`
 all clean. Committed locally, not pushed.
+
+### 2026-10-13 — Package 4 follow-ups: rate limit revert, Posts tab, new-DM bug fix
+
+**1. `DAILY_REQUEST_LIMIT` reverted 10 -> 5.** Single constant
+(`lib/dm/limits.ts`), already read by its one call site's error
+message (fixed to do that during the original Phase A pass) — nothing
+else to update. New regression-guard test: `lib/dm/limits.test.ts`.
+
+**2. Profile tabs: added "Posts."** The Phase B-only "About"/"Photos"
+split (flagged as a real content gap in that same day's DECISIONS.md
+entry) left a text-only post unreachable anywhere on a profile — now
+three tabs: "About" (practices/About text/reviews/houses/REP history/
+invited-by/partner, unchanged), "Posts" (every published post, text-
+only included, newest first — the exact `PostCard` the pre-Phase-B flat
+layout used, including the `author`/`house`/`likes`/`_count.comments`/
+`images` select that card needs), "Photos" (unchanged — the image
+grid). `ProfileTabs.tsx` generalized from a hardcoded two-tab switch to
+a small `TABS` array driving three.
+
+**3. BUG — new conversation request from a profile failed generically.**
+Root cause found: `app/api/dm/requests/route.ts`'s transaction was the
+**only** place in this entire codebase running at `isolationLevel:
+Serializable` (confirmed via `grep -rn "TransactionIsolationLevel"`
+across `app/`/`lib/` — one hit, this one). Phase A's own Boundaries
+work added two new reads inside that same transaction
+(`lib/dm/boundaries.ts#getBoundariesVerdict`: `userProfile.findUnique`,
+and conditionally `follow.findUnique`) — under Postgres's Serializable
+Snapshot Isolation, every read inside a `Serializable` transaction
+contributes to predicate locking, and `user_profiles` specifically is
+touched by a large share of this app's other traffic (ritual progress,
+Veil, Boundaries itself). Broadening this one transaction's read set
+was enough to turn a previously-rare theoretical conflict into a
+reproducible failure for an ordinary single request — a real Postgres
+`could not serialize access` error (SQLSTATE 40001), which isn't an
+`EligibilityError`, so it fell through to the route's generic
+catch-all ("Could not send. Try again shortly.") instead of surfacing
+any real reason. Matches the reported symptom exactly: only brand-new
+conversation starts go through this route at all; sending into an
+already-open thread uses a completely different route
+(`/api/dm/threads/[id]/messages`) with no special isolation.
+
+**Checked and ruled out**: the generic message was never a disguised
+*legitimate* rejection (pending request / blocked / Boundaries closed
+/ ritual incomplete) — every one of those paths already returns its
+own specific `error` string directly (`preCheck.error`/
+`raceCheck.error`), both before Phase A and after; `getRequestEligibility`
+doesn't check the *recipient's* ritual/status at all, only the
+sender's, so "recipient hasn't crossed a threshold" was never an
+actual rule this route enforces. Nothing needed to change about which
+reasons get shown — only the infrastructure bug that was masking them
+with a false generic failure. "One composer" was also already true:
+there is exactly one place in this codebase that starts a NEW
+conversation request — `MessageButton.tsx` (rendered from a member's
+profile) calling this one route — `MessagesInbox.tsx` has no composer
+of its own, only a "Find members" link pointing at the profile flow;
+nothing needed to be unified since nothing was duplicated.
+
+**Fix**: dropped the transaction back to the default isolation level
+(READ COMMITTED), same as every other transaction in this codebase.
+The conditional re-check this transaction already does (re-running
+`getRequestEligibility` against the transaction's own client) remains
+reasonable protection for the narrow race it guards — two near-
+simultaneous requests from the same sender to the same recipient — but
+isn't airtight without it; closing that race completely would need a
+database-level partial unique index (`unique(sender_id, recipient_id)
+where status = 'pending'`), which is a schema change requiring its own
+explicit rule-11 go-ahead, not bundled into this fix. Flagged in
+TECH_DEBT.md.
+
+**Test**: `app/api/dm/requests/route.test.ts` — a source-inspection
+regression guard (no mocked-Prisma/real-Postgres route harness exists
+in this codebase to actually exercise the concurrent-transaction
+failure mode) asserting `Prisma.TransactionIsolationLevel` and a bare
+`{ isolationLevel: ... }` object never reappear on this route.
+
+Committed as "pkg4 follow-ups." `npx tsc --noEmit`, `npx next lint`
+(same one pre-existing `AdminConsole.tsx` warning), `npm test` (129
+passing), `npm run build` all clean. Not pushed yet — see the next
+entry for the migration apply + push that follow this same go-ahead.

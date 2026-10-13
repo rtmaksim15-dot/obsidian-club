@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import { requireAgeVerifiedApi } from "@/lib/age-verification/gate";
@@ -113,36 +112,61 @@ export async function POST(request: Request) {
   }
 
   try {
-    const created = await prisma.$transaction(
-      async (tx) => {
-        // Re-checked inside the transaction, against the transaction's
-        // own client, to close the race between two near-simultaneous
-        // requests to the same recipient (same reasoning as this
-        // codebase's InviteToken redemption race fix — see DECISIONS.md).
-        const raceCheck = await getRequestEligibility(user, recipientId, tx);
-        if (!raceCheck.ok) {
-          throw new EligibilityError(raceCheck.status, raceCheck.error);
-        }
+    const created = await prisma.$transaction(async (tx) => {
+      // Re-checked inside the transaction, against the transaction's
+      // own client, to close the race between two near-simultaneous
+      // requests to the same recipient (same reasoning as this
+      // codebase's InviteToken redemption race fix — see DECISIONS.md).
+      //
+      // BUG FIX (Package 4 follow-up, 2026-10-13, see DECISIONS.md):
+      // this transaction used to run at isolationLevel: Serializable —
+      // the only place in this entire codebase that does. Phase A
+      // added two new reads inside this same race-check (lib/dm/
+      // boundaries.ts's getBoundariesVerdict: userProfile.findUnique,
+      // and conditionally follow.findUnique) — under Postgres's
+      // Serializable Snapshot Isolation, every read inside a
+      // Serializable transaction contributes to predicate locking, and
+      // user_profiles in particular is touched by a huge share of this
+      // app's other traffic (ritual progress, Veil, Boundaries itself).
+      // Broadening this transaction's read set was enough to make a
+      // spurious "could not serialize access" conflict (Postgres
+      // SQLSTATE 40001) a real, repeatable failure for a normal single
+      // request, not just a theoretical concurrent-double-click edge
+      // case — exactly matching the reported symptom (only brand-new
+      // conversation starts fail; sending into an existing thread uses
+      // a different route with no special isolation at all). That
+      // error isn't an EligibilityError, so it fell through to the
+      // generic catch-all below instead of a real reason. Dropped back
+      // to the default isolation level (READ COMMITTED), same as every
+      // other transaction in this app — the conditional re-check this
+      // transaction already does is reasonable protection for the
+      // narrow race it guards (two near-simultaneous requests from the
+      // same sender to the same recipient); a database-level partial
+      // unique index would close that race completely, but that's a
+      // schema change needing its own explicit go-ahead, not bundled
+      // into this fix — see DECISIONS.md/TECH_DEBT.md.
+      const raceCheck = await getRequestEligibility(user, recipientId, tx);
+      if (!raceCheck.ok) {
+        throw new EligibilityError(raceCheck.status, raceCheck.error);
+      }
 
-        const req = await tx.conversationRequest.create({
-          data: { senderId: user.id, recipientId, openingMessage: message },
-          select: { id: true },
-        });
+      const req = await tx.conversationRequest.create({
+        data: { senderId: user.id, recipientId, openingMessage: message },
+        select: { id: true },
+      });
 
-        await tx.notification.create({
-          data: {
-            userId: recipientId,
-            type: "dm.request_received",
-            title: `${user.displayName} wants to talk`,
-            body: message.length > 140 ? `${message.slice(0, 140)}…` : message,
-            data: { requestId: req.id },
-          },
-        });
+      await tx.notification.create({
+        data: {
+          userId: recipientId,
+          type: "dm.request_received",
+          title: `${user.displayName} wants to talk`,
+          body: message.length > 140 ? `${message.slice(0, 140)}…` : message,
+          data: { requestId: req.id },
+        },
+      });
 
-        return req;
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    );
+      return req;
+    });
 
     return NextResponse.json({ id: created.id, remaining: dailyLimit.remaining }, { status: 201 });
   } catch (err) {

@@ -9,12 +9,15 @@ import { prisma } from "@/lib/db/prisma";
 // simpler, no timezone to pick, and it's the infrastructure that
 // already exists.
 //
-// Raised 5 -> 10 (Package 4, Phase A, 2026-10-13, see DECISIONS.md) —
-// the task's own explicit number, now that My Boundaries gives a
-// recipient a real way to close their door entirely (whoCanMessage/
-// acceptRequests) rather than relying solely on this sender-side daily
-// cap to keep volume manageable.
-export const DAILY_REQUEST_LIMIT = 10;
+// Raised 5 -> 10, then reverted back to 5 the same day (Package 4,
+// Phase A follow-up, 2026-10-13, see DECISIONS.md) — the raise's own
+// reasoning (My Boundaries gives a real way to close the door, so the
+// sender-side cap could loosen) was reconsidered; back to the original
+// 2026-09-14 value. Kept as a single constant (this one), not
+// hardcoded anywhere else, specifically so a future change like this
+// is a one-line edit — see app/api/dm/requests/route.ts's own error
+// message, which reads this constant rather than a literal number.
+export const DAILY_REQUEST_LIMIT = 5;
 const WINDOW_MS = 24 * 60 * 60 * 1000;
 
 function limitKey(senderId: string): string {

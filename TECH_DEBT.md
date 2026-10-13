@@ -1387,3 +1387,19 @@ code type-checks against the new models, but no query against any of
 the four new tables, and no RLS policy, has actually run against
 Postgres yet. Run `npm run check:rls` after applying, per CLAUDE.md
 rule 8.
+
+## Package 4 follow-ups (2026-10-13) — new-DM bug fix
+
+Full report in DECISIONS.md. `POST /api/dm/requests`'s race-protection
+transaction dropped from `isolationLevel: Serializable` back to the
+default (READ COMMITTED) to fix a reproducible "Could not send"
+failure (see DECISIONS.md for the full root-cause writeup). This
+closes the common case but **reopens a narrow race**: two genuinely
+near-simultaneous requests from the same sender to the same recipient
+could both pass the conditional re-check and create two
+`ConversationRequest` rows. Low real-world impact (worst case: a
+recipient sees the same sender's request listed twice; no security
+exposure), but the fully correct fix is a database-level partial
+unique index — `unique(sender_id, recipient_id) where status =
+'pending'` — which needs its own explicit rule-11 go-ahead (a schema
+change) rather than being bundled into an infrastructure bug fix.
