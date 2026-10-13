@@ -1358,3 +1358,32 @@ disproportionate for this package; verified by code review instead
 (the call is simply gone from `app/api/dm/requests/[id]/route.ts`). If
 a route-level test harness gets built for some other reason later,
 this is a natural first case to backfill.
+
+## Package 4, Phase B — Profile lite (2026-10-13)
+
+Full report in DECISIONS.md.
+
+**Text-only posts no longer appear anywhere on a profile.** The old
+flat "Recent Posts" list (full `PostCard`s, image or not) was replaced
+by a two-tab "About"/"Photos" layout per this package's own spec; the
+Photos tab only shows images, and nothing feeds a text-only post into
+either tab. Worth a product decision: either add a third tab/section
+for text posts, or accept that a profile is now photo-first by design.
+
+**Bond `visible` has no toggle UI.** The schema field exists (default
+`true`), but B3's own task text named no toggle control, so none was
+built. Add one if a member should ever be able to hide a confirmed
+bond from their profile without dissolving it.
+
+**Bond accept/dissolve and private-note RLS have no automated test** —
+same gap class and same reason as the Phase A decline-silence gap
+above (no mocked-Prisma route-handler test harness exists in this
+codebase). Verified by code review only.
+
+**Member number / practice tags / bonds / private notes are all
+unexercised against a real database.** The migration is written, not
+applied (CLAUDE.md rule 11) — `prisma generate` ran locally so the
+code type-checks against the new models, but no query against any of
+the four new tables, and no RLS policy, has actually run against
+Postgres yet. Run `npm run check:rls` after applying, per CLAUDE.md
+rule 8.

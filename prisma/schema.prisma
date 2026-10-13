@@ -182,6 +182,20 @@ enum MarketplaceType {
 model User {
   id                   String      @id @default(uuid()) @db.Uuid
   email                String      @unique
+  // Profile lite, B1 (Package 4, Phase B, 2026-10-13, see DECISIONS.md)
+  // — permanent, sequential, assigned once and never reused. Null only
+  // for Lord Obsidian (id e75c0f85-3b91-49c4-a610-0bc17839476a, see
+  // lib/config/founder.ts) — the profile shows "Founder" instead of a
+  // number for that one account, by explicit instruction; every other
+  // existing member was backfilled 1..N by join date ascending. New
+  // members get the next number for free, at account creation
+  // ("activation" — this app's only User-creation path, app/api/join/
+  // [token]/route.ts, already sets status: "active" directly there):
+  // @default(dbgenerated(...)) below pulls from a dedicated Postgres
+  // sequence the DB fills in automatically whenever a create() omits
+  // this field, which that route already does — no application code
+  // change needed for new signups to get a number.
+  memberNumber         Int?        @unique @map("member_number") @default(dbgenerated("nextval('member_number_seq')"))
   // Nullable (2026-09-25, see DECISIONS.md): auto-generated
   // email-derived usernames were removed at registration — deriving a
   // handle from someone's email leaked both the email and often their
@@ -330,6 +344,13 @@ model User {
 
   // 21+ Age Verification Gate, Phase A (2026-10-10, see DECISIONS.md)
   ageVerifications AgeVerification[]
+
+  // Profile lite (Package 4, Phase B, 2026-10-13, see DECISIONS.md)
+  practices             UserPractice[]
+  bondsInitiated        Bond[]        @relation("BondFrom")
+  bondsReceived         Bond[]        @relation("BondTo")
+  privateNotesAuthored  PrivateNote[] @relation("PrivateNoteAuthor")
+  privateNotesAboutMe   PrivateNote[] @relation("PrivateNoteSubject")
 
   @@map("users")
 }
@@ -1652,4 +1673,119 @@ model MediaUrlBackfillBackup {
 
   @@index([entityType, entityId])
   @@map("media_url_backfill_backup")
+}
+
+// ============================================================
+// PROFILE LITE (Package 4, Phase B, 2026-10-13, see DECISIONS.md)
+// ============================================================
+
+// B2: Practices — a fixed, curated taxonomy (exactly the 23 tags the
+// task specified, seeded by the migration in that exact order via
+// `sort`) — deliberately NOT free text, so this never becomes an
+// unmoderated list of arbitrary strings. `active` lets a tag be
+// retired from new selection without deleting history already
+// recorded against it in UserPractice (no onDelete: Cascade concern
+// either way — nothing ever deletes a row here, only flips `active`).
+model PracticeTag {
+  id     String  @id @default(uuid()) @db.Uuid
+  slug   String  @unique
+  label  String
+  sort   Int
+  active Boolean @default(true)
+
+  userPractices UserPractice[]
+
+  @@map("practice_tags")
+}
+
+enum UserPracticeKind {
+  limit
+  practice
+  curious
+}
+
+// One row per (member, tag, kind) — a member can mark the same tag as
+// at most one of limit/practice/curious at a time (the unique
+// constraint is on (userId, tagId) alone, not including kind, so
+// re-marking the same tag under a different kind is a real state
+// change, not an additional row). Visibility is a per-member setting
+// (UserProfile.settings.practicesVisibility — JSON, no schema change
+// needed, same pattern as Veil/Boundaries), not per-row.
+model UserPractice {
+  id        String            @id @default(uuid()) @db.Uuid
+  userId    String            @map("user_id") @db.Uuid
+  tagId     String            @map("tag_id") @db.Uuid
+  kind      UserPracticeKind
+  createdAt DateTime          @default(now()) @map("created_at")
+
+  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tag  PracticeTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tagId])
+  @@index([userId])
+  @@map("user_practices")
+}
+
+enum BondKind {
+  partner
+  dominant_of
+  submissive_of
+}
+
+enum BondStatus {
+  pending
+  active
+}
+
+// B3: Bonds — one row encodes the full, directional relationship (for
+// dominant_of/submissive_of: fromUser is dominant of toUser — there's
+// no separate mirrored row on the other side; `partner` is
+// symmetric by nature but keeps the same shape, fromUser being
+// whoever sent the request). `visible` is a single shared flag, not
+// independently per-side (the task's own schema listed exactly one
+// `visible` column) — either party can toggle it; see DECISIONS.md for
+// why "shown only if both sides have visible=true" was read as this
+// one shared flag rather than two. Max 3 active bonds per member is
+// enforced in application code (lib/profile/bonds.ts), not a DB
+// constraint — same precedent as every other cross-row business rule
+// in this schema (e.g. the DM two-strike door).
+model Bond {
+  id          String     @id @default(uuid()) @db.Uuid
+  fromUserId  String     @map("from_user_id") @db.Uuid
+  toUserId    String     @map("to_user_id") @db.Uuid
+  kind        BondKind
+  status      BondStatus @default(pending)
+  visible     Boolean    @default(true)
+  createdAt   DateTime   @default(now()) @map("created_at")
+  respondedAt DateTime?  @map("responded_at")
+
+  fromUser User @relation("BondFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser   User @relation("BondTo", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@index([fromUserId])
+  @@index([toUserId])
+  @@map("bonds")
+}
+
+// B4: Private note — one member's own private note about another,
+// visible only to its author (RLS: deny-all, same reasoning as
+// AdminNote/MediaUrlBackfillBackup — nothing here is ever read via a
+// browser-side Supabase client, only through Prisma in the author's
+// own authenticated API route, which is the real access boundary; see
+// DECISIONS.md for why this is deny-all rather than a literal
+// `author_id = auth.uid()` SELECT policy). (authorId, subjectId) as
+// the primary key, not a separate id, since a member has at most one
+// note per subject by definition (re-saving overwrites, per the task's
+// "unique pair").
+model PrivateNote {
+  authorId  String   @map("author_id") @db.Uuid
+  subjectId String   @map("subject_id") @db.Uuid
+  body      String
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  author  User @relation("PrivateNoteAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  subject User @relation("PrivateNoteSubject", fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@id([authorId, subjectId])
+  @@map("private_notes")
 }

@@ -249,20 +249,24 @@ export default function ProfileEditForm({ user }: Props) {
         </div>
 
         <div>
+          {/* Relabeled "About" (Profile lite, B6, Package 4, Phase B,
+              2026-10-13, see DECISIONS.md) — same `bio` field/column,
+              limit raised 300 -> 600, contact info now rejected
+              server-side (lib/profile/about-text.ts). */}
           <label htmlFor="bio" className="input-label">
-            Bio
+            About
           </label>
           <textarea
             id="bio"
             className="input"
             rows={4}
-            maxLength={300}
+            maxLength={600}
             value={bio}
             onChange={(e) => setBio(e.target.value)}
             placeholder="A few words about you"
           />
           <p className="text-caption mt-1" style={{ color: "var(--color-text-muted)" }}>
-            {bio.length}/300
+            {bio.length}/600 · Contacts and links aren&apos;t shared here — use messages.
           </p>
         </div>
 

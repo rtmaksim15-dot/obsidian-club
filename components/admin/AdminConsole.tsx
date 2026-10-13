@@ -98,6 +98,7 @@ export type Person = {
   displayName: string;
   username: string | null;
   email: string;
+  avatarUrl: string | null;
   rep: number;
   level: number;
   trustScore: number;

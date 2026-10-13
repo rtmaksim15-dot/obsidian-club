@@ -3266,3 +3266,164 @@ applicable, no new column, nothing to backfill (see A2 above).
 `npx tsc --noEmit`, `npx next lint` (same one pre-existing, unrelated
 `AdminConsole.tsx` warning as every prior package), `npm test` (102
 passing), `npm run build` all clean. Committed locally, not pushed.
+
+### 2026-10-13 — Package 4, Phase B: Profile lite
+
+Migration **written, NOT applied** (`supabase/migrations/
+20261013120000_profile_lite.sql`) — awaiting explicit rule-11
+go-ahead naming this exact action. Verified against the live database
+with `prisma migrate diff --from-url ... --to-schema-datamodel
+prisma/schema.prisma --script`: purely additive (3 new enums, one new
+nullable+unique column on `users`, four new tables, their indexes and
+FKs) — no existing table, column, or row touched. The diff's own
+`ALTER TABLE "users" ADD COLUMN "member_number" INTEGER DEFAULT
+nextval('member_number_seq')` doesn't include creating that sequence
+(Prisma's diff only manages what's declared in `schema.prisma`, not a
+raw sequence referenced via `dbgenerated()`) — the hand-written
+migration adds `CREATE SEQUENCE` plus the backfill, in the right
+order, on top of what the diff produced.
+
+**B1, member numbers.** ASSUMPTION confirmed live (read-only query,
+no write): the founder account id in `lib/config/founder.ts`
+(`e75c0f85-3b91-49c4-a610-0bc17839476a`) does exist and is indeed
+"Lord Obsidian" — excluded from numbering entirely, per this task's
+own instruction; the profile shows "Founder," never a number, for
+that one account. Backfill: `row_number() over (order by
+coalesce(joined_at, created_at) asc)`, excluding the founder — all 6
+real users currently have a non-null `joinedAt` (confirmed live), so
+the `created_at` fallback is defensive, not currently exercised. "New
+members get the next number on activation" needed **zero application
+code changes**: this codebase has exactly one place a `User` row is
+ever created (`app/api/join/[token]/route.ts`, confirmed via
+`grep -rln "prisma.user.create"` across the whole repo — one hit),
+and it already sets `status: "active"` directly with no separate
+pending→active admin step; `memberNumber`'s schema-level
+`@default(dbgenerated("nextval('member_number_seq')"))` fires
+automatically because that route's `create()` call never sets the
+field.
+
+**B2, practices.** Exactly the 23 tags, in the task's own order
+(`sort` 0–22), seeded by the migration — never free text, matching
+the task's own "never add a tag outside this list" instruction.
+Visibility (`only_me`/`following`/`members`, default `following`) is
+a `UserProfile.settings.practicesVisibility` key, same read-merge-write
+JSON pattern as Veil/Boundaries — no schema change for it.
+`"following"` reads the same direction as Boundaries' own
+`whoCanMessage: "following"` (lib/dm/boundaries.ts): visible to people
+the **owner** follows, not people who follow the owner — kept
+consistent with that precedent rather than picking a new convention.
+
+**B3, bonds.** Two departures from the task's literal field list,
+both forced by what's actually given rather than invented:
+
+1. **`visible` is one shared boolean, not independently "per side."**
+   The task's own schema lists exactly one `visible` column on `Bond`
+   ("fromUserId, toUserId, kind, status, visible bool, createdAt") —
+   there's no second column a "both sides" reading could point to.
+   Read as shorthand for "shown only when `visible = true`"; either
+   party can toggle the one shared flag (no dedicated toggle UI was
+   asked for in B3's own bullet list, so none was built this pass —
+   it defaults `true` and stays that way until a product ask for the
+   toggle exists).
+2. **Dissolving a bond is a hard delete, including for a still-pending
+   request** (there's no separate "decline" path). `BondStatus` has
+   only `pending`/`active` — the task's own enum, unlike
+   `ConversationRequestStatus`'s several terminal states — so there's
+   no `dissolved`/`declined` value to transition into; "either side
+   can dissolve instantly" is the only exit the schema has room for,
+   and it covers declining too. No history survives a dissolve (no
+   `ModerationAction` or notification row either, beyond the plain UI
+   string) — flagged since it's a real product choice, not an
+   oversight: if history should survive, that needs a third status
+   added first.
+
+Max 3 active bonds enforced in application code
+(`lib/profile/bonds.ts`), re-checked on BOTH sides at accept time (not
+just the sender's count at request time) — same "re-verify inside the
+transaction" caution this codebase's DM-request race-fix already
+established, though a full `$transaction` wasn't used here (bonds
+aren't high-enough-traffic to need the same race protection as
+invite-token redemption).
+
+**B4, private notes.** RLS is **deny-all**, not a literal
+`author_id = auth.uid()` SELECT policy, despite the task's own "RLS
+author-only" wording — same reasoning and precedent as `admin_notes`/
+`media_url_backfill_backup` (see those migrations): nothing here is
+ever read via a browser-side Supabase client, only through Prisma in
+the author's own session-derived route, which is the real author-only
+boundary. Deny-all is a **stricter** guarantee (zero access via the
+anon/authenticated key at all) than a granted self-only policy would
+be, not a weaker one.
+
+**B5, profile layout — one real content gap, flagged rather than
+hidden.** The task's own bullet list ("avatar · name · Title · Member
+№ · (city) · bonds · practices rows · About text · tabs 'About' ·
+'Photos'") is ambiguous between "all of this sits in a fixed header"
+and "bonds/practices/About text are the About tab's own content." Read
+as the latter (a conventional header + tabbed body), since reading it
+the first way would make a standalone "About" tab redundant with the
+header immediately above it. Consequence: **the "Photos" tab is a
+grid of images pulled from the member's posts — a text-only post (no
+image) no longer appears anywhere on a profile at all** under this
+two-tab structure, since neither tab is a general post feed. This is a
+real, visible content-access change from the old flat "Recent Posts"
+list (which showed every published post, image or not) — flagged
+explicitly rather than silently decided; the old `PostCard` rendering
+was removed from this page entirely (not fed into either tab).
+Public follower/following counts **removed** per explicit instruction
+— reverses the 2026-07-30 "Members & Follows" feature's own public
+counts (that feature's Follow button/relationship itself is
+untouched, only the two count numbers are gone from the page). City
+now gated on the profile owner's own `boundaries.showCity` (Package 4,
+Phase A) — off by default, a real behavior change for any member who
+already has a city set (previously always shown).
+
+**B6, About text.** Confirmed this is the existing `bio` column
+(`/profile/edit`'s "Bio" field, server-validated in `app/api/profile/
+route.ts`) relabeled "About," not a new field — the task's own layout
+line names it immediately after "practices rows" with no separate
+schema entry. Limit raised 300 → 600 (CLAUDE.md's own roadmap notes
+the original 300 came from the 2026-07-17 "User Profiles" task);
+`lib/profile/about-text.ts` adds URL/bare-domain/email/phone/@handle/
+messenger-keyword detection, rejecting with the task's exact required
+message. Conservative by design (an 8+ digit run for phone, common
+TLDs for bare domains) — a determined member could still work around
+it, same tradeoff every client-side/regex content filter in this
+class of product has; not a cryptographic guarantee.
+
+**B7, admin "Remove avatar."** Added to the existing `PATCH
+/api/admin/members/[id]` route (a new `removeAvatar`/
+`removeAvatarReason` body shape alongside the pre-existing
+`ageVerified` toggle, not a new route) — soft (sets `avatarUrl` null;
+the Storage object itself is untouched, matching every other
+"don't hard-delete" moderation action in this app), logs a
+`ModerationAction` with the admin-entered reason required. `Person`
+(admin console's own type) and its server-side query gained
+`avatarUrl` — resolved the same signed-URL way every other avatar
+render in this app is.
+
+**Not verified live / not applied:** the same sandbox constraint as
+every migration this session — nothing in Phase B has been applied,
+so RLS correctness (the deny-all policies above) can only be confirmed
+via `npm run check:rls` and the two-account `SET ROLE` technique
+(Bundle 1's own precedent) **after** an explicit go-ahead to apply.
+`prisma generate` was run locally (client regeneration only, no DB
+touch) so the new models type-check; no query against any of the four
+new tables has actually executed against a real database yet.
+
+**Tests** (41 new: `member-number.test.ts` 5, `about-text.test.ts` 8,
+`bonds-core.test.ts` 5, `practices-core.test.ts` 4, `private-notes-
+core.test.ts` 3 — 25 in `lib/profile/`, plus Phase A's own count —
+127 total). B8's own list, covered: member-number backfill
+ordering (as a reusable TS model of the SQL rule, not the SQL
+itself — can't execute DDL in a test), practices visibility matrix,
+the max-3 bond rule + bond description phrasing, About-text contact
+stripping. **Not covered, and why**: bond accept/dissolve as ROUTE
+behavior (`lib/profile/bonds.ts`'s `acceptBondRequest`/`dissolveBond`)
+and private-note RLS — same gap class as Phase A's "decline is
+silent" (no mocked-Prisma route-handler test harness exists anywhere
+in this codebase yet); verified by code review only. See TECH_DEBT.md.
+
+`npx tsc --noEmit`, `npx next lint` (same one pre-existing
+`AdminConsole.tsx` warning), `npm test` (127 passing), `npm run build`
+all clean. Committed locally, not pushed.

@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/auth/require-admin";
 import { logModerationAction } from "@/lib/moderation/log";
 import { MIN_MEMBER_AGE } from "@/lib/legal/eligibility";
 
-type Body = { ageVerified?: boolean };
+type Body = { ageVerified?: boolean; removeAvatar?: boolean; removeAvatarReason?: string };
 
 // PATCH /api/admin/members/:id — toggle Age Verification on an existing
 // member (2026-08-03). Field first, no enforcement gate yet — see
@@ -33,13 +33,35 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
 
-  if (typeof body.ageVerified !== "boolean") {
-    return NextResponse.json({ error: "ageVerified must be a boolean." }, { status: 422 });
-  }
-
   const member = await prisma.user.findUnique({ where: { id: params.id } });
   if (!member) {
     return NextResponse.json({ error: "Member not found." }, { status: 404 });
+  }
+
+  // Profile lite, B7 (Package 4, Phase B, 2026-10-13, see DECISIONS.md)
+  // — a second, distinct action on this same route: soft-removes an
+  // explicit avatar (sets avatarUrl null; the original file in Storage
+  // is untouched — same "don't hard-delete" posture as every other
+  // moderation action in this app). A reason is required so the
+  // ModerationAction row actually explains itself later.
+  if (body.removeAvatar === true) {
+    const reason = body.removeAvatarReason?.trim();
+    if (!reason) {
+      return NextResponse.json({ error: "A reason is required." }, { status: 422 });
+    }
+    await prisma.user.update({ where: { id: params.id }, data: { avatarUrl: null } });
+    await logModerationAction({
+      adminId: admin.id,
+      action: "member.avatar_removed",
+      targetType: "user",
+      targetId: member.id,
+      note: reason,
+    });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (typeof body.ageVerified !== "boolean") {
+    return NextResponse.json({ error: "ageVerified must be a boolean." }, { status: 422 });
   }
 
   const previousValue = member.ageVerified;

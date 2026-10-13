@@ -4,14 +4,24 @@ import { getCurrentUser } from "@/lib/auth/session";
 import ReviewForm from "@/components/shared/ReviewForm";
 import FollowButton from "@/components/shared/FollowButton";
 import ContentMenu from "@/components/shared/ContentMenu";
-import PostCard, { type FeedPost } from "@/components/shared/PostCard";
 import MessageButton from "@/components/shared/MessageButton";
 import ZoomableAvatar from "@/components/shared/ZoomableAvatar";
+import ProfileTabs from "@/components/shared/ProfileTabs";
+import ProfilePhotoGrid from "@/components/shared/ProfilePhotoGrid";
+import PracticesRows from "@/components/shared/PracticesRows";
+import BondsList from "@/components/shared/BondsList";
+import BondRequestButton from "@/components/shared/BondRequestButton";
+import PendingBondRequests from "@/components/shared/PendingBondRequests";
+import PrivateNoteEditor from "@/components/shared/PrivateNoteEditor";
 import { isBlockedEitherWay } from "@/lib/moderation/block";
 import { isRitualComplete } from "@/lib/auth/ritual";
 import { getMessageButtonState } from "@/lib/dm/relationship";
-import { resolveAvatarUrl, resolveAvatarUrls, resolvePostImages } from "@/lib/storage/resolve-media";
-import { getVeilEnabled } from "@/lib/profile/veil";
+import { resolveAvatarUrl, resolvePostImages } from "@/lib/storage/resolve-media";
+import { getBoundaries } from "@/lib/dm/boundaries";
+import { getVisibleBondsForProfile } from "@/lib/profile/bonds";
+import { canViewPracticesFor, getUserPractices } from "@/lib/profile/practices";
+import { getPrivateNote } from "@/lib/profile/private-notes";
+import { formatMemberNumber } from "@/lib/profile/member-number";
 import { LEVEL_NAMES } from "@/lib/rating/levels";
 import {
   REP_NUMBER_ENABLED,
@@ -23,25 +33,18 @@ import {
 import { isFounder } from "@/lib/config/founder";
 
 /**
- * Member profile — looked up by `username` (User Profiles task,
- * 2026-07-17), replacing the old id-based `/profile/[id]`. Real header
- * data, house memberships, last 5 posts, and (owner-only) a REP event
- * ledger. Still no full tab system (PRODUCT.md's stats/achievements/
- * content/reviews tabs) — everything renders as flat sections, same
- * pattern as before.
+ * Member profile — looked up by `username`.
  *
- * Members & Follows (OBSIDIAN_ROADMAP_v3.1, 2026-07-30): a Follow
- * button + modest follower/following counts on every profile. The Feed
- * stays club-wide chronological for v1 — following doesn't filter it
- * yet (see BACKLOG.md).
- *
- * Reviews (list + submission form) moved behind REP_UI_ENABLED at the
- * time (2026-07-29), split into REVIEWS_UI_ENABLED (2026-09-27, see
- * feature-flags.ts) when the REP number itself shipped separately —
- * Max's design for the Members→profile tap-through was explicit: "No
- * REP, no reviews (already flagged off)." Previously only the REP
- * number/stars were gated; the reviews themselves weren't (see
- * TECH_DEBT.md, 2026-07-29's open question — now resolved).
+ * Profile lite (Package 4, Phase B, 2026-10-13, see DECISIONS.md) —
+ * restructured into a header (avatar/name/Title/Member №/city/bonds)
+ * plus tabs "About" (practices rows, About text, reviews/houses/REP
+ * history where their own flags allow, invited-by/partner) and
+ * "Photos" (a grid of every image from this member's posts — replaces
+ * the old flat "Recent Posts" full-card list; a text-only post with no
+ * image no longer appears anywhere on a profile under this layout —
+ * see DECISIONS.md). Public follower/following counts removed
+ * (explicit instruction — reverses the 2026-07-30 "Members & Follows"
+ * feature's own public counts).
  *
  * "Invited by [name]" / "Partner of [name]" (Invitation & Partner
  * system v1, 2026-08-01) — quiet lines, shown whenever set, for anyone
@@ -90,7 +93,7 @@ export default async function ProfilePage({ params }: { params: { username: stri
     );
   }
 
-  const [reviews, repHistory, memberships, posts, followerCount, followingCount, isFollowing] =
+  const [reviews, repHistory, memberships, posts, isFollowing, ownerBoundaries, bonds, practicesVisible, pendingBonds, existingBondWithViewer, privateNote] =
     await Promise.all([
       REVIEWS_UI_ENABLED
         ? prisma.review.findMany({
@@ -121,18 +124,9 @@ export default async function ProfilePage({ params }: { params: { username: stri
       prisma.post.findMany({
         where: { authorId: user.id, isPublished: true },
         orderBy: { publishedAt: "desc" },
-        take: 5,
+        take: 20,
         select: {
           id: true,
-          title: true,
-          content: true,
-          type: true,
-          likesCount: true,
-          createdAt: true,
-          author: { select: { id: true, username: true, displayName: true, avatarUrl: true, level: true, rep: true } },
-          house: { select: { id: true, name: true, slug: true } },
-          likes: { where: { userId: viewer?.id ?? "" }, select: { userId: true } },
-          _count: { select: { comments: true } },
           images: {
             where: { isDeleted: false },
             orderBy: { position: "asc" },
@@ -140,13 +134,39 @@ export default async function ProfilePage({ params }: { params: { username: stri
           },
         },
       }),
-      prisma.follow.count({ where: { followingId: user.id } }),
-      prisma.follow.count({ where: { followerId: user.id } }),
       viewer && !isOwnProfile
         ? prisma.follow.findUnique({
             where: { followerId_followingId: { followerId: viewer.id, followingId: user.id } },
           })
         : Promise.resolve(null),
+      // Profile lite (Package 4, Phase B, 2026-10-13, see DECISIONS.md)
+      getBoundaries(user.id),
+      getVisibleBondsForProfile(user.id),
+      canViewPracticesFor(viewer?.id ?? null, user.id),
+      isOwnProfile
+        ? prisma.bond.findMany({
+            where: { toUserId: user.id, status: "pending" },
+            orderBy: { createdAt: "asc" },
+            select: {
+              id: true,
+              kind: true,
+              createdAt: true,
+              fromUser: { select: { id: true, username: true, displayName: true, avatarUrl: true } },
+            },
+          })
+        : Promise.resolve([]),
+      viewer && !isOwnProfile
+        ? prisma.bond.findFirst({
+            where: {
+              OR: [
+                { fromUserId: viewer.id, toUserId: user.id },
+                { fromUserId: user.id, toUserId: viewer.id },
+              ],
+            },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
+      viewer && !isOwnProfile ? getPrivateNote(viewer.id, user.id) : Promise.resolve(null),
     ]);
 
   const stars = Math.round(Number(user.reputation));
@@ -154,18 +174,121 @@ export default async function ProfilePage({ params }: { params: { username: stri
     ? new Date(user.joinedAt).toLocaleDateString("en-US", { timeZone: "UTC" })
     : null;
 
+  const practices = practicesVisible
+    ? await getUserPractices(user.id)
+    : { limit: [], practice: [], curious: [] };
+
   // Private storage (task 2, 2026-09-23, see DECISIONS.md).
-  const [profileAvatarUrl, postAvatarUrls, veilEnabled] = await Promise.all([
-    resolveAvatarUrl(user.avatarUrl),
-    resolveAvatarUrls(posts.map((p) => p.author.avatarUrl)),
-    viewer ? getVeilEnabled(viewer.id) : Promise.resolve(false),
-  ]);
-  const resolvedPosts = await Promise.all(
-    posts.map(async (post, i) => ({
-      ...post,
-      images: await resolvePostImages(post.images),
-      author: { ...post.author, avatarUrl: postAvatarUrls[i] },
+  // resolvePostImages() drops any image whose signed URL couldn't be
+  // resolved, so its output can be shorter than its input — pairing by
+  // the resolved image's own `id` (not by array index) is what keeps
+  // each photo matched to the right post despite that.
+  const profileAvatarUrl = await resolveAvatarUrl(user.avatarUrl);
+  const allImages = posts.flatMap((p) => p.images.map((img) => ({ postId: p.id, image: img })));
+  const postIdByImageId = new Map(allImages.map((i) => [i.image.id, i.postId]));
+  const resolvedImages = await resolvePostImages(allImages.map((i) => i.image));
+  const photos = resolvedImages.map((img) => ({ postId: postIdByImageId.get(img.id)!, imageUrl: img.url }));
+
+  const pendingBondsResolved = await Promise.all(
+    pendingBonds.map(async (b) => ({
+      id: b.id,
+      kind: b.kind,
+      createdAt: b.createdAt.toISOString(),
+      fromUser: { ...b.fromUser, avatarUrl: await resolveAvatarUrl(b.fromUser.avatarUrl) },
     })),
+  );
+
+  const aboutContent = (
+    <div>
+      <PracticesRows practices={practices} />
+
+      {user.bio ? <p className="text-body mt-6">{user.bio}</p> : null}
+
+      {memberships.length > 0 ? (
+        <section className="mt-10">
+          <p className="text-label mb-3">Houses</p>
+          <ul className="flex flex-wrap gap-2">
+            {memberships.map((m) => (
+              <li key={m.id}>
+                <a
+                  href={`/houses/${m.house.slug}`}
+                  className="text-caption inline-block rounded-ob border px-3 py-1.5 uppercase tracking-brand"
+                  style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
+                >
+                  {m.house.name}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {viewer && !isOwnProfile && REVIEWS_UI_ENABLED ? (
+        <section className="mt-10">
+          <p className="text-label mb-3">Leave a Review</p>
+          <ReviewForm reviewedId={user.id} />
+        </section>
+      ) : null}
+
+      {isOwnProfile && REP_HISTORY_UI_ENABLED ? (
+        <section className="mt-10">
+          <p className="text-label mb-3">REP History</p>
+          {repHistory.length === 0 ? (
+            <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
+              No REP events yet.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {repHistory.map((h) => (
+                <li key={h.id} className="card flex items-center justify-between gap-4 !py-3">
+                  <div>
+                    <p className="text-data !text-sm">{h.reason ?? h.source ?? "REP event"}</p>
+                    <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
+                      {new Date(h.createdAt).toLocaleDateString("en-US", { timeZone: "UTC" })}
+                    </p>
+                  </div>
+                  <p
+                    className="text-data shrink-0"
+                    style={{ color: h.delta >= 0 ? "var(--color-success)" : "var(--color-error)" }}
+                  >
+                    {h.delta >= 0 ? `+${h.delta}` : h.delta}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : null}
+
+      {REVIEWS_UI_ENABLED ? (
+        <section className="mt-10">
+          <p className="text-label mb-3">Reviews</p>
+          {reviews.length === 0 ? (
+            <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
+              No reviews yet.
+            </p>
+          ) : (
+            <ul className="space-y-3">
+              {reviews.map((r) => (
+                <li key={r.id} className="card">
+                  <div className="flex items-center justify-between">
+                    <p className="text-data">{r.reviewer.displayName}</p>
+                    <p aria-label={`${r.rating} out of 5 stars`}>
+                      {Array.from({ length: 5 }, (_, i) => (
+                        <span key={i} className={i < r.rating ? "star-filled" : "star-empty"}>
+                          ★
+                        </span>
+                      ))}
+                    </p>
+                  </div>
+                  {r.comment ? <p className="text-body mt-2 !text-base">{r.comment}</p> : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : null}
+    </div>
   );
 
   return (
@@ -196,6 +319,13 @@ export default async function ProfilePage({ params }: { params: { username: stri
           </p>
         ) : null}
 
+        {/* Member № (Profile lite, B1, Package 4, Phase B, 2026-10-13,
+            see DECISIONS.md) — "Founder" for Lord Obsidian, never a
+            number. */}
+        <p className="text-caption mt-1" style={{ color: "var(--color-text-muted)" }}>
+          {formatMemberNumber(user.memberNumber, isFounder(user.id))}
+        </p>
+
         {REVIEWS_UI_ENABLED ? (
           <div className="mt-3 flex items-center gap-4">
             <p aria-label={`${stars} out of 5 stars`}>
@@ -208,14 +338,22 @@ export default async function ProfilePage({ params }: { params: { username: stri
           </div>
         ) : null}
 
-        <p className="text-caption mt-4" style={{ color: "var(--color-text-secondary)" }}>
-          {[user.locationCity, user.locationCountry].filter(Boolean).join(", ") || "Location not shared"}
-          {memberSince ? ` · Member since ${memberSince}` : ""}
-        </p>
+        {/* City only when the owner's own Boundaries allow it
+            (lib/dm/boundaries.ts — off by default, Package 4, Phase A,
+            2026-10-13, see DECISIONS.md) — reverses the previous
+            always-shown-if-set behavior. */}
+        {ownerBoundaries.showCity && (user.locationCity || user.locationCountry) ? (
+          <p className="text-caption mt-4" style={{ color: "var(--color-text-secondary)" }}>
+            {[user.locationCity, user.locationCountry].filter(Boolean).join(", ")}
+            {memberSince ? ` · Member since ${memberSince}` : ""}
+          </p>
+        ) : memberSince ? (
+          <p className="text-caption mt-4" style={{ color: "var(--color-text-secondary)" }}>
+            Member since {memberSince}
+          </p>
+        ) : null}
 
-        <p className="text-caption mt-1" style={{ color: "var(--color-text-muted)" }}>
-          {followerCount} {followerCount === 1 ? "follower" : "followers"} · {followingCount} following
-        </p>
+        <BondsList bonds={bonds} canDissolve={isOwnProfile} />
 
         {/* Nullable username (2026-09-25, see DECISIONS.md) — invitedBy/
             partner are other members, who could in principle be an
@@ -248,8 +386,6 @@ export default async function ProfilePage({ params }: { params: { username: stri
           </p>
         ) : null}
 
-        {user.bio ? <p className="text-body mt-6">{user.bio}</p> : null}
-
         {isOwnProfile ? (
           <a href="/profile/edit" className="btn-ghost mt-6 inline-block">
             Edit profile
@@ -271,12 +407,12 @@ export default async function ProfilePage({ params }: { params: { username: stri
         ) : null}
 
         {/* Direct Messages (2026-09-14, item 1) — state (start / pending
-            either direction / existing thread / hidden) computed by
-            lib/dm/relationship.ts#getMessageButtonState; the API
-            re-checks everything else (two-strike door, daily limit)
-            regardless, this just avoids showing a button that would
-            always reject outright, or the wrong shape of button
-            (item 2, 2026-09-20, see DECISIONS.md). */}
+            either direction / existing thread / hidden/closed) computed
+            by lib/dm/relationship.ts#getMessageButtonState; the API
+            re-checks everything else (two-strike door, daily limit,
+            Boundaries) regardless, this just avoids showing a button
+            that would always reject outright, or the wrong shape of
+            button (item 2, 2026-09-20, see DECISIONS.md). */}
         {viewer && !isOwnProfile && messageButtonState && messageButtonState.type !== "hidden" ? (
           <div className="mt-4">
             <MessageButton
@@ -287,111 +423,17 @@ export default async function ProfilePage({ params }: { params: { username: stri
           </div>
         ) : null}
 
-        {memberships.length > 0 ? (
-          <section className="mt-10">
-            <p className="text-label mb-3">Houses</p>
-            <ul className="flex flex-wrap gap-2">
-              {memberships.map((m) => (
-                <li key={m.id}>
-                  <a
-                    href={`/houses/${m.house.slug}`}
-                    className="text-caption inline-block rounded-ob border px-3 py-1.5 uppercase tracking-brand"
-                    style={{ borderColor: "var(--color-border)", color: "var(--color-text-secondary)" }}
-                  >
-                    {m.house.name}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </section>
+        {viewer && !isOwnProfile && !existingBondWithViewer ? (
+          <div className="mt-4">
+            <BondRequestButton toUserId={user.id} />
+          </div>
         ) : null}
 
-        {viewer && !isOwnProfile && REVIEWS_UI_ENABLED ? (
-          <section className="mt-10">
-            <p className="text-label mb-3">Leave a Review</p>
-            <ReviewForm reviewedId={user.id} />
-          </section>
-        ) : null}
+        {isOwnProfile ? <PendingBondRequests initialRequests={pendingBondsResolved} /> : null}
 
-        {isOwnProfile && REP_HISTORY_UI_ENABLED ? (
-          <section className="mt-10">
-            <p className="text-label mb-3">REP History</p>
-            {repHistory.length === 0 ? (
-              <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
-                No REP events yet.
-              </p>
-            ) : (
-              <ul className="space-y-2">
-                {repHistory.map((h) => (
-                  <li key={h.id} className="card flex items-center justify-between gap-4 !py-3">
-                    <div>
-                      <p className="text-data !text-sm">{h.reason ?? h.source ?? "REP event"}</p>
-                      <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
-                        {new Date(h.createdAt).toLocaleDateString("en-US", { timeZone: "UTC" })}
-                      </p>
-                    </div>
-                    <p
-                      className="text-data shrink-0"
-                      style={{ color: h.delta >= 0 ? "var(--color-success)" : "var(--color-error)" }}
-                    >
-                      {h.delta >= 0 ? `+${h.delta}` : h.delta}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        ) : null}
+        <ProfileTabs about={aboutContent} photos={<ProfilePhotoGrid photos={photos} />} />
 
-        {REVIEWS_UI_ENABLED ? (
-          <section className="mt-10">
-            <p className="text-label mb-3">Reviews</p>
-            {reviews.length === 0 ? (
-              <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
-                No reviews yet.
-              </p>
-            ) : (
-              <ul className="space-y-3">
-                {reviews.map((r) => (
-                  <li key={r.id} className="card">
-                    <div className="flex items-center justify-between">
-                      <p className="text-data">{r.reviewer.displayName}</p>
-                      <p aria-label={`${r.rating} out of 5 stars`}>
-                        {Array.from({ length: 5 }, (_, i) => (
-                          <span key={i} className={i < r.rating ? "star-filled" : "star-empty"}>
-                            ★
-                          </span>
-                        ))}
-                      </p>
-                    </div>
-                    {r.comment ? <p className="text-body mt-2 !text-base">{r.comment}</p> : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        ) : null}
-
-        <section className="mt-10">
-          <p className="text-label mb-3">Recent Posts</p>
-          {posts.length === 0 ? (
-            <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
-              No posts yet.
-            </p>
-          ) : (
-            <div className="space-y-6">
-              {resolvedPosts.map((post) => (
-                <PostCard
-                  key={post.id}
-                  post={post as FeedPost}
-                  viewerId={viewer?.id}
-                  viewerIsAdmin={viewer?.isAdmin}
-                  viewerVeilEnabled={veilEnabled}
-                />
-              ))}
-            </div>
-          )}
-        </section>
+        {viewer && !isOwnProfile ? <PrivateNoteEditor subjectId={user.id} initialBody={privateNote} /> : null}
       </div>
     </main>
   );

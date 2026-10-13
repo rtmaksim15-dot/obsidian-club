@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import { requireAgeVerifiedApi } from "@/lib/age-verification/gate";
 import { checkProfileCompleteBonus } from "@/lib/rating/rep-engine";
+import { validateAboutText } from "@/lib/profile/about-text";
 import { errCode } from "@/lib/utils/safe-error";
 
 const VALID_ROLES: MemberRole[] = ["dominant", "submissive", "switch", "observer", "newcomer"];
@@ -111,8 +112,15 @@ export async function PATCH(request: Request) {
       { status: 422 },
     );
   }
-  if (bio && bio.length > 300) {
-    return NextResponse.json({ error: "Bio must be 300 characters or fewer." }, { status: 422 });
+  // Profile lite, B6 (Package 4, Phase B, 2026-10-13, see DECISIONS.md)
+  // — "About text" in the new profile layout is this same `bio`
+  // column, not a new field; limit raised 300 -> 600 along with the
+  // new contact-info rejection.
+  if (bio) {
+    const aboutValidation = validateAboutText(bio);
+    if (!aboutValidation.ok) {
+      return NextResponse.json({ error: aboutValidation.error }, { status: 422 });
+    }
   }
 
   let role: MemberRole | undefined;

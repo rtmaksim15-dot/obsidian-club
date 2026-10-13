@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/auth/require-admin";
 import { prisma } from "@/lib/db/prisma";
 import { TOKEN_SELECT, shapeTokenRow, sortTokensFailedFirst } from "@/lib/admin/token-shape";
 import { isRitualComplete } from "@/lib/auth/ritual";
+import { resolveAvatarUrls } from "@/lib/storage/resolve-media";
 import AdminConsole from "@/components/admin/AdminConsole";
 
 // Admin Console (2026-09-09, see DECISIONS.md) — Part B of the
@@ -196,6 +197,7 @@ export default async function AdminConsolePage() {
         displayName: true,
         username: true,
         email: true,
+        avatarUrl: true,
         rep: true,
         level: true,
         trustScore: true,
@@ -610,6 +612,12 @@ export default async function AdminConsolePage() {
     : [];
   const nameById = new Map(nameLookupRows.map((r) => [r.id, r.displayName]));
 
+  // Profile lite, B7 (Package 4, Phase B, 2026-10-13, see DECISIONS.md)
+  // — People zone's avatar thumbnail + "Remove avatar" action need a
+  // resolved (signed, private-storage) URL, same pattern as every
+  // other avatar render in this app.
+  const peopleAvatarUrls = await resolveAvatarUrls(peopleBase.map((p) => p.avatarUrl));
+
   return (
     <AdminConsole
       counts={{ ...counts, acceptedNotJoined: acceptedNotJoinedCount }}
@@ -668,11 +676,12 @@ export default async function AdminConsolePage() {
         memberAgeVerified: a.memberAgeVerified,
         memberOnboardingComplete: a.memberOnboardingComplete,
       }))}
-      people={peopleBase.map((p) => ({
+      people={peopleBase.map((p, i) => ({
         id: p.id,
         displayName: p.displayName,
         username: p.username,
         email: p.email,
+        avatarUrl: peopleAvatarUrls[i],
         rep: p.rep,
         level: p.level,
         trustScore: p.trustScore,

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import ProfileEditForm from "@/components/shared/ProfileEditForm";
 import CloseAccountButton from "@/components/shared/CloseAccountButton";
+import PracticesEditor from "@/components/shared/PracticesEditor";
 import { resolveAvatarUrl } from "@/lib/storage/resolve-media";
 
 // Self-edit only — no [id]/[username] param at all, since this can only
@@ -31,6 +32,11 @@ export default async function ProfileEditPage() {
             usernameChangeUsed: Boolean(user.usernameChangedAt),
           }}
         />
+
+        <div className="mt-10 border-t border-ob-border pt-6">
+          <p className="text-label mb-4">Practices</p>
+          <PracticesEditor />
+        </div>
 
         <div className="mt-10">
           <CloseAccountButton />

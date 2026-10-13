@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Person } from "./AdminConsole";
 import { levelName } from "@/lib/rating/levels";
 import { formatAdminDateTime as formatDate, formatAdminDateOnly as formatDay } from "@/lib/admin/format-date";
+import ConfirmDialog from "@/components/shared/ConfirmDialog";
 
 // Zone 2 full depth (2026-09-11, see DECISIONS.md). Reuses the existing
 // PATCH /api/admin/members/[id] action route unchanged for the
@@ -29,6 +30,12 @@ export default function PersonDetail({
   const [noteDraft, setNoteDraft] = useState("");
   const [notePending, setNotePending] = useState(false);
   const [noteError, setNoteError] = useState<string | null>(null);
+  // Profile lite, B7 (Package 4, Phase B, 2026-10-13, see DECISIONS.md)
+  const [avatarUrl, setAvatarUrl] = useState(person.avatarUrl);
+  const [removingAvatar, setRemovingAvatar] = useState(false);
+  const [removeAvatarReason, setRemoveAvatarReason] = useState("");
+  const [confirmingRemoveAvatar, setConfirmingRemoveAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
 
   async function addNote() {
     const text = noteDraft.trim();
@@ -72,8 +79,34 @@ export default function PersonDetail({
     }
   }
 
+  async function removeAvatar() {
+    setConfirmingRemoveAvatar(false);
+    setAvatarError(null);
+    try {
+      const res = await fetch(`/api/admin/members/${person.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ removeAvatar: true, removeAvatarReason }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || "Something went wrong.");
+      setAvatarUrl(null);
+      setRemovingAvatar(false);
+      setRemoveAvatarReason("");
+      onUpdate(person.id, { avatarUrl: null });
+    } catch (e) {
+      setAvatarError(e instanceof Error ? e.message : "Something went wrong.");
+    }
+  }
+
   return (
     <div>
+      {avatarUrl ? (
+        <div className="avatar h-16 w-16 mb-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={avatarUrl} alt={person.displayName} className="h-full w-full object-cover" />
+        </div>
+      ) : null}
       <p className="text-h2 !text-base">{person.displayName}</p>
       <p className="text-data mt-1">{person.email}</p>
       <p className="text-caption mt-1" style={{ color: "var(--color-text-muted)" }}>
@@ -131,6 +164,68 @@ export default function PersonDetail({
           </p>
         ) : null}
       </div>
+
+      {/* Profile lite, B7 (Package 4, Phase B, 2026-10-13, see
+          DECISIONS.md) — soft-removes an explicit avatar; always
+          available (not conditioned on avatarUrl being set — a member
+          could re-upload one at any point, so the action is simply a
+          no-op server-side if there's nothing to clear). */}
+      <div className="mt-6 border-t border-ob-border pt-4">
+        <p className="text-label mb-2">Avatar</p>
+        {!removingAvatar ? (
+          <button type="button" className="btn-secondary" onClick={() => setRemovingAvatar(true)}>
+            Remove avatar
+          </button>
+        ) : (
+          <div>
+            <label className="input-label" htmlFor="remove-avatar-reason">
+              Reason
+            </label>
+            <textarea
+              id="remove-avatar-reason"
+              className="input mt-1"
+              rows={2}
+              value={removeAvatarReason}
+              onChange={(e) => setRemoveAvatarReason(e.target.value)}
+              placeholder="Why is this avatar being removed?"
+            />
+            <div className="mt-2 flex gap-2">
+              <button
+                type="button"
+                className="btn-danger"
+                disabled={!removeAvatarReason.trim()}
+                onClick={() => setConfirmingRemoveAvatar(true)}
+              >
+                Remove
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => {
+                  setRemovingAvatar(false);
+                  setRemoveAvatarReason("");
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+        {avatarError ? (
+          <p className="text-caption mt-2" style={{ color: "var(--color-error)" }}>
+            {avatarError}
+          </p>
+        ) : null}
+      </div>
+
+      {confirmingRemoveAvatar ? (
+        <ConfirmDialog
+          title="Remove this member's avatar? This cannot be undone."
+          confirmLabel="Remove"
+          onConfirm={removeAvatar}
+          onCancel={() => setConfirmingRemoveAvatar(false)}
+        />
+      ) : null}
 
       {person.invitedByName || person.inviteeNames.length > 0 || person.partnerName ? (
         <div className="mt-6 border-t border-ob-border pt-4">
