@@ -2,13 +2,19 @@ import "server-only";
 import { checkRateLimit } from "@/lib/security/rate-limit";
 import { prisma } from "@/lib/db/prisma";
 
-// Five outbound requests per sender per day, across all recipients
-// (item 4) — reuses RateLimitHit/checkRateLimit (the same DB-backed
+// Outbound requests per sender per day, across all recipients (item 4,
+// 2026-09-14) — reuses RateLimitHit/checkRateLimit (the same DB-backed
 // limiter apply/register/join already use), keyed per sender rather
 // than per IP. Sliding 24-hour window, not a calendar-day reset —
 // simpler, no timezone to pick, and it's the infrastructure that
 // already exists.
-export const DAILY_REQUEST_LIMIT = 5;
+//
+// Raised 5 -> 10 (Package 4, Phase A, 2026-10-13, see DECISIONS.md) —
+// the task's own explicit number, now that My Boundaries gives a
+// recipient a real way to close their door entirely (whoCanMessage/
+// acceptRequests) rather than relying solely on this sender-side daily
+// cap to keep volume manageable.
+export const DAILY_REQUEST_LIMIT = 10;
 const WINDOW_MS = 24 * 60 * 60 * 1000;
 
 function limitKey(senderId: string): string {

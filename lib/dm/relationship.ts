@@ -4,13 +4,22 @@ import { prisma } from "@/lib/db/prisma";
 import { needsDmRulesAcceptance } from "@/lib/legal/dm-rules";
 import { effectiveRequestStatus, isStrike } from "./lifecycle";
 import { MAX_STRIKES } from "./eligibility";
+import { getBoundariesVerdict } from "./boundaries";
 
 export type MessageButtonState =
   | { type: "hidden" }
   | { type: "start"; needsDmRules: boolean }
   | { type: "outgoing_pending" }
   | { type: "incoming_pending"; requestId: string }
-  | { type: "thread"; threadId: string };
+  | { type: "thread"; threadId: string }
+  // My Boundaries (Package 4, Phase A, 2026-10-13, see DECISIONS.md) —
+  // the recipient's own boundaries close the door to a brand new
+  // request from this viewer specifically. Distinct from "hidden"
+  // (the two-strike door, or viewer === target): this is shown as
+  // plain text with the recipient's own reason, not simply omitted,
+  // so the viewer knows why there's no button rather than wondering
+  // if the profile is just missing one.
+  | { type: "closed"; reason: string };
 
 /**
  * Drives the profile "Message" button (item 2, 2026-09-20, see
@@ -67,6 +76,11 @@ export async function getMessageButtonState(viewer: User, targetId: string): Pro
   });
   if (priorRequests.filter(isStrike).length >= MAX_STRIKES) {
     return { type: "hidden" };
+  }
+
+  const boundariesVerdict = await getBoundariesVerdict(targetId, viewer.id);
+  if (!boundariesVerdict.allowed) {
+    return { type: "closed", reason: boundariesVerdict.reason };
   }
 
   return { type: "start", needsDmRules: await needsDmRulesAcceptance(viewer.id) };

@@ -140,8 +140,11 @@ export const GATHERINGS_UI_ENABLED = false;
 export const ATLAS_UI_ENABLED = false;
 
 // Navigation v2, MINE menu (Phase B) — "Seal of Authenticity" and "My
-// Boundaries" rows. Neither feature exists yet (no model, no route);
-// same not-built-yet posture as the four flags above. Default false.
+// Boundaries" rows. "Seal of Authenticity" still doesn't exist (no
+// model, no route) — stays off. "My Boundaries" shipped (Package 4,
+// Phase A, 2026-10-13, see DECISIONS.md): /boundaries,
+// lib/dm/boundaries.ts, wired into getRequestEligibility/
+// getMessageButtonState — flipped on.
 export const SEAL_UI_ENABLED = false;
-export const BOUNDARIES_UI_ENABLED = false;
+export const BOUNDARIES_UI_ENABLED = true;
 

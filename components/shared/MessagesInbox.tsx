@@ -33,10 +33,18 @@ function Avatar({ person }: { person: Person }) {
   );
 }
 
+type Tab = "conversations" | "requests";
+
 // Item 2 (the recipient's side) + the accepted-threads list, one page.
 // A request's profile link opens in a new tab — "returns to the
 // request without dismissing it" is then trivial: this tab never
 // navigates away, there's nothing to return to.
+//
+// Tabs "Conversations"/"Requests (N)" (Package 4, Phase A, 2026-10-13,
+// see DECISIONS.md, A5) — replaces the two always-both-visible sections
+// this page used before. Defaults to the Requests tab whenever there's
+// at least one pending request (the thing most likely to need a
+// decision), Conversations otherwise.
 export default function MessagesInbox({
   initialRequests,
   initialThreads,
@@ -46,6 +54,7 @@ export default function MessagesInbox({
 }) {
   const router = useRouter();
   const [requests, setRequests] = useState(initialRequests);
+  const [tab, setTab] = useState<Tab>(initialRequests.length > 0 ? "requests" : "conversations");
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -76,7 +85,7 @@ export default function MessagesInbox({
     <main className="min-h-screen bg-ob-black px-6 pb-16 pt-4 text-ob-text">
       <div className="mx-auto max-w-2xl">
         <p className="text-label mb-2">Direct Messages</p>
-        <h1 className="text-h1 mb-10">Messages</h1>
+        <h1 className="text-h1 mb-8">Messages</h1>
 
         {error ? (
           <p className="text-caption mb-6" style={{ color: "var(--color-error)" }}>
@@ -85,7 +94,7 @@ export default function MessagesInbox({
         ) : null}
 
         {requests.length === 0 && initialThreads.length === 0 ? (
-          <div className="mb-10">
+          <div>
             <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
               Conversations start from a member&apos;s profile — find someone and send a message.
             </p>
@@ -93,98 +102,121 @@ export default function MessagesInbox({
               Find members
             </a>
           </div>
-        ) : null}
+        ) : (
+          <>
+            <div className="mb-6 flex gap-2 border-b border-ob-border">
+              <button
+                type="button"
+                onClick={() => setTab("conversations")}
+                className="px-4 py-2 text-caption"
+                style={{
+                  color: tab === "conversations" ? "var(--color-text-primary)" : "var(--color-text-muted)",
+                  borderBottom: tab === "conversations" ? "2px solid var(--color-accent)" : "2px solid transparent",
+                }}
+              >
+                Conversations
+              </button>
+              <button
+                type="button"
+                onClick={() => setTab("requests")}
+                className="px-4 py-2 text-caption"
+                style={{
+                  color: tab === "requests" ? "var(--color-text-primary)" : "var(--color-text-muted)",
+                  borderBottom: tab === "requests" ? "2px solid var(--color-accent)" : "2px solid transparent",
+                }}
+              >
+                Requests ({requests.length})
+              </button>
+            </div>
 
-        {requests.length > 0 ? (
-          <section className="mb-10">
-            <p className="text-label mb-3">Requests</p>
-            <ul className="space-y-4">
-              {requests.map((r) => (
-                <li key={r.id} className="card">
-                  <div className="flex items-start gap-3">
-                    <Avatar person={r.sender} />
-                    <div className="min-w-0 flex-1">
-                      {/* Nullable username (2026-09-25, see DECISIONS.md)
-                          — a non-admin sender must already have one to
-                          have sent a request at all; only an admin
-                          without a username could hit this. */}
-                      <div className="flex items-baseline justify-between gap-3">
-                        {r.sender.username ? (
-                          <a
-                            href={`/profile/${r.sender.username}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-data"
-                          >
-                            {r.sender.displayName}
-                          </a>
-                        ) : (
-                          <span className="text-data">{r.sender.displayName}</span>
-                        )}
-                        <span className="text-caption shrink-0" style={{ color: "var(--color-text-muted)" }}>
-                          {new Date(r.createdAt).toLocaleString("en-US", {
-                            dateStyle: "medium",
-                            timeStyle: "short",
-                            timeZone: "UTC",
-                          })}
-                        </span>
+            {tab === "requests" ? (
+              requests.length === 0 ? (
+                <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
+                  No one waits at your door.
+                </p>
+              ) : (
+                <ul className="space-y-4">
+                  {requests.map((r) => (
+                    <li key={r.id} className="card">
+                      <div className="flex items-start gap-3">
+                        <Avatar person={r.sender} />
+                        <div className="min-w-0 flex-1">
+                          {/* Nullable username (2026-09-25, see DECISIONS.md)
+                              — a non-admin sender must already have one to
+                              have sent a request at all; only an admin
+                              without a username could hit this. */}
+                          <div className="flex items-baseline justify-between gap-3">
+                            {r.sender.username ? (
+                              <a
+                                href={`/profile/${r.sender.username}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-data"
+                              >
+                                {r.sender.displayName}
+                              </a>
+                            ) : (
+                              <span className="text-data">{r.sender.displayName}</span>
+                            )}
+                            <span className="text-caption shrink-0" style={{ color: "var(--color-text-muted)" }}>
+                              {new Date(r.createdAt).toLocaleString("en-US", {
+                                dateStyle: "medium",
+                                timeStyle: "short",
+                                timeZone: "UTC",
+                              })}
+                            </span>
+                          </div>
+                          <p className="text-body mt-1 !text-base">{r.openingMessage}</p>
+                        </div>
                       </div>
-                      <p className="text-body mt-1 !text-base">{r.openingMessage}</p>
-                    </div>
-                  </div>
-                  <div className="mt-4 flex gap-2">
-                    <button
-                      type="button"
-                      className="btn-primary"
-                      disabled={pending === r.id}
-                      onClick={() => respond(r.id, "accept")}
-                    >
-                      {pending === r.id ? "…" : "Accept"}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-danger"
-                      disabled={pending === r.id}
-                      onClick={() => respond(r.id, "decline")}
-                    >
-                      Decline
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </section>
-        ) : null}
-
-        {requests.length > 0 || initialThreads.length > 0 ? (
-        <section>
-          <p className="text-label mb-3">Conversations</p>
-          {initialThreads.length === 0 ? (
-            <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
-              Nothing here yet.
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {initialThreads.map((t) => (
-                <li key={t.id}>
-                  <a href={`/messages/${t.id}`} className="card flex items-center gap-3">
-                    <Avatar person={t.otherParticipant} />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-data">{t.otherParticipant.displayName}</p>
-                      {t.lastMessage ? (
-                        <p className="text-caption mt-0.5 truncate" style={{ color: "var(--color-text-secondary)" }}>
-                          {t.lastMessage.fromMe ? "You: " : ""}
-                          {t.lastMessage.isDeleted ? "Message removed by moderator." : t.lastMessage.content}
-                        </p>
-                      ) : null}
-                    </div>
-                  </a>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-        ) : null}
+                      <div className="mt-4 flex gap-2">
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          disabled={pending === r.id}
+                          onClick={() => respond(r.id, "accept")}
+                        >
+                          {pending === r.id ? "…" : "Accept"}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-danger"
+                          disabled={pending === r.id}
+                          onClick={() => respond(r.id, "decline")}
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )
+            ) : initialThreads.length === 0 ? (
+              <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
+                Nothing here yet.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {initialThreads.map((t) => (
+                  <li key={t.id}>
+                    <a href={`/messages/${t.id}`} className="card flex items-center gap-3">
+                      <Avatar person={t.otherParticipant} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-data">{t.otherParticipant.displayName}</p>
+                        {t.lastMessage ? (
+                          <p className="text-caption mt-0.5 truncate" style={{ color: "var(--color-text-secondary)" }}>
+                            {t.lastMessage.fromMe ? "You: " : ""}
+                            {t.lastMessage.isDeleted ? "Message removed by moderator." : t.lastMessage.content}
+                          </p>
+                        ) : null}
+                      </div>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
       </div>
     </main>
   );

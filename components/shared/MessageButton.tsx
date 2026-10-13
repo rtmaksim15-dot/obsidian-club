@@ -7,7 +7,8 @@ type State =
   | { type: "start"; needsDmRules: boolean }
   | { type: "outgoing_pending" }
   | { type: "incoming_pending"; requestId: string }
-  | { type: "thread"; threadId: string };
+  | { type: "thread"; threadId: string }
+  | { type: "closed"; reason: string };
 
 /**
  * Profile "Message" button (item 2, 2026-09-20, see DECISIONS.md) —
@@ -121,6 +122,17 @@ export default function MessageButton({
     return (
       <p className="text-caption" style={{ color: "var(--color-text-secondary)" }}>
         {sentNotice ?? "Request sent."}
+      </p>
+    );
+  }
+
+  // My Boundaries (Package 4, Phase A, 2026-10-13, see DECISIONS.md) —
+  // the recipient's own boundaries close the door; shown as plain text
+  // with their reason, not a button that would just fail on click.
+  if (state.type === "closed") {
+    return (
+      <p className="text-caption" style={{ color: "var(--color-text-secondary)" }}>
+        {state.reason}
       </p>
     );
   }

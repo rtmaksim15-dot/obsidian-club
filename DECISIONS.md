@@ -3156,3 +3156,113 @@ New test: `lib/pwa/sw-config.test.ts` (3 — unset defaults to enabled,
 `tsc`/`lint`/`npm test`/`npm run build` all clean. Pushed to
 `origin/main` immediately after, per this go-ahead's own instruction
 — see the commit hash reported back in chat.
+
+### 2026-10-13 — Package 4, Phase A: My Boundaries + message Requests
+
+Task framing vs. reality, found during the read-first research this
+task's own GLOBAL RULES required: the task describes building a
+request/consent gate from scratch (`Conversation.status` 'active'/
+'request'/'declined', `requestedById`, "first message creates a
+request," "sender can send exactly ONE message until accepted"). All
+of that already exists, shipped 2026-09-14 (`ConversationRequest`/
+`Thread`/`ThreadParticipant`/`DirectMessage`, `lib/dm/eligibility.ts`,
+`lib/dm/relationship.ts`) — and in a stricter form than the task's own
+framing assumes: today EVERY first contact already requires an
+accepted request; there is no "direct message" path to restrict in the
+first place. Concretely, mapped onto what's real:
+
+- **A2 ("Conversation gets status 'active'/'request'/'declined', with
+  backfill") — not applicable, no schema change.** The existing
+  `ConversationRequest.status` + `Thread`'s mere existence already
+  encode exactly this (pending='request', declined='declined', a
+  `Thread` existing='active'); a new column would duplicate it. No
+  existing conversation needs backfilling — every live `Thread` already
+  came from an accepted request, so it's already "active" by
+  construction.
+- **A3's "sender can send exactly ONE message until accepted" — true
+  by construction, not a new rule.** No `Thread` exists pre-accept, so
+  there's nowhere for a second message to go. Nothing to add.
+- **A1/A3/A4/A5 are genuinely new** and are what this phase actually
+  built: Boundaries settings (`UserProfile.settings.boundaries`,
+  read-merge-write, no schema change — same JSON-field pattern as
+  `lib/profile/veil.ts`), wired into the existing
+  `getRequestEligibility`/`getMessageButtonState` as the single new
+  gate they didn't have before, `/boundaries`, and `/messages`' tabs.
+
+**No migration file for Phase A** — every one of the above needed zero
+schema changes. "Two migration files written (A, B)" in this task's own
+DONE WHEN doesn't hold; only Phase B's needs one. Flagged rather than
+manufacturing an empty one.
+
+**Two further, deliberate departures from the task's literal text,**
+both because they explicitly contradict existing, previously-documented
+product decisions rather than filling a gap — implemented as asked,
+flagged here per instruction:
+
+1. **Decline is now silent to the sender** (`PATCH /api/dm/requests/
+   [id]`, the `dm.request_declined` notification removed). This
+   directly reverses the original 2026-09-14 decision, documented in
+   that same migration's era: "Decline is reported back to the sender
+   plainly, no reason — same 'silence is not the answer' principle
+   that already governs Waitlist's decline email." This task's own A3
+   explicitly asks for the opposite ("sender is NOT told, sees nothing
+   new"), so implemented as asked — but this is a real product-stance
+   reversal, not an oversight either time.
+2. **`DAILY_REQUEST_LIMIT` raised 5 -> 10** (`lib/dm/limits.ts`) — the
+   task's own explicit number ("max 10 new requests per sender per
+   24h (existing rate limiter)"), read as "reuse the existing
+   mechanism, new threshold" rather than "the existing threshold is
+   10" (it was 5). Also fixed a hardcoded `"5"` in `app/api/dm/
+   requests/route.ts`'s error message that `DAILY_REQUEST_LIMIT`
+   itself didn't drive — would have silently lied about the real limit
+   once this changed.
+
+**What shipped:**
+- `lib/dm/boundaries-core.ts` (pure: `BoundariesSettings`,
+  `evaluateBoundaries`, `parseBoundaries`, defaults — `whoCanMessage:
+  "members"`, `showCity: false`, `acceptRequests: true`) and `lib/dm/
+  boundaries.ts` (the `"server-only"`/Prisma wrapper: `getBoundaries`/
+  `setBoundaries`/`getBoundariesVerdict`) — split the same way `lib/
+  pwa/update-bar.ts`/`chunk-error.ts` already are in this repo, so the
+  decision matrix is unit-testable without mocking `server-only`.
+- `getRequestEligibility` (`lib/dm/eligibility.ts`) now calls
+  `getBoundariesVerdict` right after the block check, before the
+  two-strike/outstanding-request history — a closed door is a closed
+  door regardless of this sender's own prior history with this
+  recipient.
+- `getMessageButtonState` (`lib/dm/relationship.ts`) gained a new
+  `{ type: "closed"; reason }` state (not folded into `"hidden"` —
+  shown as the recipient's own reason text, not simply omitted) for
+  the same check; `MessageButton.tsx` renders it as plain text instead
+  of a button that would just fail on click.
+- `/boundaries` (`app/(platform)/boundaries/page.tsx`,
+  `components/shared/BoundariesForm.tsx`) + `app/api/boundaries/route.ts`
+  (GET/PATCH, read-merge-write). `BOUNDARIES_UI_ENABLED` flipped true
+  in `lib/config/feature-flags.ts` — `MineMenu.tsx` already had the
+  flag-gated row wired to this exact route, built 2026-10-10, never
+  touched.
+- `MessagesInbox.tsx` restructured from two always-visible sections
+  into tabs "Conversations"/"Requests (N)" (defaults to Requests when
+  one exists), empty Requests copy "No one waits at your door." — same
+  accept/decline logic, unchanged.
+
+**Tests** (`lib/dm/boundaries-core.test.ts`, 5): the full allowed/
+denied matrix — default settings allow everyone; `whoCanMessage:
+"following"` allows only a followed sender, denies with the
+following-only message otherwise; `"nobody_new"` denies everyone;
+`acceptRequests: false` denies everyone regardless of `whoCanMessage`.
+
+**Listed test items not covered, and why** (A6's own list): "one-
+message limit" — not a rule to test, it's architectural (see above);
+nothing to assert beyond what already exists. "Decline is silent to
+sender" — no route-handler test harness exists anywhere in this
+codebase (every existing test is a pure/semi-pure `lib/` function, no
+mocked-Prisma route test has ever been built here); building one from
+scratch for a single assertion was judged disproportionate — verified
+by code review only (the `prisma.notification.create` call for decline
+is simply gone, see the diff). "Backfill keeps old chats active" — not
+applicable, no new column, nothing to backfill (see A2 above).
+
+`npx tsc --noEmit`, `npx next lint` (same one pre-existing, unrelated
+`AdminConsole.tsx` warning as every prior package), `npm test` (102
+passing), `npm run build` all clean. Committed locally, not pushed.

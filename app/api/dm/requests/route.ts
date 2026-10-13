@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/session";
 import { requireAgeVerifiedApi } from "@/lib/age-verification/gate";
 import { getRequestEligibility } from "@/lib/dm/eligibility";
-import { checkDailyRequestLimit } from "@/lib/dm/limits";
+import { checkDailyRequestLimit, DAILY_REQUEST_LIMIT } from "@/lib/dm/limits";
 import { effectiveRequestStatus, isRequestExpired } from "@/lib/dm/lifecycle";
 import { resolveAvatarUrls } from "@/lib/storage/resolve-media";
 import { errCode } from "@/lib/utils/safe-error";
@@ -102,7 +102,7 @@ export async function POST(request: Request) {
   const dailyLimit = await checkDailyRequestLimit(user.id);
   if (!dailyLimit.allowed) {
     return NextResponse.json(
-      { error: "You've reached today's limit of 5 requests. Try again tomorrow." },
+      { error: `You've reached today's limit of ${DAILY_REQUEST_LIMIT} requests. Try again tomorrow.` },
       { status: 429, headers: { "Retry-After": String(dailyLimit.retryAfterSeconds) } },
     );
   }

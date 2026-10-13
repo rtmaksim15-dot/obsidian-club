@@ -1344,3 +1344,17 @@ primary destination (2026-10-10). Worth revisiting whether a freshly
 launched installed app should land on `/feed` instead, but that's a
 product decision, not something this package's own DONE WHEN criteria
 touched.
+
+## Package 4, Phase A — My Boundaries + Requests (2026-10-13)
+
+Full report in DECISIONS.md. One gap, deliberately left:
+
+**"Decline is silent to the sender" has no automated test.** No
+route-handler test harness (mocked Prisma + a Next.js route module)
+exists anywhere in this codebase yet — every current test exercises a
+pure or semi-pure `lib/` function. Building that harness from scratch
+to cover one removed `prisma.notification.create` call was judged
+disproportionate for this package; verified by code review instead
+(the call is simply gone from `app/api/dm/requests/[id]/route.ts`). If
+a route-level test harness gets built for some other reason later,
+this is a natural first case to backfill.

@@ -12,13 +12,21 @@ type Body = { action?: "accept" | "decline" };
 // PATCH /api/dm/requests/:id — item 3 (Outcomes). Accept opens the
 // thread with the opening message already in it, at the message's real
 // original timestamp (when it was actually written), not the moment of
-// acceptance. Decline is reported back to the sender plainly, no
-// reason — same "silence is not the answer" principle that already
-// governs Waitlist's decline email in this codebase. Both are terminal;
-// neither branch ever echoes the request's openingMessage back in the
-// response — the recipient already has it from GET /api/dm/requests,
-// there's nothing to gain by repeating it, and once declined it must
-// not surface again anywhere (see DECISIONS.md, 2026-09-14).
+// acceptance. Both are terminal; neither branch ever echoes the
+// request's openingMessage back in the response — the recipient
+// already has it from GET /api/dm/requests, there's nothing to gain by
+// repeating it, and once declined it must not surface again anywhere
+// (see DECISIONS.md, 2026-09-14).
+//
+// Decline is now SILENT to the sender (Package 4, Phase A, 2026-10-13,
+// see DECISIONS.md) — no notification is created. This is a deliberate
+// reversal of the original 2026-09-14 decision ("decline is reported
+// back to the sender plainly, no reason — same 'silence is not the
+// answer' principle that already governs Waitlist's decline email");
+// this task's own spec explicitly asks for "sender is NOT told, sees
+// nothing new," which is the opposite rule. Flagged here, and in
+// DECISIONS.md, since it contradicts a previously deliberate, documented
+// product decision rather than filling a gap.
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const user = await getCurrentUser();
   if (!user) {
@@ -67,13 +75,6 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (updated.count === 0) {
       return NextResponse.json({ error: "This request is no longer pending." }, { status: 409 });
     }
-    await prisma.notification.create({
-      data: {
-        userId: existing.senderId,
-        type: "dm.request_declined",
-        title: `${user.displayName} declined your request`,
-      },
-    });
     return NextResponse.json({ ok: true });
   }
 

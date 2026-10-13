@@ -5,6 +5,7 @@ import { isRitualComplete } from "@/lib/auth/ritual";
 import { isBlockedEitherWay } from "@/lib/moderation/block";
 import { needsDmRulesAcceptance } from "@/lib/legal/dm-rules";
 import { effectiveRequestStatus, isStrike } from "./lifecycle";
+import { getBoundariesVerdict } from "./boundaries";
 
 export const MAX_STRIKES = 2;
 
@@ -52,6 +53,16 @@ export async function getRequestEligibility(
 
   if (await isBlockedEitherWay(sender.id, recipientId)) {
     return { ok: false, status: 403, error: "You can't reach this member." };
+  }
+
+  // My Boundaries (Package 4, Phase A, 2026-10-13, see DECISIONS.md) —
+  // the recipient's own whoCanMessage/acceptRequests preferences,
+  // checked before the two-strike/outstanding-request history below:
+  // a closed door is a closed door regardless of this particular
+  // sender's own history with this particular recipient.
+  const boundariesVerdict = await getBoundariesVerdict(recipientId, sender.id, client);
+  if (!boundariesVerdict.allowed) {
+    return { ok: false, status: 403, error: boundariesVerdict.reason };
   }
 
   const priorRequests = await client.conversationRequest.findMany({
