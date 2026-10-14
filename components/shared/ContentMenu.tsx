@@ -46,13 +46,17 @@ type Props = {
   deleteImage?: { postId: string; imageId: string };
   // Clean Hall, B3 (Package 5, Phase B, 2026-10-14, see DECISIONS.md) —
   // admin-only room-message delete, wired to the existing admin-only
-  // soft-delete route (app/api/admin/messages/[id]/route.ts, which
-  // already had "no member-facing equivalent" — a regular member
-  // deleting their OWN message has no existing action to reuse, so
-  // that part of "Delete for own/admin" isn't implemented; see
-  // DECISIONS.md). Only ever passed by a caller that already confirmed
-  // the viewer is an admin (RoomChat.tsx).
+  // soft-delete route (app/api/admin/messages/[id]/route.ts). Only
+  // ever passed by a caller that already confirmed the viewer is an
+  // admin AND it isn't that admin's own message (RoomChat.tsx uses
+  // `deleteOwnMessageId` below for that case instead).
   deleteMessageId?: string;
+  // Clean Hall, B3 follow-up (Package 5, Phase B, 2026-10-14, see
+  // DECISIONS.md) — a member deleting their OWN room message, wired to
+  // the new member-facing route (app/api/rooms/messages/[id]/route.ts,
+  // distinct from the admin-only one above — different endpoint,
+  // different eligibility rules, see lib/rooms/own-message-delete.ts).
+  deleteOwnMessageId?: string;
 };
 
 /**
@@ -75,6 +79,7 @@ export default function ContentMenu({
   blockInitialBlocked,
   deleteImage,
   deleteMessageId,
+  deleteOwnMessageId,
 }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -82,6 +87,7 @@ export default function ContentMenu({
   const [confirming, setConfirming] = useState<"delete" | "block" | "delete_image" | "delete_message" | null>(null);
   const [busy, setBusy] = useState(false);
   const [blocked, setBlocked] = useState(blockInitialBlocked ?? false);
+  const [deleteMessageError, setDeleteMessageError] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -135,18 +141,31 @@ export default function ContentMenu({
   }
 
   function handleDeleteMessage() {
-    if (!deleteMessageId || busy) return;
+    if ((!deleteMessageId && !deleteOwnMessageId) || busy) return;
     setOpen(false);
+    setDeleteMessageError(null);
     setConfirming("delete_message");
   }
 
   async function performDeleteMessage() {
-    if (!deleteMessageId) return;
+    // Clean Hall, B3 follow-up (Package 5, Phase B, 2026-10-14, see
+    // DECISIONS.md) — deleteOwnMessageId takes priority: the two are
+    // never both set for the same message (RoomChat.tsx picks exactly
+    // one), but preferring the member-facing route if it somehow were
+    // means the stricter eligibility rules (preserve/open-report) are
+    // the ones that apply.
+    const id = deleteOwnMessageId ?? deleteMessageId;
+    const endpoint = deleteOwnMessageId ? `/api/rooms/messages/${id}` : `/api/admin/messages/${id}`;
+    if (!id) return;
     setBusy(true);
     setConfirming(null);
-    const res = await fetch(`/api/admin/messages/${deleteMessageId}`, { method: "DELETE" });
+    const res = await fetch(endpoint, { method: "DELETE" });
     setBusy(false);
-    if (!res.ok) return;
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setDeleteMessageError(body?.error ?? "Could not delete.");
+      return;
+    }
     if (onDeleted) onDeleted();
     else router.refresh();
   }
@@ -179,7 +198,7 @@ export default function ContentMenu({
     setConfirming("block");
   }
 
-  if (!canReport && !deletePostId && !blockUserId && !deleteImage && !deleteMessageId) return null;
+  if (!canReport && !deletePostId && !blockUserId && !deleteImage && !deleteMessageId && !deleteOwnMessageId) return null;
 
   return (
     <div className="relative" ref={rootRef}>
@@ -237,7 +256,7 @@ export default function ContentMenu({
               Delete this image
             </button>
           ) : null}
-          {deleteMessageId ? (
+          {deleteMessageId || deleteOwnMessageId ? (
             <button
               type="button"
               role="menuitem"
@@ -309,6 +328,15 @@ export default function ContentMenu({
           onConfirm={performDeleteMessage}
           onCancel={() => setConfirming(null)}
         />
+      ) : null}
+      {deleteMessageError ? (
+        <div
+          role="alert"
+          className="absolute right-0 z-20 mt-1 w-56 rounded-ob border px-3 py-2 text-caption"
+          style={{ borderColor: "var(--color-border)", background: "var(--color-ob-dark)", color: "var(--color-btn-border)" }}
+        >
+          {deleteMessageError}
+        </div>
       ) : null}
     </div>
   );

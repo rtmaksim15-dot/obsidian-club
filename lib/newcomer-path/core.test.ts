@@ -14,14 +14,14 @@ const complete: StepInputs = {
   bioLength: 40,
   boundariesSaved: true,
   hasLimitPractice: true,
-  hasNewcomerMessage: true,
+  hasFirstPost: true,
 };
 const nothing: StepInputs = {
   hasAvatar: false,
   bioLength: 0,
   boundariesSaved: false,
   hasLimitPractice: false,
-  hasNewcomerMessage: false,
+  hasFirstPost: false,
 };
 
 describe("computeStepCompletion — A1's four triggers", () => {
@@ -31,10 +31,10 @@ describe("computeStepCompletion — A1's four triggers", () => {
     expect(computeStepCompletion({ ...nothing, hasAvatar: false, bioLength: 100 }).profile).toBe(false);
   });
 
-  it("boundaries/limits/intro are each their own independent flag", () => {
+  it("boundaries/limits/firstPost are each their own independent flag", () => {
     expect(computeStepCompletion({ ...nothing, boundariesSaved: true })).toMatchObject({ boundaries: true });
     expect(computeStepCompletion({ ...nothing, hasLimitPractice: true })).toMatchObject({ limits: true });
-    expect(computeStepCompletion({ ...nothing, hasNewcomerMessage: true })).toMatchObject({ intro: true });
+    expect(computeStepCompletion({ ...nothing, hasFirstPost: true })).toMatchObject({ firstPost: true });
   });
 
   it("all four true only when every input is satisfied", () => {
@@ -59,7 +59,7 @@ describe("decideNewcomerPathUpdate — idempotent award, no retro-award (A2/A5)"
     const result = decideNewcomerPathUpdate({}, computeStepCompletion(complete));
     expect(result.newlyAwardedSteps).toEqual([]);
     expect(result.updatedSettings.baselineComputedAt).toBeTruthy();
-    expect(result.updatedSettings.awardedSteps).toEqual(["profile", "boundaries", "limits", "intro"]);
+    expect(result.updatedSettings.awardedSteps).toEqual(["profile", "boundaries", "limits", "firstPost"]);
   });
 
   it("first-ever run for a brand new member grandfathers nothing (nothing is true yet)", () => {
@@ -92,7 +92,7 @@ describe("decideNewcomerPathUpdate — idempotent award, no retro-award (A2/A5)"
   it("a step already awarded never re-fires even if re-checked (idempotent)", () => {
     const baseline: NewcomerPathSettings = {
       baselineComputedAt: "2026-10-01T00:00:00.000Z",
-      awardedSteps: ["profile", "boundaries", "limits", "intro"],
+      awardedSteps: ["profile", "boundaries", "limits", "firstPost"],
     };
     const result = decideNewcomerPathUpdate(baseline, computeStepCompletion(complete));
     expect(result.newlyAwardedSteps).toEqual([]);

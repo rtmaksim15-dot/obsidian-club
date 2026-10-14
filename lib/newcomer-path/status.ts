@@ -2,6 +2,7 @@ import "server-only";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { awardRep } from "@/lib/rep/ledger";
+import { FEED_TYPES } from "@/lib/feed/query";
 import {
   computeStepCompletion,
   decideNewcomerPathUpdate,
@@ -40,11 +41,17 @@ export type NewcomerPathState = {
  * duplicate completion check across every action's own save route.
  */
 export async function syncNewcomerPath(userId: string): Promise<NewcomerPathState> {
-  const [user, profile, limitPracticeCount, newcomerMessageCount] = await Promise.all([
+  const [user, profile, limitPracticeCount, firstPostCount] = await Promise.all([
     prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { avatarUrl: true, bio: true } }),
     prisma.userProfile.findUnique({ where: { userId }, select: { settings: true } }),
     prisma.userPractice.count({ where: { userId, kind: "limit" } }),
-    prisma.message.count({ where: { userId, room: { slug: "newcomers" } } }),
+    // Package 5 follow-up (2026-10-14, see DECISIONS.md) — step 4,
+    // "Leave your first mark": the member's first Feed-visible post
+    // (post/story type, same FEED_TYPES the feed query itself uses),
+    // text or image, "not deleted" per the task's own wording — a
+    // preserved/removed post already clears isPublished, so that one
+    // check covers both.
+    prisma.post.count({ where: { authorId: userId, isPublished: true, type: { in: FEED_TYPES } } }),
   ]);
 
   const settingsRaw = (profile?.settings ?? {}) as Record<string, unknown>;
@@ -60,7 +67,7 @@ export async function syncNewcomerPath(userId: string): Promise<NewcomerPathStat
     // this app's other settings-backed features don't have either.
     boundariesSaved: settingsRaw.boundaries !== undefined,
     hasLimitPractice: limitPracticeCount > 0,
-    hasNewcomerMessage: newcomerMessageCount > 0,
+    hasFirstPost: firstPostCount > 0,
   });
 
   const decision = decideNewcomerPathUpdate(currentPathSettings, completion);

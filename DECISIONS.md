@@ -3848,3 +3848,67 @@ is never hidden from anyone).
 `npx tsc --noEmit`, `npx next lint` (same one pre-existing
 `AdminConsole.tsx` warning), `npm test` (156 passing), `npm run build`
 all clean. Committed locally, not pushed.
+
+### 2026-10-14 — Package 5 follow-ups: REP amount, step 4 replaced, own-message delete
+
+**1 — REP amount, 20 → 40 per step.** Single constant
+(`lib/rep/config.ts#NEWCOMER_PATH_STEP_REP`), all four
+`REASON_CATALOG` entries read from it. 160 REP total for the whole
+path — against `REP_TITLES` (Initiate 0 → Keeper 1000), that's ≈
+two-thirds of the Initiate→Keeper gap (16%, up from the original 8%)
+on its own; still can't cross the threshold by itself — a member
+still has to earn the rest through real activity, the title is never
+just handed out for finishing onboarding. The earlier 5x-under-catalog
+discrepancy flagged in Phase A's own entry (`profile_verified` etc. at
+100) narrows but doesn't close at 40 — not reconciled further, same
+"implemented exactly as instructed, flagged here" footing as before.
+
+**2 — step 4 replaced.** "Speak in the Newcomers' Hall" (`intro`,
+reason code `newcomer_intro`) → "Leave your first mark" (`firstPost`,
+reason code `newcomer_first_post`) — the member's first Feed-visible
+post (`post`/`story` type per `lib/feed/query.ts#FEED_TYPES`, text or
+image, `isPublished: true` covers "not deleted" since a removed/
+preserved post already clears that flag). `newcomer_intro` stays in
+`REASON_CATALOG`, unused, not deleted, per the task's own instruction.
+Same no-retro-award rule applies unchanged (`decideNewcomerPathUpdate`
+doesn't care which four step IDs it's tracking). **Recomputed, live,
+read-only**: of the 5 non-admin members, **all 5 currently see the
+card** (none has saved Boundaries or named a limit yet — both features
+shipped this same week — so no one clears all four steps regardless of
+step 4's own state).
+
+**3 — member self-delete of own room messages.** New pure rule
+(`lib/rooms/own-message-delete.ts#canDeleteOwnMessage`): author-only,
+denied if already deleted, denied if `preserveIndefinitely` (the
+existing red-line preservation flag — in this codebase today that's
+always set alongside `isDeleted: true` in the same admin write, so
+it's already covered by the "already deleted" check too; kept as its
+own explicit check anyway per the task's own wording, and in case a
+future removal path ever sets it independently), denied if the message
+sits under an **open** `Report` row. New member-facing route
+(`DELETE /api/rooms/messages/[id]`) — deliberately separate from the
+existing admin-only one (`/api/admin/messages/[id]`), since the
+eligibility rules genuinely differ (an admin's route has no
+preserve/open-report gate at all; a member's does) — same soft-delete
+shape (`isDeleted`/`deletedAt`/`deletedById`, actor = the author).
+`ContentMenu.tsx` gained a second, parallel prop
+(`deleteOwnMessageId`, alongside the existing `deleteMessageId`) so a
+single "Delete" menu item + `ConfirmDialog` route to either endpoint
+depending on which prop is set; an inline error message now renders
+in the menu when the member-facing route rejects (pending/preserved/
+open-report), surfaced instead of silently failing. `RoomChat.tsx`:
+an admin viewing their OWN message now goes through the stricter
+member-facing route (`deleteOwnMessageId`), not the unrestricted admin
+one — only an admin viewing someone ELSE's message still uses
+`deleteMessageId`. This also resolves Phase B's own "there's no
+member-facing delete action... to wire in instead" note.
+
+**Tests** (`lib/rooms/own-message-delete.test.ts`, 5 — 161 total): own
+message, not yet deleted, not preserved, no open report → allowed;
+someone else's message → denied (403); a preserved message → denied
+(403) even for its own author; a message under an open report →
+denied (409); an already-deleted message → denied (409).
+
+`npx tsc --noEmit`, `npx next lint` (same one pre-existing
+`AdminConsole.tsx` warning), `npm test` (161 passing), `npm run build`
+all clean. Committed locally as "pkg5 follow-ups", not yet pushed.

@@ -75,6 +75,12 @@ type ReasonDef = {
   max: number;
 };
 
+// Newcomer Path (Package 5, Phase A, 2026-10-14; raised 20 -> 40 the
+// same day, see DECISIONS.md) — the single constant every one of the
+// four REASON_CATALOG entries below shares, so a future change here
+// is a one-line edit, same reasoning as lib/dm/limits.ts#DAILY_REQUEST_LIMIT.
+export const NEWCOMER_PATH_STEP_REP = 40;
+
 /**
  * Base-value catalog (before the trust multiplier). Positive entries are
  * awarded via lib/rep/ledger.ts#awardRep; negative (BEHAVIOR) entries are
@@ -148,18 +154,26 @@ export const REASON_CATALOG: Record<string, ReasonDef> = {
   invitee_level_2: { category: "INVITED", min: 200, max: 200 }, // was 500 — "invitee reached Level II" (the reviews/level system, not titleLevel); now matches invitee_reached_keeper above
   invitee_active_90d: { category: "INVITED", min: 200, max: 200 }, // was 1000 — trigger window (90 days, lib/rating/referral-lifecycle.ts) unchanged here; package 2 reconciles the 90d/30d naming
 
-  // Newcomer Path (Package 5, Phase A, 2026-10-14, see DECISIONS.md) —
-  // the four steps in lib/newcomer-path/core.ts#STEPS. ASSUMPTION per
-  // this task's own instruction: 20 REP each (80 total for the whole
-  // path). Flagged in that package's report: this is 5x lower than the
-  // adjacent, thematically-similar onboarding reasons already in this
-  // catalog (profile_complete=100, first_community_intro=100) and only
-  // 8% of the distance from Initiate to Keeper (1000) — a deliberate
-  // number taken as given, not reconciled against those siblings.
-  newcomer_profile: { category: "ACTIVITY", min: 20, max: 20 },
-  newcomer_boundaries: { category: "ACTIVITY", min: 20, max: 20 },
-  newcomer_limits: { category: "ACTIVITY", min: 20, max: 20 },
-  newcomer_intro: { category: "ACTIVITY", min: 20, max: 20 },
+  // Newcomer Path (Package 5, Phase A, 2026-10-14; raised 20 -> 40 in
+  // the same day's follow-up, see DECISIONS.md) — the four steps in
+  // lib/newcomer-path/core.ts#STEPS, all sharing the one
+  // NEWCOMER_PATH_STEP_REP constant below. 160 REP total for the whole
+  // path is ~two-thirds of the Initiate -> Keeper gap (1000) — still
+  // not enough to cross it on its own; the title has to still be
+  // earned through the catalog's other, larger reasons
+  // (profile_verified/profile_complete/first_community_intro = 100
+  // each). `newcomer_intro` is unused since the follow-up replaced
+  // step 4 with `newcomer_first_post` — kept here, not deleted, in
+  // case a future pass revives a newcomers-room-specific step.
+  newcomer_profile: { category: "ACTIVITY", min: NEWCOMER_PATH_STEP_REP, max: NEWCOMER_PATH_STEP_REP },
+  newcomer_boundaries: { category: "ACTIVITY", min: NEWCOMER_PATH_STEP_REP, max: NEWCOMER_PATH_STEP_REP },
+  newcomer_limits: { category: "ACTIVITY", min: NEWCOMER_PATH_STEP_REP, max: NEWCOMER_PATH_STEP_REP },
+  newcomer_intro: { category: "ACTIVITY", min: NEWCOMER_PATH_STEP_REP, max: NEWCOMER_PATH_STEP_REP },
+  // Package 5 follow-up (2026-10-14, see DECISIONS.md) — step 4 is now
+  // "Leave your first mark" (first Feed post), replacing the old
+  // newcomers-room-message step above, which overlapped entirely with
+  // the Initiation Ritual's own "introduce yourself" requirement.
+  newcomer_first_post: { category: "ACTIVITY", min: NEWCOMER_PATH_STEP_REP, max: NEWCOMER_PATH_STEP_REP },
 };
 
 export type ReasonCode = keyof typeof REASON_CATALOG;

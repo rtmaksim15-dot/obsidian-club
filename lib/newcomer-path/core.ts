@@ -1,22 +1,32 @@
 // Newcomer Path (Package 5, Phase A, 2026-10-14, see DECISIONS.md) —
 // pure core, no "server-only", no Prisma. The DB-touching wrapper is
 // lib/newcomer-path/status.ts.
-export type StepId = "profile" | "boundaries" | "limits" | "intro";
+//
+// Step 4 renamed "intro" -> "firstPost" in the same day's follow-up
+// (see DECISIONS.md): it was "Speak in the Newcomers' Hall," which
+// overlapped entirely with the Initiation Ritual's own "introduce
+// yourself in the newcomers' room" requirement (already true for
+// 100% of anyone who could ever see this card). Now "Leave your first
+// mark" — the member's first real post in the Feed.
+export type StepId = "profile" | "boundaries" | "limits" | "firstPost";
 
-export const STEP_IDS: StepId[] = ["profile", "boundaries", "limits", "intro"];
+export const STEP_IDS: StepId[] = ["profile", "boundaries", "limits", "firstPost"];
 
 export const STEPS: { id: StepId; label: string; href: string }[] = [
   { id: "profile", label: "Show your face to the Circle", href: "/profile/edit" },
   { id: "boundaries", label: "Draw your boundaries", href: "/boundaries" },
   { id: "limits", label: "Name your limits", href: "/profile/edit" },
-  { id: "intro", label: "Speak in the Newcomers' Hall", href: "/rooms/newcomers" },
+  { id: "firstPost", label: "Leave your first mark", href: "/compose" },
 ];
 
 export const STEP_REASON_CODE: Record<StepId, string> = {
   profile: "newcomer_profile",
   boundaries: "newcomer_boundaries",
   limits: "newcomer_limits",
-  intro: "newcomer_intro",
+  // Package 5 follow-up — `newcomer_intro` (the old step 4's reason
+  // code) stays in REASON_CATALOG, unused, rather than deleted; see
+  // that file's own comment.
+  firstPost: "newcomer_first_post",
 };
 
 export const MIN_ABOUT_LENGTH_FOR_PROFILE_STEP = 40;
@@ -26,7 +36,8 @@ export type StepInputs = {
   bioLength: number;
   boundariesSaved: boolean;
   hasLimitPractice: boolean;
-  hasNewcomerMessage: boolean;
+  /** Any Feed-visible post (post/story type), published, text or image — "not deleted" per the task's own wording, i.e. still isPublished (preserving a post already clears that flag). */
+  hasFirstPost: boolean;
 };
 
 /**
@@ -39,7 +50,7 @@ export function computeStepCompletion(inputs: StepInputs): Record<StepId, boolea
     profile: inputs.hasAvatar && inputs.bioLength >= MIN_ABOUT_LENGTH_FOR_PROFILE_STEP,
     boundaries: inputs.boundariesSaved,
     limits: inputs.hasLimitPractice,
-    intro: inputs.hasNewcomerMessage,
+    firstPost: inputs.hasFirstPost,
   };
 }
 

@@ -60,11 +60,12 @@ function saveHiddenIds(ids: Set<string>) {
  * action trigger that's invisible until the row is hovered (desktop)
  * or long-pressed (touch) — see the row-level handlers below. "Hide
  * for me" is a pure client-side localStorage filter (no server write,
- * no new moderation logic — the task's own instruction); "Delete" is
- * the admin-only existing soft-delete route (ContentMenu's
- * `deleteMessageId`) — there's no member-facing "delete my own
- * message" action anywhere in this codebase to wire in instead (see
- * DECISIONS.md).
+ * no new moderation logic — the task's own instruction); "Delete" for
+ * someone else's message goes through the admin-only soft-delete
+ * route (ContentMenu's `deleteMessageId`), and for a member's OWN
+ * message goes through the separate member-facing route (ContentMenu's
+ * `deleteOwnMessageId`, Package 5 follow-up, 2026-10-14, see
+ * DECISIONS.md) — with its own preserve/open-report eligibility rules.
  *
  * The room header (name/description/room-nav link, the pinned note)
  * lives in the page (app/(platform)/rooms/[slug]/page.tsx), passed
@@ -285,8 +286,17 @@ export default function RoomChat({ room, currentUserId, currentUserIsAdmin, init
                     <div className="space-y-0.5">
                       {group.messages.map((m) => {
                         const isActive = activeRowId === m.id;
-                        const canDeleteThis = !m.isDeleted && currentUserIsAdmin;
-                        const canReportThis = !m.isDeleted && m.user.id !== currentUserId;
+                        const isOwnMessage = m.user.id === currentUserId;
+                        // Clean Hall, B3 follow-up (Package 5, Phase B, 2026-10-14,
+                        // see DECISIONS.md) — a member deleting their OWN message
+                        // always goes through the stricter member-facing route
+                        // (preserve/open-report checks), even when that member is
+                        // an admin; the unrestricted admin route is only for an
+                        // admin removing someone ELSE's message.
+                        const canDeleteOwn = !m.isDeleted && isOwnMessage;
+                        const canDeleteAsAdmin = !m.isDeleted && currentUserIsAdmin && !isOwnMessage;
+                        const canDeleteThis = canDeleteOwn || canDeleteAsAdmin;
+                        const canReportThis = !m.isDeleted && !isOwnMessage;
                         const hasAnyAction = canDeleteThis || canReportThis;
 
                         return (
@@ -328,7 +338,8 @@ export default function RoomChat({ room, currentUserId, currentUserIsAdmin, init
                                   targetId={m.id}
                                   preview={m.content}
                                   canReport={canReportThis}
-                                  deleteMessageId={canDeleteThis ? m.id : undefined}
+                                  deleteMessageId={canDeleteAsAdmin ? m.id : undefined}
+                                  deleteOwnMessageId={canDeleteOwn ? m.id : undefined}
                                 />
                               </div>
                             ) : null}
