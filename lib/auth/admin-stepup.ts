@@ -39,6 +39,17 @@ export const ADMIN_STEPUP_COOKIE_OPTIONS = {
   maxAge: Math.ceil(STEP_UP_WINDOW_MS / 1000) + 60 * 60, // 12h + 1h buffer, in seconds
 };
 
+/**
+ * Admin security hardening, Package S1 follow-up (2026-10-15, see
+ * DECISIONS.md) — a silent check (no console.error, unlike getSecret()
+ * below) for the admin console's own "step-up protection inactive"
+ * banner. Server-only; the page reads this and passes a plain boolean
+ * down as a prop — never the secret's value itself.
+ */
+export function isStepUpSecretConfigured(): boolean {
+  return Boolean(process.env.ADMIN_SESSION_SECRET);
+}
+
 function getSecret(): string | null {
   const secret = process.env.ADMIN_SESSION_SECRET;
   if (!secret) {

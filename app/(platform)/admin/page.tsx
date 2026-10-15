@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireAdmin } from "@/lib/auth/require-admin";
+import { isStepUpSecretConfigured } from "@/lib/auth/admin-stepup";
 import { prisma } from "@/lib/db/prisma";
 import { TOKEN_SELECT, shapeTokenRow, sortTokensFailedFirst } from "@/lib/admin/token-shape";
 import { isRitualComplete } from "@/lib/auth/ritual";
@@ -635,6 +636,7 @@ export default async function AdminConsolePage() {
 
   return (
     <AdminConsole
+      stepUpSecretConfigured={isStepUpSecretConfigured()}
       counts={{ ...counts, acceptedNotJoined: acceptedNotJoinedCount }}
       emailCaptures={emailCaptures.map((c) => {
         const linked = linkedWaitlistByEmail.get(c.email);

@@ -249,6 +249,12 @@ export type AccessLogRow = {
 };
 
 type Props = {
+  // Package S1 follow-up (2026-10-15, see DECISIONS.md) — whether
+  // ADMIN_SESSION_SECRET is set server-side. Never the secret itself,
+  // just this one boolean (lib/auth/admin-stepup.ts#isStepUpSecretConfigured),
+  // computed in the page and passed down so the banner below can render
+  // without this client component ever touching process.env itself.
+  stepUpSecretConfigured: boolean;
   counts: Counts;
   applications: Application[];
   people: Person[];
@@ -289,6 +295,7 @@ type Props = {
 // surfacing it under "Failed Sends" if it has a send error, decided or
 // not (see Step 2 commit for why that has to be true).
 export default function AdminConsole({
+  stepUpSecretConfigured,
   counts,
   applications: initialApplications,
   people: initialPeople,
@@ -543,6 +550,24 @@ export default function AdminConsole({
               onConfirm={handleSignOutEverywhere}
               onCancel={() => setSignOutConfirming(false)}
             />
+          ) : null}
+
+          {/* Package S1 follow-up (2026-10-15, see DECISIONS.md) —
+              shown whenever ADMIN_SESSION_SECRET is unset server-side.
+              The step-up/idle gate itself already fails open in this
+              state (middleware.ts never locks anyone out over a
+              missing env var) — this banner is purely so an admin
+              looking at the console knows that protection isn't
+              actually active right now, rather than assuming silence
+              means it is. Never renders the secret's value — only
+              whether it's set at all. */}
+          {!stepUpSecretConfigured ? (
+            <p
+              className="text-caption mb-4 rounded-ob border px-3 py-2"
+              style={{ borderColor: "var(--color-error)", color: "var(--color-error)" }}
+            >
+              Step-up protection inactive — ADMIN_SESSION_SECRET not set.
+            </p>
           ) : null}
 
           <StatusBar counts={counts} activeZone={zone} activeFilter={filter} onSelect={selectStat} />

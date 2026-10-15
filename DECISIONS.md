@@ -4313,3 +4313,25 @@ rather than implying a live walkthrough happened.
 `AdminConsole.tsx` warning), `npm test` (232 passing, 51 new), `npm
 run build` all clean. Committed locally, **not pushed** (task
 constraint).
+
+### 2026-10-15 — Package S1 follow-up: step-up safety banner
+
+GO-AHEAD item 1, now that `ADMIN_SESSION_SECRET` is set in Vercel.
+`lib/auth/admin-stepup.ts#isStepUpSecretConfigured()` — a silent
+boolean check (no `console.error`, unlike the existing `getSecret()`
+in the same file, which the step-up/idle checks themselves still use)
+— read once in `app/(platform)/admin/page.tsx` and passed down as a
+plain `stepUpSecretConfigured` prop. `AdminConsole.tsx` renders a red
+line, "Step-up protection inactive — ADMIN_SESSION_SECRET not set.",
+whenever it's false — never the secret's value, only whether it
+exists. Purely informational: the gate itself already failed open in
+this state before this change (middleware.ts never locked anyone out
+over a missing env var) — this just makes that state visible to
+whoever's looking at the console instead of silent.
+
+**Tests** (`lib/auth/admin-stepup.test.ts`, 3 new — true when set,
+false when unset, false when set to an empty string): true/false
+coverage for the exact flag the banner branches on.
+
+`npx tsc --noEmit`, `npx next lint` (same one pre-existing warning),
+`npm test` (235 passing), `npm run build` all clean.

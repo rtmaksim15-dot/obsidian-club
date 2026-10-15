@@ -1,7 +1,33 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { signStepUpCookie, verifyStepUpCookie } from "./admin-stepup";
+import { signStepUpCookie, verifyStepUpCookie, isStepUpSecretConfigured } from "./admin-stepup";
 
 const ORIGINAL_SECRET = process.env.ADMIN_SESSION_SECRET;
+
+// Admin console safety banner (Package S1 follow-up, 2026-10-15, see
+// DECISIONS.md) — "Step-up protection inactive" shows exactly when
+// this is false. Separate describe block (not nested under the
+// beforeEach below, which always sets a secret) so each case controls
+// the env var explicitly.
+describe("isStepUpSecretConfigured", () => {
+  afterEach(() => {
+    process.env.ADMIN_SESSION_SECRET = ORIGINAL_SECRET;
+  });
+
+  it("true when ADMIN_SESSION_SECRET is set", () => {
+    process.env.ADMIN_SESSION_SECRET = "test-secret-do-not-use-in-prod";
+    expect(isStepUpSecretConfigured()).toBe(true);
+  });
+
+  it("false when unset", () => {
+    delete process.env.ADMIN_SESSION_SECRET;
+    expect(isStepUpSecretConfigured()).toBe(false);
+  });
+
+  it("false when set to an empty string", () => {
+    process.env.ADMIN_SESSION_SECRET = "";
+    expect(isStepUpSecretConfigured()).toBe(false);
+  });
+});
 
 describe("admin step-up cookie sign/verify", () => {
   beforeEach(() => {
