@@ -35,7 +35,7 @@ export default function ZoomableAvatar({ avatarUrl, displayName, className }: Pr
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={avatarUrl} alt={displayName} className="h-full w-full object-cover" />
       </button>
-      {open ? <Lightbox src={avatarUrl} alt={displayName} onClose={() => setOpen(false)} /> : null}
+      {open ? <Lightbox images={[{ src: avatarUrl, alt: displayName }]} onClose={() => setOpen(false)} /> : null}
     </>
   );
 }

@@ -1408,13 +1408,11 @@ change) rather than being bundled into an infrastructure bug fix.
 
 Full report in DECISIONS.md.
 
-**A member can't delete their own room message.** `app/api/admin/
-messages/[id]/route.ts` was already admin-only with "no member-facing
-equivalent" by its own comment, before this package touched it — B3's
-"Delete for own/admin" only implemented the admin half, since a
-genuine self-delete action doesn't exist anywhere to reuse (this
-phase's own instruction was "no new moderation logic"). A member
-wanting a message gone today has to ask an admin.
+**A member can't delete their own room message — resolved 2026-10-14,
+Package 5 follow-ups.** `app/api/rooms/messages/[id]/route.ts` + `lib/
+rooms/own-message-delete.ts` now give the author their own soft-delete
+path (denied if preserved or under an open report), separate from the
+admin-only route. See DECISIONS.md.
 
 **No database-level dedupe on the newcomers'-room pinned note across
 rooms**, and no UI yet for an admin to set one on a room *other* than
@@ -1424,9 +1422,25 @@ is reachable is from inside that room's own chat — an admin visiting
 a different active room would see the same control there too, just
 with nothing pre-filled).
 
-**`is_test` is unexercised against a real database** — same situation
-as every migration this session: written, not applied. No query
-against the new column, and no RLS-relevant behavior change (it's an
-ordinary column on an existing table, not a new one — nothing new to
-add to `scripts/check-rls.ts`'s own concerns), has actually run
-against Postgres yet.
+**`is_test` is unexercised against a real database — resolved
+2026-10-14, Package 5 follow-ups.** Migration applied live; `is_test =
+false` confirmed for every existing user, `npm run check:rls` confirmed
+clean. See DECISIONS.md.
+
+## Full-screen photo viewer fix pass (2026-10-14)
+
+Full report in DECISIONS.md.
+
+**Profile Photos grid thumbnails ignore Veil.** Found while auditing
+every place that opens the fullscreen viewer for this fix — `lib/
+profile/veil.ts#getVeilEnabled` (a viewer's own "blur sensitive photos
+for me" preference) is threaded into `PostCard`/`PostCarousel` for the
+"Posts" tab and the feed, but `ProfilePhotoGrid` (the "Photos" tab)
+never receives it at all, so those thumbnails render unblurred
+regardless of the viewer's setting — a pre-existing gap, not something
+this pass introduced or widened (the new fullscreen viewer on top of
+them is exactly as unveiled as the thumbnails already were). Not
+fixed here — out of scope for a "the viewer has no close button" bug
+fix; needs its own pass to thread `viewerVeilEnabled` through to
+`ProfilePhotoGrid` and decide whether to lift per-image reveal state
+the way `PostCarousel`'s shared Lightbox now does.

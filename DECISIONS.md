@@ -3912,3 +3912,140 @@ denied (409); an already-deleted message → denied (409).
 `npx tsc --noEmit`, `npx next lint` (same one pre-existing
 `AdminConsole.tsx` warning), `npm test` (161 passing), `npm run build`
 all clean. Committed locally as "pkg5 follow-ups", not yet pushed.
+
+### 2026-10-14 — Fullscreen photo viewer: no way out, fixed
+
+**Bug.** `Lightbox.tsx` (post photos, avatars — 2026-09-30) already had
+a ✕ button, Escape, and backdrop-click close in code; the actual
+production report (iPhone Safari + the installed PWA) was that none of
+it was reachable/usable in practice in two ways this pass addresses:
+nothing closed the viewer via the system/browser Back (standalone PWA
+has no browser chrome of its own to fall back on, so a member stuck in
+the viewer had no OS-level escape either), and a multi-photo post's
+viewer was really N independent single-image viewers (see below) with
+no shared "N total" to orient by.
+
+**1 — ✕ button.** Already present; bumped 40px → 44px (`h-11 w-11`,
+the project's own touch-target convention — see `BottomTabBar.tsx`/
+`members/page.tsx`), moved to `max(env(safe-area-inset-*), 0.75rem)`
+positioning (same pattern `TopBar.tsx`/`PwaUpdateManager.tsx` already
+use), switched to the `.nav-control` class (gold outline, focus-visible
+only — Navigation v2's own convention, `app/globals.css`).
+
+**2 — close triggers.** Backdrop tap and Escape were already correct
+and unchanged. Added swipe-down (single-finger, only while the current
+image isn't zoomed in — see 4).
+
+**3 — history/Back.** The actual headline fix. Opening the viewer now
+pushes one same-URL history entry; the system/browser Back (and the
+Android back gesture) pops it and closes the viewer instead of leaving
+the page — this is what "no way out" meant on a standalone PWA with no
+browser chrome. Every explicit close trigger (✕/backdrop/swipe-down/
+Escape) calls `history.back()` itself rather than closing directly, so
+Back never leaves a dead entry behind an already-closed viewer — one
+single close path regardless of which trigger fired. Implemented as
+`lib/photo-viewer/history-guard.ts`, a pure function with its
+`window.history`/listener calls injected as `deps` rather than called
+directly inline — this project's test runner is Node-only, no DOM (see
+`vitest.config.ts`'s own comment), so this is what makes "opening
+pushes exactly one entry; an explicit close results in exactly one
+`back()` and exactly one `onClose()`, never both paths firing twice"
+actually unit-testable (5 tests) without adding a DOM test
+dependency the project deliberately doesn't have.
+
+**4 — carousel.** The real surprise here: `PostCarousel.tsx` (the
+multi-photo strip) never actually opened one shared viewer — each
+thumbnail's `VeiledPhoto` → `ZoomableImage` owned its *own* `Lightbox`
+instance with its own single-image array, so tapping photo 2 of 3
+opened a viewer that only ever knew about photo 2, with no index to
+show and no way to swipe to 1 or 3. `ZoomableImage` gained an optional
+`onOpen` (forwarded through `VeiledPhoto`) that, when passed, hands the
+click to the caller instead of opening its own `Lightbox` — used only
+by `PostCarousel`'s 2+-image branch, which now owns one `lightboxIndex`
+state and renders a single `Lightbox` with the full `images` array,
+opened at whichever thumbnail was tapped. `Lightbox` itself gained
+`images`/`initialIndex` (replacing the old single `src`/`alt`),
+swipe-left/right + the `ChevronLeft`/`ChevronRight` buttons + Arrow
+keys (all three only matter once `images.length > 1`), and a "current/
+total" counter. A single-image post's branch is untouched — no shared
+state needed there, so it still renders exactly as before. Swipe
+classification (`dx`/`dy` → close/prev/next/none) is also pure and
+unit-tested (`lib/photo-viewer/gestures.ts`, 8 tests) rather than
+inlined, same DOM-free reasoning as the history guard.
+
+**Veil, carrying over into the carousel fix.** `VeiledPhoto`'s own
+gate (blur + "Tap to reveal", never auto-shown) only lets a thumbnail
+become clickable once revealed — but with one shared `Lightbox` now
+holding every image in the post, swiping from a revealed photo into a
+still-veiled, not-yet-revealed one could have silently bypassed that
+gate. `Lightbox` now carries a `veiled` flag per image and reveals an
+image inside the viewer independently from the grid's own reveal state
+— seeded revealed **only** for the tapped `initialIndex` (the one
+index the caller can actually guarantee was already revealed), so
+swiping to any other still-veiled image shows the same blur +
+"Tap to reveal" inside the viewer too, never the real photo. Minor,
+accepted redundancy: an image already revealed in the thumbnail strip
+before opening the viewer isn't remembered as revealed inside it —
+matches `VeiledPhoto`'s own "never persisted" comment, just applied to
+a second, independent reveal state rather than lifting one shared
+state across both call sites for this.
+
+**5 — scroll lock + restore.** Already locked `body.overflow`
+(unchanged). Added explicit `window.scrollY` capture on open and
+`window.scrollTo` restore on close — the existing lock alone doesn't
+guarantee the position survives; iOS Safari (and the installed PWA
+especially) can snap to the top the instant `overflow` flips back with
+nothing else pinning it.
+
+**6 — every call site, audited.** `ZoomableAvatar` (profile avatar) —
+updated to the new `images` prop, otherwise unchanged (single image,
+no veil, already correct). `ProfilePhotoGrid` (profile "Photos" tab)
+was the one real inconsistency found: it didn't open "the viewer" at
+all — it was a plain `<a href="/posts/:id">`, navigating away to the
+post instead. Converted to a client component opening the same shared
+`Lightbox` across the whole grid (swipe through every photo, "i/N"
+counter), matching every other surface. Nothing is actually lost by
+dropping the post-navigation — the same post is still one tap away via
+the adjacent "Posts" tab on the same profile page. Feed, `/posts/[id]`,
+the profile's own "Posts" tab, and `/keepsakes` all already funnel
+through the same `PostCard` → `PostCarousel` chain, so they inherit
+every fix above with no separate change needed.
+
+**Found in passing, not fixed (TECH_DEBT.md).** `ProfilePhotoGrid`'s
+thumbnails ignore the viewer's own Veil preference (`getVeilEnabled`)
+entirely — a pre-existing gap, not introduced or widened by giving
+those same already-unveiled thumbnails a fullscreen viewer. Out of
+scope for this bug fix; flagged instead of silently fixed or silently
+left undocumented.
+
+**Manual QA** (temporary, unauthenticated local route — deleted before
+this entry, never committed; the dev server's `DATABASE_URL` is the
+live database, so logging in as a real member wasn't an option):
+3-image carousel with the 3rd flagged `veiled` — ✕ shows counter "1/3"
+and the correct chevrons per position, swiping/paging to image 3 shows
+blur + "Tap to reveal" (not auto-shown), tapping it reveals correctly.
+Confirmed via `window.history.length`: opening pushes exactly one
+entry. Closed via ✕, via backdrop tap, via Escape, and via the actual
+browser Back button (`navigate` tool, `back`) — **Back closed the
+viewer and left the page exactly where it was (same URL)**, confirming
+the actual reported bug is fixed. Single-image mode shows no counter/
+chevrons, unchanged. Re-checked at a 375×812 mobile viewport — ✕ and
+the counter sit well clear of the top edge. No console errors across
+any of the above.
+
+**Tests** (`lib/photo-viewer/gestures.test.ts` 8, `lib/photo-viewer/
+history-guard.test.ts` 5 — 13 new, 174 total): swipe classification in
+all four directions past/under the threshold, the exactly-at-threshold
+edge (no trigger), a roughly-diagonal swipe resolving to "none" rather
+than guessing, and the dominant-axis tie-break; the history guard's
+own core invariant — creating it pushes exactly once and registers one
+listener, `requestClose()` calls `back()` and never `onClose()`
+directly, a simulated Back (`popstate`) calls `onClose()`, the full
+explicit-close round trip (`requestClose` → `back()` → `popstate`)
+calls `onClose()` exactly once, and `dispose()` stops a later pop from
+calling `onClose()` at all.
+
+`npx tsc --noEmit`, `npx next lint` (same one pre-existing
+`AdminConsole.tsx` warning), `npm test` (174 passing), `npm run build`
+all clean. No schema/data change — nothing to migrate, nothing
+requiring rule-11 go-ahead.

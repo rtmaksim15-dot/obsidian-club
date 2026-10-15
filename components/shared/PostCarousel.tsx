@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import VeiledPhoto from "./VeiledPhoto";
+import Lightbox from "./Lightbox";
 
 export type CarouselImage = { id: string; url: string; width: number | null; height: number | null };
 
@@ -31,6 +32,12 @@ type Props = {
 // PostCard photo.
 export default function PostCarousel({ images, veiled, className, onActiveImageChange }: Props) {
   const [index, setIndex] = useState(0);
+  // No-way-out fix pass (2026-10-14, see DECISIONS.md) — a single shared
+  // Lightbox instance for the whole carousel (not one per thumbnail),
+  // so opening any image lets the viewer swipe across all of them with
+  // a working "i/N" counter, instead of each thumbnail's own isolated
+  // single-image viewer.
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   // Clamp if the image set shrinks from under us (e.g. the active
   // image was just deleted and a refresh hasn't landed new props yet).
@@ -65,9 +72,15 @@ export default function PostCarousel({ images, veiled, className, onActiveImageC
         onScroll={onScroll}
         style={{ scrollbarWidth: "none" }}
       >
-        {images.map((img) => (
+        {images.map((img, i) => (
           <div key={img.id} className="relative h-full w-full shrink-0 snap-start">
-            <VeiledPhoto src={img.url} alt="" className="h-full w-full object-cover" veiled={veiled} />
+            <VeiledPhoto
+              src={img.url}
+              alt=""
+              className="h-full w-full object-cover"
+              veiled={veiled}
+              onOpen={() => setLightboxIndex(i)}
+            />
           </div>
         ))}
       </div>
@@ -90,6 +103,14 @@ export default function PostCarousel({ images, veiled, className, onActiveImageC
           />
         ))}
       </div>
+
+      {lightboxIndex !== null ? (
+        <Lightbox
+          images={images.map((img) => ({ src: img.url, alt: "", veiled }))}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+        />
+      ) : null}
     </div>
   );
 }

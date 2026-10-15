@@ -8,17 +8,20 @@ type Props = {
   alt: string;
   className?: string;
   veiled: boolean;
+  // Forwarded straight to ZoomableImage — see that component's own
+  // comment (multi-photo carousel fix pass, 2026-10-14, DECISIONS.md).
+  onOpen?: () => void;
 };
 
 // Veil (Phase B, B6, 2026-10-10, see DECISIONS.md) — reveal is per-image
 // and never persisted (local component state only), exactly per spec.
 // Wraps ZoomableImage rather than replacing it, so a revealed image
 // still opens the full Lightbox/zoom experience exactly as before.
-export default function VeiledPhoto({ src, alt, className, veiled }: Props) {
+export default function VeiledPhoto({ src, alt, className, veiled, onOpen }: Props) {
   const [revealed, setRevealed] = useState(false);
 
   if (!veiled || revealed) {
-    return <ZoomableImage src={src} alt={alt} className={className} />;
+    return <ZoomableImage src={src} alt={alt} className={className} onOpen={onOpen} />;
   }
 
   return (
