@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { requireAdmin } from "@/lib/auth/require-admin";
+import { requireAdminApi } from "@/lib/auth/require-admin";
 
 type Body = { body?: string };
 
@@ -11,10 +11,11 @@ type Body = { body?: string };
 // server-side via Prisma, is the only way any of these rows are ever
 // read or written.
 export async function POST(request: Request, { params }: { params: { id: string } }) {
-  const admin = await requireAdmin();
-  if (!admin) {
-    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  const adminResult = await requireAdminApi();
+  if (!adminResult.ok) {
+    return adminResult.response;
   }
+  const admin = adminResult.user;
 
   let body: Body;
   try {

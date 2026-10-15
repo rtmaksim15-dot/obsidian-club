@@ -1,6 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { SUPABASE_COOKIE_OPTIONS } from "./lib/auth/cookie-options";
+import { isAdminId } from "./lib/auth/admin-allowlist";
+import {
+  ADMIN_STEPUP_COOKIE_NAME,
+  ADMIN_STEPUP_COOKIE_OPTIONS,
+  signStepUpCookie,
+  verifyStepUpCookie,
+} from "./lib/auth/admin-stepup";
+import { decideStepUp } from "./lib/auth/admin-stepup-policy";
 
 // Refreshes the Supabase session on every request and gates the
 // authenticated Platform routes (ADR-0010). Fine-grained checks (e.g.
@@ -78,6 +86,69 @@ export async function middleware(request: NextRequest) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", request.nextUrl.pathname);
     return NextResponse.redirect(loginUrl);
+  }
+
+  // Admin security hardening, Package S1 (2026-10-15, see DECISIONS.md)
+  // — step-up (12h) + idle timeout (30m), enforced once here for both
+  // /admin pages and /api/admin/* routes, rather than duplicated in
+  // each (both already pass through this middleware; PROTECTED_PREFIXES
+  // above only covers "/admin" as a page prefix, not "/api/admin", so
+  // this check is independent of `isProtected`).
+  //
+  // Only runs this extra gate for a request that's ALREADY a real,
+  // currently-aal2 admin per Supabase — i.e. someone who has
+  // demonstrably completed MFA for this account at some point in this
+  // very session. For anyone else (not logged in, logged in but not an
+  // admin, or an admin whose session never reached aal2 at all), this
+  // deliberately does nothing extra and falls through to the existing
+  // requireAdmin()/requireAdminApi() checks, which 404/403 them exactly
+  // as before (item 2, 2026-09-17's own obscurity reasoning: a stranger
+  // and an admin-without-MFA must stay indistinguishable from outside —
+  // redirecting straight to an MFA entry screen here would leak "this
+  // account is an admin, just needs a code" to anyone holding a stolen
+  // aal1 session cookie). The 12h/30m freshness check only ever applies
+  // to someone who can't be that stranger, since they already hold a
+  // live aal2 session on a real admin account.
+  const isAdminPath = request.nextUrl.pathname.startsWith("/admin") || request.nextUrl.pathname.startsWith("/api/admin");
+  if (isAdminPath && user && isAdminId(user.id)) {
+    const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (aalData?.currentLevel === "aal2") {
+      if (!process.env.ADMIN_SESSION_SECRET) {
+        // Fail OPEN for this one new gate specifically — not the
+        // surrounding isAdmin+aal2 check above, which already stands on
+        // its own regardless of this env var. A missing signing secret
+        // means verifyStepUpCookie()/signStepUpCookie() can only ever
+        // return null (both fail closed by design, see admin-stepup.ts)
+        // — without this explicit bypass, that would make
+        // decideStepUp() return "require-stepup" for literally every
+        // request forever (no cookie can ever be minted to satisfy it
+        // either), redirecting every admin, including the founder, into
+        // an MFA loop they can never clear. Missing env var degrades to
+        // "no step-up/idle timeout enforced yet," not "nobody can use
+        // /admin" — same severity-matched failure mode as, e.g.,
+        // RESEND_API_KEY being unset skipping email instead of blocking
+        // signups.
+        console.error("[middleware] ADMIN_SESSION_SECRET is unset — admin step-up/idle timeout is not enforced.");
+      } else {
+        const state = await verifyStepUpCookie(request.cookies.get(ADMIN_STEPUP_COOKIE_NAME)?.value);
+        const decision = decideStepUp(state, Date.now());
+
+        if (decision.action === "require-stepup") {
+          if (request.nextUrl.pathname.startsWith("/api/admin")) {
+            return NextResponse.json({ error: "Re-verification required." }, { status: 401 });
+          }
+          const mfaUrl = new URL("/login/mfa", request.url);
+          mfaUrl.searchParams.set("next", request.nextUrl.pathname);
+          return NextResponse.redirect(mfaUrl);
+        }
+
+        const refreshedCookie = await signStepUpCookie(decision.refreshedState);
+        if (refreshedCookie) {
+          response.cookies.set(ADMIN_STEPUP_COOKIE_NAME, refreshedCookie, ADMIN_STEPUP_COOKIE_OPTIONS);
+        }
+      }
+    }
+    // currentLevel !== "aal2": fall through unchanged, see comment above.
   }
 
   return response;

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { RoomType } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
-import { requireAdmin } from "@/lib/auth/require-admin";
+import { requireAdminApi } from "@/lib/auth/require-admin";
 import { errCode } from "@/lib/utils/safe-error";
 
 type Body = {
@@ -21,9 +21,9 @@ const VALID_TYPES = Object.values(RoomType);
 // (general/newcomers/named local circles) are seeded — see
 // prisma/seed.ts and DECISIONS.md, 2026-07-03.
 export async function POST(request: Request) {
-  const admin = await requireAdmin();
-  if (!admin) {
-    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  const adminResult = await requireAdminApi();
+  if (!adminResult.ok) {
+    return adminResult.response;
   }
 
   let body: Body;

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { requireAdmin } from "@/lib/auth/require-admin";
+import { requireAdminApi } from "@/lib/auth/require-admin";
 import { logModerationAction } from "@/lib/moderation/log";
 import { requiresMandatoryRetention } from "@/lib/moderation/retention";
 
@@ -26,10 +26,11 @@ const VALID_ACTIONS: Action[] = ["dismiss", "review", "preserve", "remove", "rem
 // red-line category. Every action is logged to ModerationAction — who,
 // when, what, against which report's category.
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  const admin = await requireAdmin();
-  if (!admin) {
-    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  const adminResult = await requireAdminApi();
+  if (!adminResult.ok) {
+    return adminResult.response;
   }
+  const admin = adminResult.user;
 
   let body: { action?: string };
   try {

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { InviteSource } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
-import { requireAdmin } from "@/lib/auth/require-admin";
+import { requireAdminApi } from "@/lib/auth/require-admin";
 import { logModerationAction } from "@/lib/moderation/log";
 
 const VALID_SOURCES: InviteSource[] = ["purchase_card", "member", "partner"];
@@ -13,10 +13,11 @@ const VALID_SOURCES: InviteSource[] = ["purchase_card", "member", "partner"];
 // this control is for correcting a token minted under the wrong source
 // (e.g. a QA-TEST token), not for wiring up member/partner attribution.
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  const admin = await requireAdmin();
-  if (!admin) {
-    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  const adminResult = await requireAdminApi();
+  if (!adminResult.ok) {
+    return adminResult.response;
   }
+  const admin = adminResult.user;
 
   let body: { source?: string };
   try {

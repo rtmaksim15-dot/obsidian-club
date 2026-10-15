@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { requireAdmin } from "@/lib/auth/require-admin";
+import { requireAdminApi } from "@/lib/auth/require-admin";
 import { logModerationAction } from "@/lib/moderation/log";
 import { REPORT_CATEGORIES } from "@/lib/moderation/report";
 import { requiresMandatoryRetention } from "@/lib/moderation/retention";
@@ -18,10 +18,11 @@ const KNOWN_CATEGORIES = REPORT_CATEGORIES.map((c) => c.value as string);
 // `category` body field, same reasoning as the messages route's
 // identical addition.
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
-  const admin = await requireAdmin();
-  if (!admin) {
-    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  const adminResult = await requireAdminApi();
+  if (!adminResult.ok) {
+    return adminResult.response;
   }
+  const admin = adminResult.user;
 
   let category: string | undefined;
   try {
@@ -70,10 +71,11 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
 // its own ModerationAction — the removal's own log row is untouched,
 // so the full remove-then-restore history stays readable.
 export async function PATCH(_request: Request, { params }: { params: { id: string } }) {
-  const admin = await requireAdmin();
-  if (!admin) {
-    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  const adminResult = await requireAdminApi();
+  if (!adminResult.ok) {
+    return adminResult.response;
   }
+  const admin = adminResult.user;
 
   const comment = await prisma.comment.findUnique({ where: { id: params.id } });
   if (!comment) {

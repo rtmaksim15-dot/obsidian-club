@@ -147,7 +147,7 @@ export default async function AdminConsolePage() {
     notFound();
   }
 
-  const [applications, peopleBase, reports, tokensPage, tokensTotal, counts, emailCaptures, emailCapturesTotal, securityEventRows, shortCodeFailureRows] =
+  const [applications, peopleBase, reports, tokensPage, tokensTotal, counts, emailCaptures, emailCapturesTotal, securityEventRows, shortCodeFailureRows, accessLogRows] =
     await Promise.all([
     prisma.waitlist.findMany({
       where: {
@@ -281,6 +281,19 @@ export default async function AdminConsolePage() {
       orderBy: { createdAt: "desc" },
       take: 100,
       select: { id: true, shortCode: true, ip: true, createdAt: true },
+    }),
+    // Admin security hardening, Package S1 (2026-10-15, see
+    // DECISIONS.md), item 5 — last 20 admin_access_log rows, one per
+    // successful step-up (distinct from the AdminAuthEvent sign-in/MFA
+    // log above — see that table's own schema comment for the split).
+    // The migration is written, not applied (CLAUDE.md rule 11) and
+    // this code isn't pushed yet either (this task's own constraint)
+    // — both land together, same sequencing as every other
+    // not-yet-applied-migration feature in this session's history.
+    prisma.adminAccessLog.findMany({
+      orderBy: { at: "desc" },
+      take: 20,
+      select: { id: true, userId: true, at: true, ipHash: true, userAgent: true },
     }),
   ]);
 
@@ -605,6 +618,7 @@ export default async function AdminConsolePage() {
         ...tokens.map((t) => t.redeemedById),
         ...tokens.map((t) => t.inviterId),
         ...tokens.map((t) => t.partnerOfId),
+        ...accessLogRows.map((r) => r.userId),
       ].filter((id): id is string => Boolean(id)),
     ),
   );
@@ -650,6 +664,13 @@ export default async function AdminConsolePage() {
         shortCode: r.shortCode,
         ip: r.ip,
         createdAt: r.createdAt.toISOString(),
+      }))}
+      accessLogs={accessLogRows.map((r) => ({
+        id: r.id,
+        userName: nameById.get(r.userId) ?? "(unknown)",
+        at: r.at.toISOString(),
+        ipHash: r.ipHash,
+        userAgent: r.userAgent,
       }))}
       applications={applicationsToShow.map((a) => ({
         id: a.id,

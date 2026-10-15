@@ -4095,3 +4095,221 @@ change itself is plain JSX with no new branchable logic to unit-test),
 `npm run build` all clean (one transient Google Fonts fetch failure on
 a cold `.next` cache, unrelated to this change — a same-session rerun
 built clean). No schema/data change.
+
+### 2026-10-15 — Admin security hardening, Package S1
+
+Full audit table and ranked findings given to Max directly in chat (the
+task's own REPORT BACK format); this entry is the implementation
+record. Committed locally, **not pushed** (this task's own constraint).
+
+**Audit, in short**: every one of the 22 real admin API routes
+(`app/api/admin/**/route.ts`, 24 exported handlers) already called
+`requireAdmin()` (isAdmin allowlist + current Supabase aal2) as its
+first line — no page-only or client-side check anywhere. The one
+route with no guard at all (`POST /api/admin/invite-batches`) is an
+intentional, unconditional 410 for a retired feature — no data, no
+action, identity genuinely doesn't matter there. The real gap wasn't
+missing checks; it was that a *stale* aal2 session (the founder's own
+"opened `/admin` in Chrome with an old session and got straight in")
+never had to prove anything recent, and no API route distinguished
+"not logged in" from "logged in but not admin."
+
+**1 — one shared API guard, with real status codes.**
+`lib/auth/require-admin.ts#requireAdminApi()` added alongside the
+existing `requireAdmin()` (kept, unchanged, for pages — their 404-
+obscurity behavior is intentional, see its own 2026-09-17 comment).
+Mechanically migrated all 24 call sites (`const admin = await
+requireAdmin(); if (!admin) return 403;` → `const adminResult = await
+requireAdminApi(); if (!adminResult.ok) return adminResult.response;`)
+— anonymous now gets a real 401, an authenticated non-admin (or an
+admin whose Supabase session never reached aal2 at all) gets 403,
+matching the task's own obscurity reasoning: the API tells a stranger
+apart from a member, but never tells a member apart from "an admin who
+hasn't done MFA yet."
+
+**2 — step-up (12h) + idle timeout (30m).** The actual headline fix.
+Two independent clocks (`lib/auth/admin-stepup-policy.ts`, pure,
+unit-tested): step-up resets only on a genuine fresh
+`mfa.challengeAndVerify()` success; idle refreshes on every `/admin` or
+`/api/admin/*` request while still valid. Enforced once, in
+`middleware.ts` (already runs on every such request — "/api/admin" was
+never actually covered by `PROTECTED_PREFIXES`, a `/admin`-prefix
+string match that doesn't match `/api/admin/*`, confirmed while
+reading it; this package's own gate is independent of that list), for
+BOTH pages and API routes, rather than duplicated per-route. State
+lives in a new, separate, HttpOnly+Secure+SameSite=Strict cookie
+(`oc_admin_su`, `lib/auth/admin-stepup.ts`) — deliberately not
+piggybacked on Supabase's own session cookie (which stays `httpOnly:
+false` by its own documented, unrelated tradeoff — browser-client
+Realtime/Storage/password-login all read it directly, see `lib/auth/
+cookie-options.ts`). HMAC-SHA256 via Web Crypto (`crypto.subtle`), so
+the identical code runs in both the Edge (middleware) and Node (API
+routes) runtimes. **Deliberately scoped**: this extra gate only ever
+engages for a request that's *already* a real, currently-aal2 admin —
+anyone else (not logged in, not an admin, or an admin whose session
+never reached aal2 this sign-in) falls through unchanged to the
+existing 404/403 obscurity behavior, preserving the 2026-09-17
+decision that a stranger and an admin-without-MFA must look identical
+from outside; redirecting straight to an MFA entry screen for THAT
+case would leak "this account is an admin, just needs a code" to
+anyone holding a stolen aal1 cookie. The new redirect/401 only ever
+fires for someone who can't be that stranger, since reaching it
+requires already holding a live aal2 session on a real admin account.
+
+**Never locks the founder out**, by construction, not just intent:
+- Missing `ADMIN_SESSION_SECRET` → the whole gate fails OPEN (logged
+  loudly), not closed — every existing protection (allowlist, aal2)
+  stays exactly as strict as before; this one new layer just isn't
+  enforced yet. See TECH_DEBT.md.
+- A stale step-up never produces a dead end — it's a redirect to
+  `/login/mfa` (reused as-is; that page only ever required *an*
+  existing session, never checked whether it was already aal2, so it
+  works unmodified for "re-verify" the same as "verify for the first
+  time") or a 401 a client can react to, always with a working path
+  forward (re-enter the code you already have).
+- Per-account lockout (item 4 below) is a 15-minute rolling window,
+  never a permanent state — it ages out on its own, attack pressure or
+  not.
+
+**3 — "Sign out everywhere."** `POST /api/admin/sign-out-everywhere`
+(admin-gated via `requireAdminApi()`) calls Supabase's own `auth.
+signOut({ scope: "global" })` — revokes every refresh token for the
+account, this browser's current session included — and clears the new
+step-up cookie. Button + `ConfirmDialog` in `AdminConsole.tsx`'s
+header (global, not zone-scoped); hard `window.location.href`
+redirect to `/login` on success since nothing in the React tree is
+still a valid session to render.
+
+**4 — rate limiting + per-account lockout + alert email.** Per-IP was
+already in place on both `/api/auth/sign-in` (10/15min → lowered to
+5/15min, matching the task's own number and the MFA-verify route's
+existing one) and `/api/auth/mfa/verify` (already 5/15min, unchanged).
+New: a per-ACCOUNT rolling-failure lockout on both
+(`lib/security/account-lockout.ts`, pure, unit-tested), reusing the
+EXISTING `AdminAuthEvent` log (already records every `sign_in_failure`
+/`mfa_challenge_failure` with a timestamp) as the failure-count source
+— no new table needed for this part. 5 failures/15min locks the
+account regardless of which IP is asking (closes the gap a per-IP-only
+limit leaves: a distributed guesser spreading attempts across many
+IPs against ONE admin account's password or TOTP). A new alert email,
+`sendAdminAccountLockoutAlert` (`lib/utils/email.ts`), fires on
+lockout — debounced via the same `checkRateLimit()` infra every other
+limit in this codebase uses (max 1/15min per account) so a sustained
+attack doesn't re-send it on every single blocked attempt.
+
+**5 — alert email enrichment + `admin_access_log`.** The two existing
+admin sign-in alerts (`sendAdminPasswordAcceptedAlert`/
+`sendAdminSignInCompletedAlert`) and the new lockout alert now all show
+approximate location (country/region, `lib/security/geo.ts` — reads
+Vercel's own `x-vercel-ip-country(-region)` edge headers, zero new
+service/secret; "Unknown location" off-Vercel or in local dev) and a
+parsed "Browser on OS" line (`lib/security/user-agent.ts` — a small
+regex heuristic, not a new dependency, matching this codebase's
+existing avoid-a-package-for-a-dozen-lines pattern) alongside the
+time/IP/raw-UA they already showed. **New table**, `admin_access_log`
+(migration written, NOT applied — see below): one row per successful
+step-up (not per page view), written from `POST /api/auth/mfa/verify`
+on success. Deliberately distinct from `AdminAuthEvent` (the existing
+sign-in/MFA-attempt audit trail, success AND failure, raw IP) — this
+one is a lower-sensitivity "who's been in `/admin` lately" glance for
+the console (last 20, new row in the existing Security zone), so its
+IP is a one-way HMAC hash (`lib/security/ip-hash.ts`, keyed with
+`ADMIN_SESSION_SECRET` — a bare SHA-256 of an IPv4 address is
+brute-forceable across its whole ~4B keyspace; keying it is what
+actually makes it one-way in practice) and its user agent is the same
+short parsed summary, not the raw header.
+
+**6 — headers were already almost entirely done.** Security package 4,
+Fix 8 (2026-09-29) had already shipped X-Frame-Options DENY,
+X-Content-Type-Options nosniff, Referrer-Policy
+strict-origin-when-cross-origin, a locked-down Permissions-Policy,
+HSTS at **2 years** (`max-age=63072000` — exceeds this task's own "1
+year" ask; left as-is, stricter is not a regression), and a
+Report-Only CSP with `frame-ancestors 'none'` already included — this
+task's own instruction not to move CSP to enforcing mode in this
+package is honored, unchanged. Genuinely new here: `X-Robots-Tag:
+noindex, nofollow` on `/admin/:path*` and `/api/admin/:path*`
+(`next.config.mjs`), paired with `/admin` added to `app/robots.ts`'s
+own disallow list (item 7) — the one real gap found in this area.
+
+**7 — robots.** Covered above; `curl -I` against a local production
+build confirms the header lands on both an anonymous `/admin` redirect
+and an anonymous `/api/admin/*` 401 (see test results below).
+
+**8 — covered under item 4 above** (rate limiting was this item's own
+heading in the task; folded in since it's one coherent change).
+
+**9 — cookie flags, confirmed, not changed.** Supabase's own session
+cookie: `secure: true`, `httpOnly: false` (deliberate — the browser
+client reads/writes it directly for password sign-in, Realtime, and
+direct-to-Storage uploads; see `lib/auth/cookie-options.ts`'s own
+comment and CLAUDE.md), `sameSite: "lax"` (package default — `strict`
+would drop the cookie on the top-level redirect back from Google
+OAuth). The new admin-only step-up cookie (item 2) IS
+HttpOnly+Secure+SameSite=Strict, since nothing server-side needs
+browser-JS access to it and it never has to survive a cross-site OAuth
+redirect — the task's own "or Strict for admin-only cookies" suggestion,
+applied to the one cookie this package actually controls end-to-end.
+
+**10 — tests.** `app/api/admin/admin-routes-guard.test.ts` dynamically
+imports every `app/api/admin/**/route.ts` file (enumerated via a real
+filesystem walk, not a hand-maintained list) and asserts anonymous
+-> 401 / authenticated non-admin -> 403 on every exported HTTP method
+— 24 routes covered automatically, including `sign-out-everywhere`
+the moment it was added, with zero route-specific setup needed (every
+handler's guard check runs before touching params/body, confirmed by
+the mechanical migration in item 1). `lib/auth/admin-stepup-policy.
+test.ts` (9 tests) covers step-up expiry, idle expiry, the "idle
+refreses while step-up doesn't" distinction, a simulated continuously-
+active admin never getting force-logged-out before the 12h ceiling,
+and the exact-boundary edge. `lib/security/account-lockout.test.ts`
+(4 tests) covers the lockout threshold. `lib/auth/admin-stepup.test.ts`
+(6) covers the cookie's sign/verify roundtrip, tamper detection (both
+a forged timestamp and a forged signature), and fail-closed-on-missing-
+secret. `lib/security/{geo,user-agent,ip-hash}.test.ts` (15 combined)
+cover the three small enrichment helpers.
+
+**Migration**: `supabase/migrations/20261015120000_admin_access_log.sql`
+— **written, NOT applied**, per CLAUDE.md rule 11, awaiting explicit
+go-ahead naming this exact action. One new table (`admin_access_log`),
+deny-all RLS (same established pattern as `admin_notes`/
+`admin_auth_events`), additive only — no existing table/column
+touched.
+
+**Recovery path if an admin's MFA device is lost** (the task's own
+required question): `POST /api/auth/mfa/unenroll` requires aal2 to
+remove an already-verified factor (correct, pre-existing — a stolen
+aal1 session shouldn't be able to strip real protection either), which
+means an admin who's lost the device can't self-service remove it —
+they can prove aal1 (password) but never aal2 (the thing they lost).
+The actual path is outside this codebase entirely: whoever holds
+Supabase project access (the founder) removes the stuck factor via the
+Supabase Dashboard (Authentication → Users → the account → MFA
+factors → delete), or a one-off script using the existing service-role
+client (`lib/auth/supabase-admin.ts`). After that, the admin signs in
+at aal1 and re-enrolls a fresh factor at `/account/security`, which is
+reachable at aal1 specifically for this reason (pre-existing, see
+`requireAdmin()`'s own 2026-09-17 comment). No in-app backup codes or
+admin-removes-another-admin's-factor console action exists — flagged,
+not built, in TECH_DEBT.md (out of scope for a hardening pass asked to
+describe this path, not invent a new one).
+
+**Live verification**: `curl -I` against a local `next build` +
+`next start` confirmed every header present on `/` (global set) and on
+an anonymous `/admin` request (redirect still carries them, plus
+`X-Robots-Tag`) and an anonymous `GET /api/admin/applications` (a real
+`401 Unauthorized`, not 403 — confirming item 1 live, not just in the
+test suite). `robots.txt` confirmed serving the new `Disallow: /admin`
+line. The actual step-up/idle/sign-out-everywhere flow could **not**
+be exercised end-to-end live — it needs a real Supabase admin account
+with an enrolled TOTP factor and a live 6-digit code, which isn't
+something this session has access to generate, and the local dev
+server points at the real production database (confirmed earlier this
+session) — so this is verified via the unit tests above plus the
+`curl` checks, not a full browser click-through; said explicitly here
+rather than implying a live walkthrough happened.
+
+`npx tsc --noEmit`, `npx next lint` (same one pre-existing
+`AdminConsole.tsx` warning), `npm test` (232 passing, 51 new), `npm
+run build` all clean. Committed locally, **not pushed** (task
+constraint).

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { requireAdmin } from "@/lib/auth/require-admin";
+import { requireAdminApi } from "@/lib/auth/require-admin";
 import { logModerationAction } from "@/lib/moderation/log";
 
 // POST /api/admin/invite-tokens/:id/revoke — admin batch board, per-token
@@ -16,10 +16,11 @@ import { logModerationAction } from "@/lib/moderation/log";
 // unattributed while checking ageVerified — small enough to fix
 // alongside it.
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
-  const admin = await requireAdmin();
-  if (!admin) {
-    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  const adminResult = await requireAdminApi();
+  if (!adminResult.ok) {
+    return adminResult.response;
   }
+  const admin = adminResult.user;
 
   const token = await prisma.inviteToken.findUnique({ where: { id: params.id } });
   if (!token) {

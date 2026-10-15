@@ -65,6 +65,21 @@ const nextConfig = {
         source: "/sw.js",
         headers: [{ key: "Cache-Control", value: "no-cache" }],
       },
+      // Admin security hardening, Package S1 (2026-10-15, see
+      // DECISIONS.md), item 7 — belt-and-suspenders alongside
+      // app/robots.ts's own "/admin" disallow: a header-level noindex
+      // also covers /api/admin/* (robots.txt disallow rules only ever
+      // apply to crawling, not API responses, and nothing links to
+      // these paths for a crawler to find anyway, but this costs
+      // nothing and closes the gap completely either way).
+      {
+        source: "/admin/:path*",
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+      },
+      {
+        source: "/api/admin/:path*",
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+      },
     ];
   },
 };

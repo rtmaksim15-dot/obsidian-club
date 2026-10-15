@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { requireAdmin } from "@/lib/auth/require-admin";
+import { requireAdminApi } from "@/lib/auth/require-admin";
 import { sendPersonalInvitationEmail, sendInvitationEmail } from "@/lib/utils/email";
 import { logModerationAction } from "@/lib/moderation/log";
 
@@ -15,10 +15,11 @@ import { logModerationAction } from "@/lib/moderation/log";
 // lives at PATCH /api/admin/applications/[id], keyed off the Waitlist
 // row, not this one) without needing an explicit source allow-list.
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
-  const admin = await requireAdmin();
-  if (!admin) {
-    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  const adminResult = await requireAdminApi();
+  if (!adminResult.ok) {
+    return adminResult.response;
   }
+  const admin = adminResult.user;
 
   const token = await prisma.inviteToken.findUnique({ where: { id: params.id } });
   if (!token) {

@@ -21,7 +21,11 @@ export default function robots(): MetadataRoute.Robots {
       // real gate is the Accept decision) — but nothing should link to
       // it or list it, so it shouldn't be crawled/indexed either. See
       // that page's own `noindex` metadata for the second half of this.
-      disallow: ["/legal/internal/", "/invitation"],
+      //
+      // /admin (admin security hardening, Package S1, 2026-10-15, see
+      // DECISIONS.md, item 7) — paired with next.config.mjs's own
+      // X-Robots-Tag header on /admin/* and /api/admin/*.
+      disallow: ["/legal/internal/", "/invitation", "/admin"],
     },
   };
 }

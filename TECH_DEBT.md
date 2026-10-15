@@ -1444,3 +1444,57 @@ fixed here — out of scope for a "the viewer has no close button" bug
 fix; needs its own pass to thread `viewerVeilEnabled` through to
 `ProfilePhotoGrid` and decide whether to lift per-image reveal state
 the way `PostCarousel`'s shared Lightbox now does.
+
+## Admin security hardening, Package S1 (2026-10-15)
+
+Full report in DECISIONS.md.
+
+**No in-app self-service recovery if an admin's MFA device is lost.**
+`POST /api/auth/mfa/unenroll` requires the session to already be aal2
+before removing a *verified* factor (security fix, 2026-09-23 — a
+stolen aal1 session shouldn't be able to strip real MFA protection
+either), which is correct, but it means an admin who has genuinely
+lost the device that held their only verified factor cannot remove it
+themselves — they can prove aal1 (password) but never aal2 (the thing
+they lost). The actual recovery path today is entirely outside this
+codebase: whoever holds Supabase project access (the founder) removes
+the stuck factor via the Supabase Dashboard (Authentication → Users →
+the affected account → MFA factors → delete), or via a one-off script
+using the service-role client (`supabaseAdmin.auth.admin.mfa.
+deleteFactor()` — `lib/auth/supabase-admin.ts` already has the
+service-role client this would use, though no such script exists
+today). Once the stuck factor is gone, the admin signs in at aal1 and
+re-enrolls a fresh factor at `/account/security`, which is reachable
+at aal1 specifically for this reason (`requireAdmin()`'s own comment).
+No backup/recovery codes exist anywhere in this app. Not built here —
+out of scope for a hardening pass that was asked to describe the
+recovery path, not invent a new one; a backup-codes feature (or an
+in-app "founder removes another admin's factor" admin-console action)
+would be a real, separate addition if this gap is ever worth closing.
+
+**Admin step-up/idle enforcement depends on a new env var,
+`ADMIN_SESSION_SECRET`, not yet set anywhere.** Until Max sets it (in
+`.env.local` for local dev, and in Vercel for production), `lib/auth/
+admin-stepup.ts` can only ever fail closed on sign/verify — deliberately
+not a lockout (see middleware.ts's own comment): the 12h-step-up/
+30-min-idle gate simply isn't enforced yet, and every existing
+protection (isAdmin allowlist, aal2 check, rate limits) stays exactly
+as strict as it already was. Same category of gap as `RESEND_API_KEY`
+above — written and ready, inert until the secret is provisioned.
+
+**`admin_access_log` is unexercised against a real database** — same
+situation as every migration in this session: written
+(`supabase/migrations/20261015120000_admin_access_log.sql`), not
+applied (CLAUDE.md rule 11), and this whole package isn't pushed yet
+either (this task's own explicit constraint). The admin console's
+Security zone already queries it and will show "Nothing here" (not
+error) until both land, since the `Promise.all` it's part of would
+otherwise 500 the whole page against a table that doesn't exist yet —
+worth double-checking live once the migration is applied, same as
+every other such feature this session has shipped.
+
+**CSP stays Report-Only, by this task's own explicit instruction**
+("do not enforce CSP in this package") — already true before this
+package (Security package 4, Fix 8, 2026-09-29) and unchanged here.
+`/api/csp-report` (that same package) is where violations land; worth
+a look before any future pass moves it to enforcing mode.

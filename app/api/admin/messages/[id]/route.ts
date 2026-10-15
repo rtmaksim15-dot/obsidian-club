@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { requireAdmin } from "@/lib/auth/require-admin";
+import { requireAdminApi } from "@/lib/auth/require-admin";
 import { logModerationAction } from "@/lib/moderation/log";
 import { REPORT_CATEGORIES } from "@/lib/moderation/report";
 import { requiresMandatoryRetention } from "@/lib/moderation/retention";
@@ -23,10 +23,11 @@ const KNOWN_CATEGORIES = REPORT_CATEGORIES.map((c) => c.value as string);
 // a removal through this route has no classification signal at all and
 // defaults to NOT red-line, same as before this change.
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
-  const admin = await requireAdmin();
-  if (!admin) {
-    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  const adminResult = await requireAdminApi();
+  if (!adminResult.ok) {
+    return adminResult.response;
   }
+  const admin = adminResult.user;
 
   let category: string | undefined;
   try {
@@ -74,10 +75,11 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
 // ModerationAction. Same Realtime caveat as the DELETE handler above —
 // a restore also won't push live, members see it on next fetch.
 export async function PATCH(_request: Request, { params }: { params: { id: string } }) {
-  const admin = await requireAdmin();
-  if (!admin) {
-    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  const adminResult = await requireAdminApi();
+  if (!adminResult.ok) {
+    return adminResult.response;
   }
+  const admin = adminResult.user;
 
   const message = await prisma.message.findUnique({ where: { id: params.id } });
   if (!message) {

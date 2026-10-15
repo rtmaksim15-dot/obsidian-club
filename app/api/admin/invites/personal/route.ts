@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { requireAdmin } from "@/lib/auth/require-admin";
+import { requireAdminApi } from "@/lib/auth/require-admin";
 import { generateInviteToken } from "@/lib/utils/codes";
 import { computeValidUntil, HARD_CAP_DAYS } from "@/lib/invites/lifecycle";
 import { sendPersonalInvitationEmail } from "@/lib/utils/email";
@@ -32,10 +32,11 @@ type Body = { email?: string; name?: string };
 // equivalent, and a failed send is intrinsically about this token's
 // send, not an application decision.
 export async function POST(request: Request) {
-  const admin = await requireAdmin();
-  if (!admin) {
-    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  const adminResult = await requireAdminApi();
+  if (!adminResult.ok) {
+    return adminResult.response;
   }
+  const admin = adminResult.user;
 
   let body: Body;
   try {

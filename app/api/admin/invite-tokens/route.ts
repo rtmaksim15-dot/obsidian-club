@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { requireAdmin } from "@/lib/auth/require-admin";
+import { requireAdminApi } from "@/lib/auth/require-admin";
 import { TOKEN_SELECT, shapeTokenRow, sortTokensFailedFirst } from "@/lib/admin/token-shape";
 
 // GET /api/admin/invite-tokens?cursor=<tokenId> — Zone 4 pagination
@@ -10,9 +10,9 @@ import { TOKEN_SELECT, shapeTokenRow, sortTokensFailedFirst } from "@/lib/admin/
 // order (createdAt desc, id as tie-breaker) and the same "fetch 51,
 // keep 50" trick to know whether yet another page follows.
 export async function GET(request: Request) {
-  const admin = await requireAdmin();
-  if (!admin) {
-    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  const adminResult = await requireAdminApi();
+  if (!adminResult.ok) {
+    return adminResult.response;
   }
 
   const cursor = new URL(request.url).searchParams.get("cursor");

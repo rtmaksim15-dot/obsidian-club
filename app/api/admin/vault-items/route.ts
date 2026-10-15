@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { requireAdmin } from "@/lib/auth/require-admin";
+import { requireAdminApi } from "@/lib/auth/require-admin";
 
 type Body = { name?: string; description?: string; minRep?: number; imageUrl?: string };
 
@@ -9,9 +9,9 @@ type Body = { name?: string; description?: string; minRep?: number; imageUrl?: s
 // — no catalog is invented or seeded, see prisma/schema.prisma's
 // VaultItem comment and ADR-0016.
 export async function POST(request: Request) {
-  const admin = await requireAdmin();
-  if (!admin) {
-    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  const adminResult = await requireAdminApi();
+  if (!adminResult.ok) {
+    return adminResult.response;
   }
 
   let body: Body;

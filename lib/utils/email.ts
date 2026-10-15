@@ -2,6 +2,7 @@ import "server-only";
 import { Resend } from "resend";
 import { HARD_CAP_DAYS, joinUrl } from "@/lib/invites/lifecycle";
 import { errCode } from "@/lib/utils/safe-error";
+import { parseUserAgent } from "@/lib/security/user-agent";
 
 // Transactional emails. Email clients don't reliably load custom fonts or
 // read CSS variables, so brand colors are inlined here as literal hex —
@@ -226,12 +227,28 @@ function formatEasternTime(date: Date): string {
   });
 }
 
-function adminAlertBody(intro: string, params: { ip: string; userAgent: string | null; at: Date }): string {
+// Admin security hardening, Package S1 (2026-10-15, see DECISIONS.md),
+// item 5 — `location` (approximate, country/region only, from Vercel's
+// own geo headers — lib/security/geo.ts) and a parsed "Browser on OS"
+// line (lib/security/user-agent.ts) alongside the time/IP/raw-UA this
+// already showed. `location` is optional (absent in local dev / any
+// non-Vercel host — see that helper's own comment) so the email still
+// renders sensibly without it, just without that one line.
+function adminAlertBody(
+  intro: string,
+  params: { ip: string; userAgent: string | null; at: Date; location?: string },
+): string {
+  const { browser, os } = parseUserAgent(params.userAgent);
+  const locationLine = params.location
+    ? `<p style="font-size:14px;color:#9E9A94;line-height:1.7;margin:0 0 8px;">Approximate location: ${escapeHtml(params.location)}</p>`
+    : "";
   return `
     <div style="background:#0A0908;padding:32px 24px;font-family:Georgia,'Times New Roman',serif;color:#EDEAE4;">
       <div style="max-width:480px;margin:0 auto;">
         <p style="font-size:16px;line-height:1.6;margin:0 0 16px;">${intro}</p>
         <p style="font-size:14px;color:#9E9A94;line-height:1.7;margin:0 0 8px;">Time: ${escapeHtml(formatEasternTime(params.at))}</p>
+        ${locationLine}
+        <p style="font-size:14px;color:#9E9A94;line-height:1.7;margin:0 0 8px;">Browser/OS: ${escapeHtml(`${browser} on ${os}`)}</p>
         <p style="font-size:14px;color:#9E9A94;line-height:1.7;margin:0 0 8px;">IP: ${escapeHtml(params.ip)}</p>
         <p style="font-size:14px;color:#9E9A94;line-height:1.7;margin:0;">User agent: ${escapeHtml(params.userAgent ?? "(none)")}</p>
       </div>
@@ -252,6 +269,7 @@ export async function sendAdminPasswordAcceptedAlert(params: {
   ip: string;
   userAgent: string | null;
   at: Date;
+  location?: string;
 }): Promise<{ ok: boolean; error?: string }> {
   const html = adminAlertBody(`The admin account (${escapeHtml(params.email)}) passed the first check. Awaiting the authenticator code.`, params);
   return sendEmail(ADMIN_ALERT_EMAIL, "Password accepted — awaiting code", html);
@@ -270,9 +288,35 @@ export async function sendAdminSignInCompletedAlert(params: {
   ip: string;
   userAgent: string | null;
   at: Date;
+  location?: string;
 }): Promise<{ ok: boolean; error?: string }> {
   const html = adminAlertBody(`The admin account (${escapeHtml(params.email)}) signed in.`, params);
   return sendEmail(ADMIN_ALERT_EMAIL, "Admin sign-in completed", html);
+}
+
+/**
+ * Account-lockout alert (item 8, Package S1, 2026-10-15, see
+ * DECISIONS.md) — fired when either the sign-in or MFA-verify route's
+ * per-account rolling-failure-count lockout trips, debounced by the
+ * caller (checkRateLimit, same pattern as every other rate limit in
+ * this codebase) so a sustained attack doesn't re-send this on every
+ * single blocked attempt. `context` names which check locked
+ * ("password" vs "authenticator code") since the two have different
+ * real-world implications for the founder reading this.
+ */
+export async function sendAdminAccountLockoutAlert(params: {
+  email: string;
+  ip: string;
+  userAgent: string | null;
+  at: Date;
+  location?: string;
+  context: "password" | "authenticator code";
+}): Promise<{ ok: boolean; error?: string }> {
+  const html = adminAlertBody(
+    `The admin account (${escapeHtml(params.email)}) is temporarily locked out after too many incorrect ${escapeHtml(params.context)} attempts.`,
+    params,
+  );
+  return sendEmail(ADMIN_ALERT_EMAIL, "Admin account locked out", html);
 }
 
 /**

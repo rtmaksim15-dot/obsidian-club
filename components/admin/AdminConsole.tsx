@@ -10,6 +10,7 @@ import TokenDetail from "./TokenDetail";
 import CreatePersonalInvite from "./CreatePersonalInvite";
 import CommandPalette from "./CommandPalette";
 import EmailCapturesPanel, { type EmailCaptureRow } from "./EmailCapturesPanel";
+import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import { levelName } from "@/lib/rating/levels";
 import { formatAdminDateTime } from "@/lib/admin/format-date";
 import LogoMark from "@/components/ui/LogoMark";
@@ -229,6 +230,24 @@ export type ShortCodeFailureRow = {
   createdAt: string;
 };
 
+// Admin security hardening, Package S1 (2026-10-15, see DECISIONS.md),
+// item 5 — last 20 rows of admin_access_log (one per successful
+// step-up), a quick "who's been in here lately" glance distinct from
+// the sign-in/MFA attempt log above — see that table's own schema
+// comment for the split. ipHash and userAgent are already the short,
+// privacy-conscious forms (hashed IP, parsed "Browser on OS") by the
+// time they reach this component; userName is resolved server-side
+// (userId is a raw User.id, no Prisma relation surfaced here, same
+// pattern as every other admin/adminId field this console already
+// resolves through nameById).
+export type AccessLogRow = {
+  id: string;
+  userName: string;
+  at: string;
+  ipHash: string;
+  userAgent: string;
+};
+
 type Props = {
   counts: Counts;
   applications: Application[];
@@ -241,6 +260,7 @@ type Props = {
   emailCapturesTotal: number;
   securityEvents: SecurityEventRow[];
   shortCodeFailures: ShortCodeFailureRow[];
+  accessLogs: AccessLogRow[];
 };
 
 // Admin Console shell (2026-09-09, see DECISIONS.md) — "one route, one
@@ -280,6 +300,7 @@ export default function AdminConsole({
   emailCapturesTotal,
   securityEvents,
   shortCodeFailures,
+  accessLogs,
 }: Props) {
   const [applications, setApplications] = useState(initialApplications);
   const [people, setPeople] = useState(initialPeople);
@@ -291,7 +312,26 @@ export default function AdminConsole({
   const [openId, setOpenId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [signOutBusy, setSignOutBusy] = useState(false);
+  const [signOutConfirming, setSignOutConfirming] = useState(false);
   const applicationDetailRef = useRef<ApplicationDetailHandle>(null);
+
+  // "Sign out everywhere" (item 4, Package S1, 2026-10-15, see
+  // DECISIONS.md) — revokes every session on this admin account,
+  // including this one; POST /api/admin/sign-out-everywhere does the
+  // actual Supabase-side revocation. A hard redirect (not router.push)
+  // on success, since this browser's own session is now gone too —
+  // nothing left in this React tree is still valid to render.
+  async function handleSignOutEverywhere() {
+    setSignOutBusy(true);
+    const res = await fetch("/api/admin/sign-out-everywhere", { method: "POST" });
+    if (res.ok) {
+      window.location.href = "/login";
+      return;
+    }
+    setSignOutBusy(false);
+    setSignOutConfirming(false);
+  }
 
   // Report email alert deep link (item 6, 2026-09-20, see DECISIONS.md)
   // — sendReportAlert() links to /admin?report=<id>; this jumps straight
@@ -477,10 +517,33 @@ export default function AdminConsole({
               <LogoMark size={20} />
               <span className="text-label">Admin Console</span>
             </div>
-            <a href="/feed" className="nav-control text-caption" style={{ color: "var(--color-text-secondary)" }}>
-              ← Back to the club
-            </a>
+            <div className="flex items-center gap-4">
+              {/* "Sign out everywhere" (item 4, Package S1, 2026-10-15,
+                  see DECISIONS.md) — global, not zone-specific, so it's
+                  reachable regardless of which zone is open. */}
+              <button
+                type="button"
+                className="nav-control text-caption"
+                style={{ color: "var(--color-error)" }}
+                onClick={() => setSignOutConfirming(true)}
+              >
+                Sign out everywhere
+              </button>
+              <a href="/feed" className="nav-control text-caption" style={{ color: "var(--color-text-secondary)" }}>
+                ← Back to the club
+              </a>
+            </div>
           </div>
+
+          {signOutConfirming ? (
+            <ConfirmDialog
+              title={"Sign out of this admin account on every device?\nThis includes the browser you're using right now."}
+              confirmLabel="Sign out everywhere"
+              busy={signOutBusy}
+              onConfirm={handleSignOutEverywhere}
+              onCancel={() => setSignOutConfirming(false)}
+            />
+          ) : null}
 
           <StatusBar counts={counts} activeZone={zone} activeFilter={filter} onSelect={selectStat} />
 
@@ -527,7 +590,9 @@ export default function AdminConsole({
               actually been visible since it shipped. Found while adding
               shortCodeFailures here, which would have been equally
               invisible without this fix. */}
-          {(zone === "security" ? securityEvents.length === 0 && shortCodeFailures.length === 0 : currentList.length === 0) ? (
+          {(zone === "security"
+            ? securityEvents.length === 0 && shortCodeFailures.length === 0 && accessLogs.length === 0
+            : currentList.length === 0) ? (
             <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
               Nothing here.
             </p>
@@ -651,6 +716,31 @@ export default function AdminConsole({
                     </div>
                     <p className="text-caption mt-1 break-all" style={{ color: "var(--color-text-muted)" }}>
                       IP: {f.ip ?? "(unknown)"}
+                    </p>
+                  </li>
+                ))}
+              {/* Admin security hardening, Package S1 (2026-10-15, see
+                  DECISIONS.md), item 5 — last 20 admin_access_log rows,
+                  one per successful step-up. */}
+              {zone === "security" && accessLogs.length > 0 ? (
+                <li className="pt-2">
+                  <p className="text-label mb-2">Admin Access Log</p>
+                </li>
+              ) : null}
+              {zone === "security" &&
+                accessLogs.map((a) => (
+                  <li key={a.id} className="card">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-data">{a.userName}</p>
+                      <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
+                        {formatAdminDateTime(a.at)}
+                      </p>
+                    </div>
+                    <p className="text-caption mt-1" style={{ color: "var(--color-text-secondary)" }}>
+                      {a.userAgent}
+                    </p>
+                    <p className="text-caption mt-1 break-all" style={{ color: "var(--color-text-muted)" }}>
+                      IP (hashed): {a.ipHash}
                     </p>
                   </li>
                 ))}

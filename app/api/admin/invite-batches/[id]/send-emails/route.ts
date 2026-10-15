@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { requireAdmin } from "@/lib/auth/require-admin";
+import { requireAdminApi } from "@/lib/auth/require-admin";
 import { parseEmailNameCsv } from "@/lib/utils/csv";
 import { sendInvitationEmail } from "@/lib/utils/email";
 
@@ -17,9 +17,9 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // gets a clear count mismatch instead of a partially-sent batch that's
 // confusing to reason about afterward.
 export async function POST(request: Request, { params }: { params: { id: string } }) {
-  const admin = await requireAdmin();
-  if (!admin) {
-    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  const adminResult = await requireAdminApi();
+  if (!adminResult.ok) {
+    return adminResult.response;
   }
 
   const batch = await prisma.inviteBatch.findUnique({ where: { id: params.id } });

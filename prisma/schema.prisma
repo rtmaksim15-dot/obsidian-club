@@ -359,6 +359,8 @@ model User {
 
   // Admin access hardening (2026-09-17, see DECISIONS.md)
   adminAuthEvents AdminAuthEvent[]
+  // Admin security hardening, Package S1 (2026-10-15, see DECISIONS.md)
+  adminAccessLogs AdminAccessLog[]
 
   // 21+ Age Verification Gate, Phase A (2026-10-10, see DECISIONS.md)
   ageVerifications AgeVerification[]
@@ -1662,6 +1664,33 @@ model AdminAuthEvent {
   @@index([userId, createdAt])
   @@index([type, createdAt])
   @@map("admin_auth_events")
+}
+
+// Admin security hardening, Package S1 (2026-10-15, see DECISIONS.md) —
+// a separate, lower-sensitivity "who's accessed /admin lately" log,
+// distinct from AdminAuthEvent above (which is the sign-in/MFA-attempt
+// audit trail, success AND failure, with a raw IP, used for the alert-
+// email logic). This one row is written once per successful step-up
+// (a real mfa.challengeAndVerify() success — POST /api/auth/mfa/
+// verify), not per page view/request, and its IP is one-way hashed
+// (lib/security/ip-hash.ts, keyed with ADMIN_SESSION_SECRET), since
+// this table's purpose is a quick glance in the admin console ("who's
+// been in, from roughly where, recently"), not a forensic record —
+// AdminAuthEvent already is that. userAgent is the short browser/OS
+// summary (lib/security/user-agent.ts#parseUserAgent), not the raw
+// header, for the same "short, glanceable" reason.
+model AdminAccessLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  at        DateTime @default(now())
+  ipHash    String   @map("ip_hash")
+  userAgent String   @map("user_agent")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, at])
+  @@index([at])
+  @@map("admin_access_log")
 }
 
 // Normal-operation mode (2026-09-21, see DECISIONS.md) — a single,

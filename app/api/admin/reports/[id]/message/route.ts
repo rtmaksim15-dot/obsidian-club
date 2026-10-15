@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { requireAdmin } from "@/lib/auth/require-admin";
+import { requireAdminApi } from "@/lib/auth/require-admin";
 import { logModerationAction } from "@/lib/moderation/log";
 
 // GET /api/admin/reports/:id/message — the only path by which an admin
@@ -17,10 +17,11 @@ import { logModerationAction } from "@/lib/moderation/log";
 // opening this and closing the tab without reading still counts as an
 // access, which is the honest thing to log.
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
-  const admin = await requireAdmin();
-  if (!admin) {
-    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  const adminResult = await requireAdminApi();
+  if (!adminResult.ok) {
+    return adminResult.response;
   }
+  const admin = adminResult.user;
 
   const report = await prisma.report.findUnique({ where: { id: params.id } });
   if (!report) {

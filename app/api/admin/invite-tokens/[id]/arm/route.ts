@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { requireAdmin } from "@/lib/auth/require-admin";
+import { requireAdminApi } from "@/lib/auth/require-admin";
 import { computeClientExpiresAt, evaluateTokenLifecycle } from "@/lib/invites/lifecycle";
 import { logModerationAction } from "@/lib/moderation/log";
 
@@ -12,10 +12,11 @@ import { logModerationAction } from "@/lib/moderation/log";
 // admins confirming a physical card is live before handing it out.
 // No-ops (200, unchanged) if the token isn't in an armable state.
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
-  const admin = await requireAdmin();
-  if (!admin) {
-    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  const adminResult = await requireAdminApi();
+  if (!adminResult.ok) {
+    return adminResult.response;
   }
+  const admin = adminResult.user;
 
   const token = await prisma.inviteToken.findUnique({ where: { id: params.id } });
   if (!token) {

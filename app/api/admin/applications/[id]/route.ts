@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { requireAdmin } from "@/lib/auth/require-admin";
+import { requireAdminApi } from "@/lib/auth/require-admin";
 import {
   approveWaitlistEntry,
   holdWaitlistEntry,
@@ -24,10 +24,11 @@ type Body = { action?: Action; ageVerified?: boolean; heldReason?: string; heldN
 // is now just request parsing + response shaping; see that file's own
 // comment for the full history (A5/A6/A7) this used to carry inline.
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  const admin = await requireAdmin();
-  if (!admin) {
-    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  const adminResult = await requireAdminApi();
+  if (!adminResult.ok) {
+    return adminResult.response;
   }
+  const admin = adminResult.user;
 
   let body: Body;
   try {

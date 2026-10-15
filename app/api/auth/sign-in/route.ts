@@ -1,9 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptionsWithName } from "@supabase/ssr";
+import { prisma } from "@/lib/db/prisma";
 import { SUPABASE_COOKIE_OPTIONS } from "@/lib/auth/cookie-options";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
 import { logAdminAuthEvent, resolveAdminByEmail } from "@/lib/security/admin-auth-log";
-import { sendAdminPasswordAcceptedAlert } from "@/lib/utils/email";
+import { sendAdminPasswordAcceptedAlert, sendAdminAccountLockoutAlert } from "@/lib/utils/email";
+import { getApproxLocation } from "@/lib/security/geo";
+import { isAccountLockedOut } from "@/lib/security/account-lockout";
 import { errCode } from "@/lib/utils/safe-error";
 
 // POST /api/auth/sign-in — item 2, 2026-09-17 (see DECISIONS.md). The
@@ -16,7 +19,17 @@ import { errCode } from "@/lib/utils/safe-error";
 // makes logging unconditional and unbypassable by the client, not just
 // best-effort. Only sign-ins that resolve to a real, allowlisted admin
 // account are written to AdminAuthEvent — see resolveAdminByEmail().
-const RATE_LIMIT = { max: 10, windowMs: 15 * 60 * 1000 };
+//
+// Admin security hardening, Package S1 (2026-10-15, see DECISIONS.md),
+// item 8 — lowered 10 -> 5 attempts/15min to match the task's own
+// spec'd number (also now the same number as the MFA-verify route's
+// own per-IP limit, one fewer number to reason about). A per-ACCOUNT
+// lockout runs below too, independent of this per-IP one — see that
+// block's own comment.
+const RATE_LIMIT = { max: 5, windowMs: 15 * 60 * 1000 };
+const ACCOUNT_LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
+const ACCOUNT_LOCKOUT_MAX_FAILURES = 5;
+const LOCKOUT_ALERT_DEBOUNCE = { max: 1, windowMs: 15 * 60 * 1000 };
 
 type Body = { email?: string; password?: string };
 
@@ -41,6 +54,35 @@ export async function POST(request: NextRequest) {
   const password = body.password;
   if (!email || !password) {
     return NextResponse.json({ error: "Email and password are required." }, { status: 422 });
+  }
+
+  // Per-ACCOUNT lockout (item 8, Package S1, 2026-10-15, see
+  // DECISIONS.md), independent of the per-IP limit above — reuses
+  // AdminAuthEvent (already logs every sign_in_failure with a
+  // timestamp) as the rolling-window failure count, same reasoning and
+  // same numbers as the MFA-verify route's matching lockout. Checked
+  // before ever calling signInWithPassword() — a locked-out account
+  // shouldn't even get a real password check run against it.
+  const lockoutCandidate = await resolveAdminByEmail(email);
+  if (lockoutCandidate) {
+    const windowStart = new Date(Date.now() - ACCOUNT_LOCKOUT_WINDOW_MS);
+    const recentFailures = await prisma.adminAuthEvent.count({
+      where: { userId: lockoutCandidate.id, type: "sign_in_failure", createdAt: { gte: windowStart } },
+    });
+    if (isAccountLockedOut(recentFailures, ACCOUNT_LOCKOUT_MAX_FAILURES)) {
+      const alertGate = await checkRateLimit(`signin-lockout-alert:${lockoutCandidate.id}`, LOCKOUT_ALERT_DEBOUNCE);
+      if (alertGate.allowed) {
+        await sendAdminAccountLockoutAlert({
+          email,
+          ip,
+          userAgent: request.headers.get("user-agent"),
+          at: new Date(),
+          location: getApproxLocation(request.headers),
+          context: "password",
+        }).catch((err) => console.error("[auth/sign-in] Failed to send lockout alert:", errCode(err)));
+      }
+      return NextResponse.json({ error: "Too many attempts for this account. Try again later." }, { status: 429 });
+    }
   }
 
   let cookiesToSet: { name: string; value: string; options: CookieOptionsWithName }[] = [];
@@ -96,6 +138,7 @@ export async function POST(request: NextRequest) {
       ip,
       userAgent: request.headers.get("user-agent"),
       at: new Date(),
+      location: getApproxLocation(request.headers),
     }).catch((err) => console.error("[auth/sign-in] Failed to send password-accepted alert:", errCode(err)));
   }
 
