@@ -4335,3 +4335,43 @@ coverage for the exact flag the banner branches on.
 
 `npx tsc --noEmit`, `npx next lint` (same one pre-existing warning),
 `npm test` (235 passing), `npm run build` all clean.
+
+### 2026-10-15 — Package S1 migration applied live
+
+GO-AHEAD items 2-3. Fresh backup first:
+`obsidian-club-backup-2026-10-15T14-56-32-676Z.json`, 627,152 bytes,
+`~/obsidian-backups/`, perms 600.
+
+Applied `supabase/migrations/20261015120000_admin_access_log.sql`
+(explicit statement array in a single transaction — the established
+technique this session, not a regex split of the `.sql` file).
+
+**`npm run check:rls`**: 47 tables checked (up from 46), RLS enabled
+on every one.
+
+**RLS probe, `admin_access_log`** (SET ROLE technique, each role its
+own transaction): seeded one real row via the elevated connection,
+then queried as `anon` and `authenticated` with
+`request.jwt.claim.sub` set to that row's own `user_id` (the
+strictest case — even the row's "own" user, under the RLS-relevant
+Supabase roles, not just an unrelated one) — both returned **0 rows**
+(SELECT under RLS-enabled-zero-policies doesn't throw, zero rows is
+the actual denial signal). Seeded row cleaned up via a fresh
+`PrismaClient` with an explicit `RESET ROLE` first (the established
+fix for `SET ROLE` leaking across a pooled connection, found earlier
+this session).
+
+**Schema drift found and fixed** (same recurring class every hand-
+written migration this session has hit) — `prisma migrate diff`
+against live wasn't empty after the first apply:
+- `id`'s real default is `gen_random_uuid()`, not Prisma's inferred
+  `uuid()` → `@default(dbgenerated("gen_random_uuid()"))`
+- `at` is really `timestamptz`, not a bare timestamp → added
+  `@db.Timestamptz`
+- The hand-written FK has no explicit `ON UPDATE` clause, so
+  Postgres's real default (`NO ACTION`) is live, not Prisma's inferred
+  `CASCADE` → added `onUpdate: NoAction` on the relation
+
+Re-ran `prisma migrate diff` after the schema-only fix: **empty**.
+`npx tsc --noEmit`, `npm test` (235 passing), `npm run build` all
+clean after the fix too.

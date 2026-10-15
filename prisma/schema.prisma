@@ -1680,13 +1680,22 @@ model AdminAuthEvent {
 // summary (lib/security/user-agent.ts#parseUserAgent), not the raw
 // header, for the same "short, glanceable" reason.
 model AdminAccessLog {
-  id        String   @id @default(uuid()) @db.Uuid
+  // Schema-vs-live drift fixes (2026-10-15, see DECISIONS.md), same
+  // recurring class this session has hit on every hand-written-SQL
+  // migration: `gen_random_uuid()` (not Prisma's own `uuid()`) is the
+  // real DB-level default; `timestamptz`, not a bare timestamp, is the
+  // real column type; the hand-written FK has no explicit `ON UPDATE`
+  // clause, so Postgres's own default (`NO ACTION`) is what's actually
+  // live, not Prisma's inferred `CASCADE`. All three confirmed via
+  // `prisma migrate diff` against the live DB after applying the
+  // migration — schema-only fixes, no second DB change.
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId    String   @map("user_id") @db.Uuid
-  at        DateTime @default(now())
+  at        DateTime @default(now()) @db.Timestamptz
   ipHash    String   @map("ip_hash")
   userAgent String   @map("user_agent")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([userId, at])
   @@index([at])
