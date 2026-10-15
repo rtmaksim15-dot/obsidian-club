@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { ChevronRight } from "lucide-react";
 import { STEPS, TOTAL_SEGMENTS, type StepId } from "@/lib/newcomer-path/core";
+import { NEWCOMER_PATH_STEP_REP } from "@/lib/rep/config";
 
 type Props = {
   completion: Record<StepId, boolean>;
@@ -66,6 +68,13 @@ export default function NewcomerPathCard({ completion, filled, initiallyDismisse
   return (
     <div className="card mb-6">
       <p className="text-label mb-1">THE PATH OF THE INITIATE</p>
+      {/* Card polish pass (2026-10-14, see DECISIONS.md) — one line of
+          intro copy under the title, same Cormorant body font as every
+          other prose line on this card, muted since it's scene-setting
+          rather than content. */}
+      <p className="text-body !text-sm mt-0.5" style={{ color: "var(--color-text-muted)" }}>
+        Four steps to be seen by the Circle.
+      </p>
       <div className="mt-3">
         <SegmentBar filled={filled} />
       </div>
@@ -76,7 +85,7 @@ export default function NewcomerPathCard({ completion, filled, initiallyDismisse
             <li key={step.id}>
               <a
                 href={step.href}
-                className="nav-control flex items-center gap-2 py-1"
+                className="nav-control flex min-h-11 items-center gap-2 py-1"
                 style={{ color: done ? "var(--color-text-muted)" : "var(--color-text-primary)" }}
               >
                 <span
@@ -89,7 +98,22 @@ export default function NewcomerPathCard({ completion, filled, initiallyDismisse
                 >
                   {done ? "✓" : ""}
                 </span>
-                <span className={`text-body !text-sm ${done ? "line-through" : ""}`}>{step.label}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex flex-wrap items-baseline gap-x-2">
+                    <span className={`text-body !text-sm ${done ? "line-through" : ""}`}>{step.label}</span>
+                    {!done ? (
+                      <span className="text-caption shrink-0" style={{ color: "var(--color-gold)" }}>
+                        +{NEWCOMER_PATH_STEP_REP} REP
+                      </span>
+                    ) : null}
+                  </span>
+                  {!done ? (
+                    <span className="text-caption mt-0.5 block" style={{ color: "var(--color-text-muted)" }}>
+                      {step.hint}
+                    </span>
+                  ) : null}
+                </span>
+                {!done ? <ChevronRight size={16} strokeWidth={1.5} className="shrink-0" /> : null}
               </a>
             </li>
           );

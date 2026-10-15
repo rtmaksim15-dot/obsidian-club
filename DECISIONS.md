@@ -4049,3 +4049,49 @@ calling `onClose()` at all.
 `AdminConsole.tsx` warning), `npm test` (174 passing), `npm run build`
 all clean. No schema/data change — nothing to migrate, nothing
 requiring rule-11 go-ahead.
+
+### 2026-10-14 — Newcomer Path card polish
+
+Pure copy/layout pass over `components/shared/NewcomerPathCard.tsx` —
+no new data, no new state, nothing server-side changed.
+
+**0 — intro line.** "Four steps to be seen by the Circle." under the
+title, `.text-body` (the project's own Cormorant body style) at
+`!text-sm`, muted — scene-setting copy, not content, so it reads
+quieter than the step rows themselves.
+
+**1/2/3 — incomplete-row treatment.** A `ChevronRight` now sits on the
+right of every incomplete row; `min-h-11` (44px, this project's own
+touch-target convention) added to the row so the chevron isn't the
+only thing that grew. The gold "+N REP" reads `NEWCOMER_PATH_STEP_REP`
+straight from `lib/rep/config.ts` (the task's own "read from the
+single REP constant" — currently 40, see the Package 5 follow-ups
+entry above) rather than a second hardcoded `40` anywhere in this
+file, so a future change to that one constant updates the card's own
+copy for free. `STEPS` in `lib/newcomer-path/core.ts` gained a fourth
+field, `hint`, with the task's own four hint strings verbatim — kept
+in the pure core alongside `label`/`href` rather than hardcoded in the
+component, same reasoning as those two already being there.
+
+**4 — completed rows.** Unchanged from before this pass (checkmark,
+strikethrough label, muted color) — the chevron/reward/hint block is
+entirely gated on `!done`, so a completed row renders exactly as it
+did before this polish pass, nothing extra to suppress.
+
+**Verified manually** (temporary, unauthenticated local route — mounts
+`NewcomerPathCard` directly with hand-built `completion` props, no DB
+needed since this component takes it as a prop; deleted before this
+entry, never committed): an all-incomplete card shows all four hints/
+rewards/chevrons; a mixed card (2 of 4 done) shows the done two with
+no hint/reward and the remaining two with both; `read_page` confirmed
+every row (done or not) is still a real `<a href>` link to its correct
+destination, matching the behavior before this pass.
+
+`npx tsc --noEmit`, `npx next lint` (same one pre-existing
+`AdminConsole.tsx` warning), `npm test` (174 passing — this pass added
+no new tests, since `STEPS` gaining a `hint` field needed no new
+coverage beyond the existing step-completion tests, and the rendering
+change itself is plain JSX with no new branchable logic to unit-test),
+`npm run build` all clean (one transient Google Fonts fetch failure on
+a cold `.next` cache, unrelated to this change — a same-session rerun
+built clean). No schema/data change.

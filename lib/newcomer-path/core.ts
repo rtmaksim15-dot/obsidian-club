@@ -12,11 +12,35 @@ export type StepId = "profile" | "boundaries" | "limits" | "firstPost";
 
 export const STEP_IDS: StepId[] = ["profile", "boundaries", "limits", "firstPost"];
 
-export const STEPS: { id: StepId; label: string; href: string }[] = [
-  { id: "profile", label: "Show your face to the Circle", href: "/profile/edit" },
-  { id: "boundaries", label: "Draw your boundaries", href: "/boundaries" },
-  { id: "limits", label: "Name your limits", href: "/profile/edit" },
-  { id: "firstPost", label: "Leave your first mark", href: "/compose" },
+// `hint` (card polish pass, 2026-10-14, see DECISIONS.md) — one line
+// shown under an INCOMPLETE row only, saying what's actually missing;
+// never shown once that step is done (NewcomerPathCard.tsx's own
+// concern, not this file's).
+export const STEPS: { id: StepId; label: string; href: string; hint: string }[] = [
+  {
+    id: "profile",
+    label: "Show your face to the Circle",
+    href: "/profile/edit",
+    hint: "Add a photo and a few words about yourself (40+ characters).",
+  },
+  {
+    id: "boundaries",
+    label: "Draw your boundaries",
+    href: "/boundaries",
+    hint: "Choose who may write to you first.",
+  },
+  {
+    id: "limits",
+    label: "Name your limits",
+    href: "/profile/edit",
+    hint: "Mark at least one limit.",
+  },
+  {
+    id: "firstPost",
+    label: "Leave your first mark",
+    href: "/compose",
+    hint: "Share your first post in the Feed.",
+  },
 ];
 
 export const STEP_REASON_CODE: Record<StepId, string> = {
