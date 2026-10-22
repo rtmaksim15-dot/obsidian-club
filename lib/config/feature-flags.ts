@@ -148,3 +148,29 @@ export const ATLAS_UI_ENABLED = false;
 export const SEAL_UI_ENABLED = false;
 export const BOUNDARIES_UI_ENABLED = true;
 
+// Hide Newcomer Path + Practices (founder decision, 2026-10-22, see
+// DECISIONS.md) — "too much load for members." Both shipped working
+// (Package 5, Phase A and Package 4, Phase B respectively) and are
+// turned off here rather than removed: every underlying table/row
+// (UserProfile.settings.newcomerPath, practice_tags, user_practices)
+// stays exactly as it is, nothing is migrated or deleted.
+
+// Gates: "THE PATH OF THE INITIATE" card on /feed, and — the one real
+// behavioral change, not just a rendering gate — lib/newcomer-path/
+// status.ts#syncNewcomerPath() itself now returns null immediately
+// while this is false, before touching the database at all, so no
+// NEWCOMER_* REP is awarded while the flag is off (no silent awards
+// accruing out of sight). REP already awarded before this flipped off
+// is untouched — this only gates future awards, never reverses past
+// ones, same as every other UI_ENABLED flag in this file leaves its
+// underlying data alone.
+export const NEWCOMER_PATH_ENABLED = false;
+
+// Gates: the practices editor (the 23-row curated list + "Who can see
+// this") on /profile/edit, the "My limits"/"I practise"/"Curious
+// about" rows on /profile/[username], and GET/PATCH
+// /api/profile/practices (both now 404 while this is false — the
+// underlying lib/profile/practices.ts functions and the
+// practice_tags/user_practices tables are untouched, just not served).
+export const PRACTICES_UI_ENABLED = false;
+

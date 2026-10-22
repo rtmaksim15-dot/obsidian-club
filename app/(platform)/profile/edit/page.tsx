@@ -4,6 +4,7 @@ import ProfileEditForm from "@/components/shared/ProfileEditForm";
 import CloseAccountButton from "@/components/shared/CloseAccountButton";
 import PracticesEditor from "@/components/shared/PracticesEditor";
 import { resolveAvatarUrl } from "@/lib/storage/resolve-media";
+import { PRACTICES_UI_ENABLED } from "@/lib/config/feature-flags";
 
 // Self-edit only — no [id]/[username] param at all, since this can only
 // ever be the caller's own profile. The API route re-derives the user
@@ -33,10 +34,12 @@ export default async function ProfileEditPage() {
           }}
         />
 
-        <div className="mt-10 border-t border-ob-border pt-6">
-          <p className="text-label mb-4">Practices</p>
-          <PracticesEditor />
-        </div>
+        {PRACTICES_UI_ENABLED ? (
+          <div className="mt-10 border-t border-ob-border pt-6">
+            <p className="text-label mb-4">Practices</p>
+            <PracticesEditor />
+          </div>
+        ) : null}
 
         <div className="mt-10">
           <CloseAccountButton />

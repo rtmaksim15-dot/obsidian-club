@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { awardRep } from "@/lib/rep/ledger";
 import { FEED_TYPES } from "@/lib/feed/query";
+import { NEWCOMER_PATH_ENABLED } from "@/lib/config/feature-flags";
 import {
   computeStepCompletion,
   decideNewcomerPathUpdate,
@@ -40,7 +41,16 @@ export type NewcomerPathState = {
  * is actually shown (/feed's own render), rather than scattering a
  * duplicate completion check across every action's own save route.
  */
-export async function syncNewcomerPath(userId: string): Promise<NewcomerPathState> {
+export async function syncNewcomerPath(userId: string): Promise<NewcomerPathState | null> {
+  // Hide Newcomer Path (founder decision, 2026-10-22, see DECISIONS.md)
+  // — returns before touching the database at all, so no NEWCOMER_*
+  // REP can be silently awarded while this is off, and the caller
+  // (/feed) never has completion/settings data to render the card
+  // from. Already-awarded REP (rep_history rows from before this
+  // flipped off) is untouched — this is purely "stop awarding more,"
+  // never a reversal.
+  if (!NEWCOMER_PATH_ENABLED) return null;
+
   const [user, profile, limitPracticeCount, firstPostCount] = await Promise.all([
     prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { avatarUrl: true, bio: true } }),
     prisma.userProfile.findUnique({ where: { userId }, select: { settings: true } }),

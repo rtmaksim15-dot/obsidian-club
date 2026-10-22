@@ -31,6 +31,7 @@ import {
   REVIEWS_UI_ENABLED,
   HOUSES_UI_ENABLED,
   LEVELS_UI_ENABLED,
+  PRACTICES_UI_ENABLED,
 } from "@/lib/config/feature-flags";
 import { isFounder } from "@/lib/config/founder";
 
@@ -161,7 +162,7 @@ export default async function ProfilePage({ params }: { params: { username: stri
       // Profile lite (Package 4, Phase B, 2026-10-13, see DECISIONS.md)
       getBoundaries(user.id),
       getVisibleBondsForProfile(user.id),
-      canViewPracticesFor(viewer?.id ?? null, user.id),
+      PRACTICES_UI_ENABLED ? canViewPracticesFor(viewer?.id ?? null, user.id) : Promise.resolve(false),
       isOwnProfile
         ? prisma.bond.findMany({
             where: { toUserId: user.id, status: "pending" },
@@ -231,7 +232,7 @@ export default async function ProfilePage({ params }: { params: { username: stri
 
   const aboutContent = (
     <div>
-      <PracticesRows practices={practices} />
+      {PRACTICES_UI_ENABLED ? <PracticesRows practices={practices} /> : null}
 
       {user.bio ? <p className="text-body mt-6">{user.bio}</p> : null}
 

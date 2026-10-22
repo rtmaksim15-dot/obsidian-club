@@ -4375,3 +4375,75 @@ against live wasn't empty after the first apply:
 Re-ran `prisma migrate diff` after the schema-only fix: **empty**.
 `npx tsc --noEmit`, `npm test` (235 passing), `npm run build` all
 clean after the fix too.
+
+### 2026-10-22 — Hide Newcomer Path and Practices (founder decision)
+
+"Too much load for members." Both shipped working (Package 5, Phase A;
+Package 4, Phase B) — hidden behind two new flags, not removed: no
+migration, no data touched, same pattern every other `*_UI_ENABLED`
+flag in `lib/config/feature-flags.ts` already follows.
+
+**`NEWCOMER_PATH_ENABLED` (default `false`).** The one place this
+actually changes behavior, not just rendering, is `lib/newcomer-path/
+status.ts#syncNewcomerPath()` — it now returns `null` as its very
+first statement when the flag is off, before touching Prisma or
+`awardRep()` at all. That single change does three things at once:
+the "THE PATH OF THE INITIATE" card never renders on `/feed` (it was
+already conditioned on `newcomerPath` being non-null for the
+admin-skip case, so no further change was needed there), no
+`NEWCOMER_*` REP is ever awarded while it's off (the award loop is
+unreachable, not merely skipped), and REP already awarded before this
+flipped off is completely untouched (`rep_history` rows are never
+read, written, or reversed by this code path). `dismissNewcomerPath()`
+(the "Later" button's own endpoint) wasn't touched — nothing can call
+it once the card itself never renders, so gating it too would be
+unreachable dead code guarding unreachable dead code.
+
+**`PRACTICES_UI_ENABLED` (default `false`).** Three call sites:
+- `/profile/edit` — the "Practices" section (label + `PracticesEditor`)
+  wrapped in the flag; everything else on the page (avatar, about
+  text/`ProfileEditForm`, `CloseAccountButton`) untouched. ("Boundaries
+  link" from the task's own item 4 isn't actually on this page —
+  checked; it lives on `/boundaries` itself, reached from the nav MINE
+  menu, not from `/profile/edit` — nothing there to touch either way.)
+- `/profile/[username]` — `canViewPracticesFor()` now only runs
+  when the flag is on (`Promise.resolve(false)` otherwise, same
+  pattern `REVIEWS_UI_ENABLED`/`HOUSES_UI_ENABLED` already use two
+  lines above it in the same `Promise.all`), and the `<PracticesRows>`
+  render itself is also explicitly flag-gated — belt-and-suspenders
+  with `PracticesRows`'s own already-correct "render nothing when all
+  three groups are empty" behavior, rather than relying on that
+  coincidence alone.
+- `GET`/`PATCH /api/profile/practices` — both now return **404**
+  (not 403) as their first statement, before `getCurrentUser()` is
+  even called — a disabled route shouldn't distinguish a signed-in
+  caller from an anonymous one any more than a route that was never
+  built would.
+
+`practice_tags`/`user_practices` and every existing row: completely
+untouched, exactly as the task specified — nothing here reads, writes,
+or migrates either table.
+
+**Tests** (`lib/config/feature-flags.test.ts` 1, `lib/newcomer-path/
+status.test.ts` 2, `app/api/profile/practices/route.test.ts` 3 — 6
+new, 241 total): both flags default `false`; `syncNewcomerPath()`
+flag-off returns `null` with zero Prisma/`awardRep` calls (not just a
+null return — the absence of any underlying call is asserted
+directly, via mocks); flag-on reaches past the guard into Prisma
+(confirmed by letting a mocked `findUniqueOrThrow` throw and asserting
+the throw propagates, proving the guard didn't swallow it); the
+practices route flag-off 404s on both methods without calling
+`getCurrentUser()`; flag-on falls through to the pre-existing 403
+auth check instead of 404. The page-level JSX gates themselves (plain
+`{FLAG ? <X/> : null}` wrapping already-tested components, no new
+branchable logic) weren't given dedicated tests — this project's test
+runner has no DOM (`vitest.config.ts`'s own comment), so a rendering
+assertion isn't possible without adding that; not attempted here as
+out of scope for a hide/show flag flip. Not verified in a live browser
+either, for the same reason prior packages in this session couldn't
+be: the dev server points at the real production database and these
+pages require a real session.
+
+`npx tsc --noEmit`, `npx next lint` (same one pre-existing
+`AdminConsole.tsx` warning), `npm test` (241 passing), `npm run build`
+all clean. No schema/data change — nothing to migrate.
