@@ -1498,3 +1498,32 @@ every other such feature this session has shipped.
 package (Security package 4, Fix 8, 2026-09-29) and unchanged here.
 `/api/csp-report` (that same package) is where violations land; worth
 a look before any future pass moves it to enforcing mode.
+
+## Web Push, Package N1 (2026-10-25)
+
+Full report in DECISIONS.md.
+
+**No "install instructions" page exists** — the task's own spec asked
+`/settings/notifications` to "link to the existing install
+instructions" for the iOS-not-installed case; no such page or content
+exists anywhere in this codebase (confirmed by grepping for "Add to
+Home Screen"/"install instructions"). Wrote the four install steps
+inline on the settings page itself instead. If a real, linkable
+install guide is ever wanted (e.g. for other iOS-only features later),
+it doesn't exist yet and would need its own task.
+
+**Everything in this package is written but off and unapplied**: the
+`PUSH_ENABLED` flag, the `push_subscriptions` migration, and the
+VAPID keys (generated, in `.env.local` and `~/obsidian-backups/
+vapid-keys.txt`, but not yet in Vercel) are all inert until Max turns
+each on in sequence — same "built ahead of launch, shipped off"
+posture as `NEWCOMER_PATH_ENABLED`/`PRACTICES_UI_ENABLED` two packages
+ago, not a gap so much as a deliberate, staged rollout.
+
+**No retry/backoff on a transient web-push failure** (anything other
+than 404/410 — e.g. a 5xx from the push service, or a network error)
+— logged and dropped, never retried. At this project's scale (one
+push per trigger, not a queue), a dropped notification is a minor,
+silent miss rather than a user-facing failure; a real retry queue
+would be a disproportionate addition for a feature that's not even
+turned on yet.

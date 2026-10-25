@@ -6,6 +6,8 @@ import { track } from "@/lib/analytics/track";
 import { resolveAvatarUrl, resolveAvatarUrls } from "@/lib/storage/resolve-media";
 import { isBlockedEitherWay, getBlockedEitherWayUserIds } from "@/lib/moderation/block";
 import { checkRateLimit } from "@/lib/security/rate-limit";
+import { sendPush } from "@/lib/push/send";
+import { PUSH_CONVERSATION_THROTTLE } from "@/lib/push/throttle";
 
 // Fix 10 (2026-09-29, see DECISIONS.md) — 30/hour per author, higher
 // than posts since back-and-forth commenting is naturally more frequent
@@ -120,6 +122,24 @@ export async function POST(request: Request, { params }: { params: { id: string 
     entity: "post",
     entityId: post.id,
     meta: { parentId: post.id },
+  });
+
+  // Web Push, Package N1 (2026-10-25, see DECISIONS.md) — "replies to
+  // my posts." sendPush() itself checks for a block between commenter
+  // and author (this route, unlike the DM ones, never did — GET only
+  // filters blocked authors OUT of the comment list for a reader, it
+  // never stopped a blocked-either-way member from commenting in the
+  // first place), so this is the one trigger where that check inside
+  // send.ts is actually load-bearing, not just defense-in-depth.
+  await sendPush({
+    category: "reply",
+    recipientId: post.authorId,
+    actorId: user.id,
+    actorIsAdmin: user.isAdmin,
+    senderDisplayName: user.displayName,
+    url: `/posts/${post.id}`,
+    throttleKey: `push:comment:${post.id}:${post.authorId}`,
+    throttleOptions: PUSH_CONVERSATION_THROTTLE,
   });
 
   const resolvedComment = { ...comment, author: { ...comment.author, avatarUrl: await resolveAvatarUrl(comment.author.avatarUrl) } };

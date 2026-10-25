@@ -6,6 +6,8 @@ import { isBlockedEitherWay } from "@/lib/moderation/block";
 import { resolveAvatarUrl, resolveAvatarUrls } from "@/lib/storage/resolve-media";
 import { checkRateLimit } from "@/lib/security/rate-limit";
 import { errCode } from "@/lib/utils/safe-error";
+import { sendPush } from "@/lib/push/send";
+import { PUSH_CONVERSATION_THROTTLE } from "@/lib/push/throttle";
 
 const PAGE_SIZE = 100;
 const MAX_MESSAGE_LENGTH = 2000;
@@ -132,6 +134,24 @@ export async function POST(request: Request, { params }: { params: { id: string 
       select: messageSelect,
     });
     const resolvedMessage = { ...message, sender: { ...message.sender, avatarUrl: await resolveAvatarUrl(message.sender.avatarUrl) } };
+
+    // Web Push, Package N1 (2026-10-25, see DECISIONS.md) — awaited,
+    // not fire-and-forget (a serverless function isn't guaranteed to
+    // finish unawaited async work before freezing on return — same
+    // lesson as the admin alert emails, see DECISIONS.md). sendPush()
+    // itself never throws, so this can't turn a successfully-sent
+    // message into an error response.
+    await sendPush({
+      category: "message",
+      recipientId: otherId,
+      actorId: user.id,
+      actorIsAdmin: user.isAdmin,
+      senderDisplayName: user.displayName,
+      url: `/messages/${params.id}`,
+      throttleKey: `push:dm:${params.id}:${otherId}`,
+      throttleOptions: PUSH_CONVERSATION_THROTTLE,
+    });
+
     return NextResponse.json({ message: resolvedMessage }, { status: 201 });
   } catch (err) {
     console.error("[dm/threads/messages] Failed to create message:", errCode(err));

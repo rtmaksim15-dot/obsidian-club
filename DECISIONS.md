@@ -4447,3 +4447,208 @@ pages require a real session.
 `npx tsc --noEmit`, `npx next lint` (same one pre-existing
 `AdminConsole.tsx` warning), `npm test` (241 passing), `npm run build`
 all clean. No schema/data change — nothing to migrate.
+
+### 2026-10-25 — Web Push, Package N1
+
+Built fully, shipped off: `PUSH_ENABLED` (`lib/config/feature-flags.ts`)
+defaults `false`. While off: no permission prompt is ever requested
+(`/settings/notifications` 404s, same posture as every other
+flag-gated page this session has shipped), no `PushSubscription` row
+is ever created, and `lib/push/send.ts#sendPush()`/
+`sendLordWordBroadcast()` both return before touching Prisma or
+web-push at all — same shape as `NEWCOMER_PATH_ENABLED`'s own guard,
+two entries above.
+
+**VAPID keys** — generated with `web-push generate-vapid-keys()` via a
+one-off script (deleted after running, never printed a value to this
+terminal — CLAUDE.md rule 12). Written to `.env.local`
+(`NEXT_PUBLIC_VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT`,
+read-merge — only appended the three new lines) and to `~/obsidian-
+backups/vapid-keys.txt` (perms 600) for Max to copy into Vercel
+(Production + Preview). Names only (no values) added to `.env.example`.
+
+**Schema** — `supabase/migrations/20261025120000_push_subscriptions.sql`:
+**written, NOT applied**, per CLAUDE.md rule 11. One new table,
+`push_subscriptions` (id, user_id FK, endpoint unique, p256dh, auth,
+user_agent_short, created_at, last_used_at), deny-all RLS — same
+established pattern as `admin_notes`/`admin_access_log`. Written with
+this session's own already-learned live-default conventions from the
+start (`dbgenerated("gen_random_uuid()")`, `@db.Timestamptz`,
+`onUpdate: NoAction`) rather than needing a second drift-fix pass at
+apply time.
+
+**Preferences** — `UserProfile.settings.notifications`, read-merge-
+write (`lib/push/preferences.ts`, CLAUDE.md rule 9), default `{
+discreet: true, messages: true, replies: true, lordWord: true }` —
+verbatim the task's own spec. No migration: the JSON column already
+exists, same situation Veil/Boundaries/Newcomer Path all used.
+
+**Architecture** — three pure modules, one orchestration file, same
+"extract pure core, test that" pattern this whole session has used
+(admin-stepup-policy.ts, lib/photo-viewer/gestures.ts, etc.) — this
+project's test runner has no DOM (vitest.config.ts's own comment), so
+keeping the actual rules DOM/DB-free is what makes them unit-testable
+at all:
+- `lib/push/payload.ts` — the discreet/non-discreet copy rules. Title
+  is always the fixed "Obsidian Club," both modes; discreet body is
+  one of four fixed, name-free strings per category (the task's own
+  exact copy); non-discreet may include the sender's display name
+  (never message/comment text, never an image — structurally
+  impossible, since neither is ever passed in). `lord_word` never
+  takes a name in either mode — there's no individual sender for a
+  broadcast.
+- `lib/push/policy.ts` — `isEligibleForPush()` (flag, own-action,
+  block, is_test-vs-admin, category preference — everything EXCEPT the
+  throttle) and `shouldSendPush()` (adds the throttle as a final gate).
+  Split so `lib/push/send.ts` checks eligibility BEFORE spending a
+  throttle check (which itself writes a `RateLimitHit` row) — an
+  ineligible call never burns part of the recipient's budget.
+- `lib/push/client-support.ts` — iOS user-agent detection, the
+  standalone-install check, and the URL-safe-base64 → `Uint8Array`
+  conversion `pushManager.subscribe()`'s `applicationServerKey` needs.
+- `lib/push/send.ts` — orchestration: `sendPush()` (one recipient, one
+  of the three personal categories, its own per-category throttle) and
+  `sendLordWordBroadcast()` (many recipients, one GLOBAL 24h throttle
+  checked ONCE before the recipient loop — not per-recipient, which
+  would let the first recipient's call consume the whole 24h budget
+  and silently block every other recipient of the SAME broadcast).
+  Both funnel into a shared `deliverToUser()` that fetches a
+  recipient's live subscriptions, sends, and deletes any that come
+  back 404/410 (the push service's own "this endpoint is gone"
+  signal — the member uninstalled, cleared site data, or revoked OS
+  permission).
+
+**"skip is_test accounts for non-admins"** — implemented as: a
+test-account recipient is skipped unless the ACTOR triggering the push
+is an admin. For the three personal triggers this means a real member
+messaging/replying to a test account never pushes to it; an admin
+testing against a seeded test account does. For the broadcast, the
+actor is always an admin (the route is `requireAdminApi()`-gated), so
+this rule never excludes a test account from a Word of the Lord
+broadcast — a deliberate, uniform application of the one stated rule
+rather than a special case invented for broadcasts specifically.
+
+**Triggers** (all awaited, not fire-and-forget — same lesson as the
+admin alert emails: a serverless function isn't guaranteed to finish
+unawaited async work before freezing on return):
+- `POST /api/dm/threads/[id]/messages` — new DM message. `sendPush()`
+  independently re-checks the block between sender/recipient
+  (redundant with this route's own existing pre-check, kept for
+  consistency with the other two triggers where it's load-bearing).
+- `POST /api/dm/requests` — new conversation request, inside the same
+  transaction's existing `Notification.create` call's sibling code,
+  after the transaction commits. No `Thread` exists yet at request
+  time, so the throttle key is the sender/recipient pair, not a
+  thread id — same "per conversation per recipient" spirit.
+- `POST /api/posts/[id]/comments` — new comment on own post ("replies
+  to my posts"). **The one trigger where `sendPush()`'s own block
+  check is actually load-bearing** — this route, unlike the two DM
+  ones, never checked blocks before creating a comment (`GET` only
+  filters a blocked author's comments OUT of what a reader sees, it
+  never stopped the comment from being created).
+- `POST /api/admin/push/lord-word` — admin-only (`requireAdminApi()`),
+  ≤140 chars, `ConfirmDialog`-gated in `AdminConsole.tsx`. The typed
+  text is never itself sent in the push payload (every recipient gets
+  the same fixed "The Lord has spoken," discreet or not) — the length
+  ceiling is a guardrail on what an admin is allowed to broadcast
+  *about* in spirit, not literal payload content; nothing persists
+  what was typed.
+
+**Settings page** — `/settings/notifications` (404s while the flag's
+off), linked from `MineMenu.tsx` as "Push notifications" (`SoonRow`
+while off, same `BOUNDARIES_UI_ENABLED` pattern) — deliberately NOT
+reusing the existing "Notifications" row's label, which is the
+unrelated in-app notification inbox (`/notifications`).
+`NotificationSettingsForm.tsx` (same `ToggleRow` component shape as
+`BoundariesForm.tsx`): "Enable on this device" requests permission
+**only** on its own click handler, never automatically — confirmed by
+reading the component, not just by convention, since this was the
+task's own explicit requirement. iOS + not-installed shows the install
+message inline and leaves the Enable button available underneath (not
+hidden) for a visitor who installs mid-visit.
+
+**Discrepancy, flagged**: the task's own spec says "link to the
+existing install instructions" for the iOS-not-installed case — no
+such page or content exists anywhere in this codebase (confirmed:
+grepped for "Add to Home Screen"/"install instructions" across
+app/components/lib — the only two hits are an unrelated manifest
+comment in `app/layout.tsx` and an unrelated code comment in
+`EmailCapturesPanel.tsx`). Wrote the install steps inline on the
+settings page itself instead of linking to something that doesn't
+exist, rather than silently inventing a whole separate install-guide
+page/feature not actually asked for by this task.
+
+**Service worker** — `push`/`notificationclick` handlers added to
+`scripts/sw-template.js` only, deliberately absent from
+`scripts/sw-killswitch-template.js` (whose entire job is to
+unregister itself and wipe every cache — it has no business ever
+showing a notification). The push payload shape (`{title, body, url}`)
+is trusted without re-validation — only this app's own server, keyed
+by the VAPID key pair, can ever produce a payload the browser accepts
+as genuinely from this origin's subscription.
+
+**Admin console** — "Word of the Lord" block (textarea + char count +
+`ConfirmDialog`), hidden entirely while the flag's off, placed next to
+the existing `ADMIN_SESSION_SECRET` safety banner in the console
+header (global, not zone-scoped, same reasoning as "Sign out
+everywhere").
+
+**Tests** (112 new, 299 total): `lib/push/payload.test.ts` (17) — every
+category's discreet body is name/text-free, verified against the
+actual wire-sent JSON in `send.test.ts` too, not just the pure
+builder; non-discreet may include a name, falls back without one;
+`lord_word` never takes a name in either mode. `lib/push/policy.test.ts`
+(10) — each eligibility rule independently, including the
+is_test-vs-admin asymmetry. `lib/push/client-support.test.ts` (7) — iOS
+detection, the standalone/install-prompt decision, the base64url
+round-trip (including an input needing padding). `lib/push/send.test.ts`
+(13) — flag off touches neither Prisma nor web-push; own-action/block/
+preference-off never reach the throttle; throttle-denied never reaches
+web-push; a missing VAPID config fails closed without throwing; the
+happy path sends to every subscription and refreshes `lastUsedAt`; a
+404/410 deletes only the dead subscription, leaving a healthy sibling
+untouched; a non-404/410 failure is logged, not treated as dead;
+`sendLordWordBroadcast`'s global throttle is checked exactly once
+regardless of recipient count. `lib/push/preferences.test.ts` (5) — the
+documented defaults, a partial merge over them, and the read-merge-
+write itself never clobbering a sibling `settings` key (veil,
+boundaries) on the same JSON column. `app/api/push/push-routes-flag.test.ts`
+(6) — all three member-facing routes and the admin broadcast route
+404 before touching auth while the flag's off; the broadcast route
+still genuinely reaches `requireAdminApi()`/`sendLordWordBroadcast()`
+when the flag's on. `lib/config/feature-flags.test.ts` extended (now 2
+assertions) for the new flag's default.
+
+**A real regression found and fixed along the way**: adding the new
+`push/lord-word` admin route initially broke 8 of the EXISTING
+`admin-routes-guard.test.ts` cases (Package S1) with swapped-looking
+401/403 failures. Root cause: that test's `getCurrentUser` mock is one
+shared instance across every `it.each` case in the file (no
+per-iteration reset), and `lord-word`'s own flag-off 404 (correctly)
+never calls it at all — leaving that test case's two queued
+`mockResolvedValueOnce` values unconsumed, which then silently shifted
+onto the NEXT route's assertions instead. Fixed by adding `push/
+lord-word/route.ts` to that test's existing `NO_GUARD_EXPECTED`
+exclusion set (same precedent as the already-excluded retired
+`invite-batches` route), with its own flag-on coverage moved to
+`push-routes-flag.test.ts` instead (see above) — the route's real
+admin guard is still verified, just not by the generic enumeration.
+
+`npx tsc --noEmit`, `npx next lint` (same one pre-existing
+`AdminConsole.tsx` warning, plus two `react/no-unescaped-entities`
+errors in the new `NotificationSettingsForm.tsx` found and fixed —
+`&ldquo;`/`&rdquo;`/`&apos;`), `npm test` (299 passing), `npm run build`
+all clean. Verified the settings page's rendering/toggle-interaction
+live in the browser pane via a temporary, unauthenticated local route
+(deleted before this entry, never committed) — confirmed the layout
+matches the task's own copy exactly, a toggle click correctly
+optimistic-updates then reverts on a failed save (the expected
+behavior here, since `PUSH_ENABLED` is off on the dev server, same
+constraint every flag-gated feature this session has hit — the dev
+server points at the real production database), and no console errors
+beyond that expected 404. The actual subscribe/send/receive flow on a
+real device needs a real admin account, a real iPhone, and the flag
+actually turned on — not exercised live, same limitation Package S1's
+own report was explicit about for its MFA flow.
+
+Committed locally. **Not pushed** (task's own explicit instruction).

@@ -46,6 +46,51 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+// Web Push, Package N1 (2026-10-25, see DECISIONS.md) — deliberately
+// NOT present in scripts/sw-killswitch-template.js: the kill switch's
+// whole job is to unregister itself and wipe every cache, so it has no
+// business ever showing a notification, discreet or not. The push
+// payload is always exactly { title, body, url } (lib/push/payload.ts
+// builds it server-side; this is the one place that shape is trusted
+// without re-validating it — only this app's own server ever sends a
+// push here, authenticated by the VAPID key pair). `self.location.origin`
+// resolves `url` so the payload only ever needs a path, matching how
+// every other same-origin link in this app works.
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+  let payload;
+  try {
+    payload = event.data.json();
+  } catch {
+    return;
+  }
+  const title = payload.title || "Obsidian Club";
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: payload.body || "",
+      data: { url: payload.url || "/" },
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = new URL(event.notification.data?.url || "/", self.location.origin).href;
+  event.waitUntil(
+    (async () => {
+      const allClients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const client of allClients) {
+        if (client.url === targetUrl && "focus" in client) {
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(targetUrl);
+    })(),
+  );
+});
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;

@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Lock } from "lucide-react";
 import SideSheet from "./SideSheet";
 import SignOutButton from "./SignOutButton";
-import { CIRCLES_UI_ENABLED, SEAL_UI_ENABLED, BOUNDARIES_UI_ENABLED } from "@/lib/config/feature-flags";
+import { CIRCLES_UI_ENABLED, SEAL_UI_ENABLED, BOUNDARIES_UI_ENABLED, PUSH_ENABLED } from "@/lib/config/feature-flags";
 import { formatInvitationCount } from "@/lib/invitations/format";
 
 export type MineMenuProps = {
@@ -183,6 +183,16 @@ export default function MineMenu({
           />
         </button>
       </div>
+      {/* Web Push, Package N1 (2026-10-25, see DECISIONS.md) — distinct
+          from the existing "Notifications" row below (the in-app
+          notification inbox, /notifications) — this one is the push
+          preferences screen. Same SoonRow-while-off pattern as
+          Boundaries/Seal above. */}
+      {PUSH_ENABLED ? (
+        <Row href="/settings/notifications">Push notifications</Row>
+      ) : (
+        <SoonRow>Push notifications</SoonRow>
+      )}
       <Row href="/notifications">Notifications</Row>
       <Row href="/profile/edit">Account</Row>
 

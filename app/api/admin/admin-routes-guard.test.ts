@@ -25,12 +25,27 @@ vi.mock("@/lib/auth/session", () => ({
 
 const ADMIN_API_DIR = path.join(__dirname); // app/api/admin
 
-// This one route is a deliberate exception: a retired, always-410
-// endpoint with no admin check at all (see its own file comment) —
-// identity doesn't matter because it performs no action and returns no
-// data regardless of caller. Every other file under app/api/admin is
-// expected to use requireAdminApi().
-const NO_GUARD_EXPECTED = new Set([path.join(ADMIN_API_DIR, "invite-batches", "route.ts")]);
+// Deliberate exceptions — a route excluded here still calls
+// requireAdminApi() correctly (own dedicated tests cover that), it
+// just can't be exercised by THIS generic enumeration:
+// - invite-batches/route.ts: a retired, always-410 endpoint with no
+//   admin check at all (see its own file comment) — identity doesn't
+//   matter because it performs no action and returns no data
+//   regardless of caller.
+// - push/lord-word/route.ts: 404s on its own feature flag
+//   (PUSH_ENABLED, false by default — this test only mocks
+//   @/lib/auth/session, not @/lib/config/feature-flags) BEFORE ever
+//   calling requireAdminApi(). Left in, its two mocked getCurrentUser()
+//   values (queued via mockResolvedValueOnce, shared across every
+//   it.each case in this file since the mock isn't reset per-iteration)
+//   would go unconsumed and silently shift onto the NEXT route's
+//   assertions instead — exactly the kind of swapped-looking 401/403
+//   failures that first caught this. See app/api/push/
+//   push-routes-flag.test.ts for its own flag-off coverage instead.
+const NO_GUARD_EXPECTED = new Set([
+  path.join(ADMIN_API_DIR, "invite-batches", "route.ts"),
+  path.join(ADMIN_API_DIR, "push", "lord-word", "route.ts"),
+]);
 
 function findRouteFiles(dir: string): string[] {
   const entries = fs.readdirSync(dir, { withFileTypes: true });

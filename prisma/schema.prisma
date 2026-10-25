@@ -361,6 +361,8 @@ model User {
   adminAuthEvents AdminAuthEvent[]
   // Admin security hardening, Package S1 (2026-10-15, see DECISIONS.md)
   adminAccessLogs AdminAccessLog[]
+  // Web Push, Package N1 (2026-10-25, see DECISIONS.md)
+  pushSubscriptions PushSubscription[]
 
   // 21+ Age Verification Gate, Phase A (2026-10-10, see DECISIONS.md)
   ageVerifications AgeVerification[]
@@ -866,6 +868,38 @@ model Notification {
 
   @@index([userId])
   @@map("notifications")
+}
+
+// Web Push, Package N1 (2026-10-25, see DECISIONS.md) — one row per
+// subscribed device/browser (a member can have several — phone,
+// desktop — each its own row, "Turn off on this device" removes only
+// one). `endpoint` is the push service's own per-subscription URL
+// (unique by definition — no two subscriptions ever share one) and is
+// what a 404/410 response from that service identifies for cleanup
+// (lib/push/send.ts). `p256dh`/`auth` are the subscription's public
+// key and auth secret, both required by the Web Push protocol to
+// encrypt a payload that only this one subscription can decrypt.
+// `userAgentShort` is the same short parsed summary ("Chrome on
+// macOS") admin_access_log already uses (lib/security/user-agent.ts),
+// not the raw header — shown in the settings UI as "this device,"
+// never logged verbatim. Conventions (dbgenerated uuid, Timestamptz,
+// onUpdate: NoAction) match this session's own established fixes for
+// every hand-written migration's real live defaults — written that
+// way from the start here instead of needing a second drift-fix pass.
+model PushSubscription {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  endpoint       String   @unique
+  p256dh         String
+  auth           String
+  userAgentShort String   @map("user_agent_short")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  lastUsedAt     DateTime @default(now()) @map("last_used_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([userId])
+  @@map("push_subscriptions")
 }
 
 // ============================================================

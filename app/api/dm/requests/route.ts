@@ -7,6 +7,8 @@ import { checkDailyRequestLimit, DAILY_REQUEST_LIMIT } from "@/lib/dm/limits";
 import { effectiveRequestStatus, isRequestExpired } from "@/lib/dm/lifecycle";
 import { resolveAvatarUrls } from "@/lib/storage/resolve-media";
 import { errCode } from "@/lib/utils/safe-error";
+import { sendPush } from "@/lib/push/send";
+import { PUSH_CONVERSATION_THROTTLE } from "@/lib/push/throttle";
 
 const MAX_MESSAGE_LENGTH = 1000;
 
@@ -166,6 +168,24 @@ export async function POST(request: Request) {
       });
 
       return req;
+    });
+
+    // Web Push, Package N1 (2026-10-25, see DECISIONS.md) — awaited,
+    // same reasoning as the DM-message trigger. No real threadId
+    // exists yet for a mere request (it's created only on accept), so
+    // the throttle key is the sender/recipient pair instead of a
+    // thread id — same "per conversation per recipient" spirit, just
+    // keyed on the two people rather than a Thread row that doesn't
+    // exist yet.
+    await sendPush({
+      category: "conversation_request",
+      recipientId,
+      actorId: user.id,
+      actorIsAdmin: user.isAdmin,
+      senderDisplayName: user.displayName,
+      url: "/messages",
+      throttleKey: `push:dmrequest:${user.id}:${recipientId}`,
+      throttleOptions: PUSH_CONVERSATION_THROTTLE,
     });
 
     return NextResponse.json({ id: created.id, remaining: dailyLimit.remaining }, { status: 201 });

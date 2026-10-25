@@ -174,3 +174,14 @@ export const NEWCOMER_PATH_ENABLED = false;
 // practice_tags/user_practices tables are untouched, just not served).
 export const PRACTICES_UI_ENABLED = false;
 
+// Web Push, Package N1 (2026-10-25, see DECISIONS.md) — discreet push
+// notifications for the PWA, built fully but shipped off by default
+// ahead of the Nov 1 launch. While false: no permission prompt is ever
+// requested (the settings page itself 404s, same as every other
+// hidden-behind-a-flag page in this file), no PushSubscription row is
+// ever created, and lib/push/send.ts#sendPush() returns before
+// touching the database or calling web-push at all — mirrors
+// NEWCOMER_PATH_ENABLED's own "the gate is the first statement, not a
+// rendering afterthought" shape two flags above.
+export const PUSH_ENABLED = false;
+

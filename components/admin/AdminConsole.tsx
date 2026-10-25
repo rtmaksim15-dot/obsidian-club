@@ -11,6 +11,7 @@ import CreatePersonalInvite from "./CreatePersonalInvite";
 import CommandPalette from "./CommandPalette";
 import EmailCapturesPanel, { type EmailCaptureRow } from "./EmailCapturesPanel";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
+import { PUSH_ENABLED } from "@/lib/config/feature-flags";
 import { levelName } from "@/lib/rating/levels";
 import { formatAdminDateTime } from "@/lib/admin/format-date";
 import LogoMark from "@/components/ui/LogoMark";
@@ -321,6 +322,11 @@ export default function AdminConsole({
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [signOutBusy, setSignOutBusy] = useState(false);
   const [signOutConfirming, setSignOutConfirming] = useState(false);
+  const [lordWordText, setLordWordText] = useState("");
+  const [lordWordConfirming, setLordWordConfirming] = useState(false);
+  const [lordWordBusy, setLordWordBusy] = useState(false);
+  const [lordWordError, setLordWordError] = useState<string | null>(null);
+  const [lordWordSent, setLordWordSent] = useState(false);
   const applicationDetailRef = useRef<ApplicationDetailHandle>(null);
 
   // "Sign out everywhere" (item 4, Package S1, 2026-10-15, see
@@ -338,6 +344,33 @@ export default function AdminConsole({
     }
     setSignOutBusy(false);
     setSignOutConfirming(false);
+  }
+
+  // "Word of the Lord" broadcast (item 6, Package N1, 2026-10-25, see
+  // DECISIONS.md) — the text typed here is never itself sent in the
+  // push payload (every recipient gets the same fixed "The Lord has
+  // spoken" copy, discreet or not — lib/push/payload.ts); the 140-char
+  // ceiling and the confirm dialog exist so this stays a deliberate,
+  // rare action, not a casual one. Server-side throttle (max 1/24h,
+  // lib/push/send.ts#sendLordWordBroadcast) is the real guard; this
+  // UI doesn't try to duplicate that check client-side.
+  async function handleLordWordSend() {
+    setLordWordBusy(true);
+    setLordWordError(null);
+    const res = await fetch("/api/admin/push/lord-word", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: lordWordText }),
+    });
+    setLordWordBusy(false);
+    setLordWordConfirming(false);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setLordWordError(body?.error ?? "Could not send.");
+      return;
+    }
+    setLordWordText("");
+    setLordWordSent(true);
   }
 
   // Report email alert deep link (item 6, 2026-09-20, see DECISIONS.md)
@@ -568,6 +601,62 @@ export default function AdminConsole({
             >
               Step-up protection inactive — ADMIN_SESSION_SECRET not set.
             </p>
+          ) : null}
+
+          {/* "Word of the Lord" broadcast (item 6, Package N1,
+              2026-10-25, see DECISIONS.md) — a rare, deliberate push to
+              every subscribed member who hasn't turned that category
+              off, max once per 24h (server-enforced). Hidden entirely
+              while PUSH_ENABLED is off, same as the rest of this
+              feature. */}
+          {PUSH_ENABLED ? (
+            <div className="mb-6 rounded-ob border px-3 py-3" style={{ borderColor: "var(--color-border)" }}>
+              <p className="text-label mb-2">Word of the Lord</p>
+              <textarea
+                className="input w-full"
+                rows={2}
+                maxLength={140}
+                value={lordWordText}
+                onChange={(e) => {
+                  setLordWordText(e.target.value);
+                  setLordWordSent(false);
+                }}
+                placeholder="A rare word to the whole Circle (≤140 characters)…"
+              />
+              <div className="mt-2 flex items-center gap-3">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={!lordWordText.trim() || lordWordBusy}
+                  onClick={() => setLordWordConfirming(true)}
+                >
+                  Send
+                </button>
+                <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
+                  {lordWordText.length}/140
+                </p>
+              </div>
+              {lordWordError ? (
+                <p className="text-caption mt-2" style={{ color: "var(--color-error)" }}>
+                  {lordWordError}
+                </p>
+              ) : null}
+              {lordWordSent ? (
+                <p className="text-caption mt-2" style={{ color: "var(--color-text-secondary)" }}>
+                  Sent.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {lordWordConfirming ? (
+            <ConfirmDialog
+              title={"Send this to every subscribed member who allows Word of the Lord?\nThis can only be done once per 24 hours."}
+              confirmLabel="Send"
+              busy={lordWordBusy}
+              onConfirm={handleLordWordSend}
+              onCancel={() => setLordWordConfirming(false)}
+            />
           ) : null}
 
           <StatusBar counts={counts} activeZone={zone} activeFilter={filter} onSelect={selectStat} />
