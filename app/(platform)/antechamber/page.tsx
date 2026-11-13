@@ -6,8 +6,9 @@ import SignOutButton from "@/components/shared/SignOutButton";
 
 /**
  * The Antechamber (`/antechamber`) — the Doors mechanic (pre-launch
- * cleanup, 2026-08-08), November 1 cohort launch (moved from October 1,
- * 2026-09-10). Ritual-complete
+ * cleanup, 2026-08-08), December 1 cohort launch (moved from November 1,
+ * 2026-11-13; originally October 1, 2026-09-10 — see DECISIONS.md for
+ * both moves). Ritual-complete
  * members are redirected here from `/feed`, `/hall`, `/compose`, and
  * `/members` while `DOORS_OPEN_DATE` is in the future — see
  * `lib/config/doors.ts`. Admins bypass at each of those gate points, so

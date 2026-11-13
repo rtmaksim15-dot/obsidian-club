@@ -1527,3 +1527,29 @@ push per trigger, not a queue), a dropped notification is a minor,
 silent miss rather than a user-facing failure; a real retry queue
 would be a disproportionate addition for a feature that's not even
 turned on yet.
+
+## Launch date moved to December 1, 2026 (2026-11-13)
+
+Full audit in DECISIONS.md.
+
+**Four legal documents' `Effective date:` is stale — `October 1,
+2026`** (`legal/02-terms-of-service.md`, `legal/03-privacy-policy.md`,
+`legal/04-acceptable-use-policy.md`, `legal/06-dmca-policy.md`, all
+line 3) — never updated during the *first* launch-date move (Oct 1 →
+Nov 1, 2026-09-10) either, so this is now two moves behind. Listed for
+the attorney, not edited (attorney protocol, both in CLAUDE.md and
+this task's own instruction).
+
+**Reopening the Newcomers-room soft-launch exception for existing
+members, Nov 13 – Dec 1.** Pushing `DOORS_OPEN_DATE` to a future date
+while `APP_OPEN=true` (true in production since 2026-11-04) makes
+`lib/rating/room-access.ts#canAccessRoom` open the Newcomers room to
+every member unconditionally again — the "small hand-picked early
+cohort" exception, originally meant for *before* any real launch. The
+6 existing active members (already past Nov 1, already inside the app
+normally) will regain unrestricted Newcomers access for this ~2.5
+week window as a side effect of the date move alone, not a separate
+decision anyone made about them specifically. Flagged in DECISIONS.md
+at the moment the date was changed; not fixed here — it's a real
+product question (should already-onboarded members be exempted from
+this exception?) that this task wasn't asked to resolve.

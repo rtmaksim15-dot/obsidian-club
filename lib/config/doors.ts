@@ -2,8 +2,9 @@ import "server-only";
 import { isPreviewId } from "@/lib/auth/preview-allowlist";
 import { isAppOpen } from "@/lib/config/app-open";
 
-// The Doors mechanic (pre-launch cleanup, 2026-08-08) — the November 1
-// cohort launch gate (moved from October 1, 2026-09-10). Unlike
+// The Doors mechanic (pre-launch cleanup, 2026-08-08) — the December 1
+// cohort launch gate (moved from November 1, 2026-11-13; originally
+// October 1, 2026-09-10 — see DECISIONS.md for both moves). Unlike
 // feature-flags.ts's compile-time booleans,
 // this reads a runtime env var (`DOORS_OPEN_DATE`) and compares it to
 // the current time on every call, so flipping the launch date or
@@ -60,7 +61,7 @@ function ordinal(n: number): string {
   return `${n}${ORDINAL_SUFFIXES[(v - 20) % 10] || ORDINAL_SUFFIXES[v] || ORDINAL_SUFFIXES[0]}`;
 }
 
-/** "November 1st" — no year, matching the ceremonial tone of the rest of the ritual/antechamber copy. */
+/** "December 1st" — no year, matching the ceremonial tone of the rest of the ritual/antechamber copy. */
 export function formatDoorsDate(date: Date): string {
   const month = date.toLocaleDateString("en-US", { month: "long", timeZone: "UTC" });
   return `${month} ${ordinal(date.getUTCDate())}`;

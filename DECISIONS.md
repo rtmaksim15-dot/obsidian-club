@@ -4652,3 +4652,159 @@ actually turned on — not exercised live, same limitation Package S1's
 own report was explicit about for its MFA flow.
 
 Committed locally. **Not pushed** (task's own explicit instruction).
+
+### 2026-11-13 — Launch date moved November 1 → December 1, 2026
+
+**Audit (read-only, done first).**
+
+**1 — how `DOORS_OPEN_DATE` is read, and everything it controls.**
+`lib/config/doors.ts#getDoorsState()` reads `process.env.DOORS_OPEN_DATE`
+fresh on every call (no caching) via `new Date(raw)` — whatever offset
+the string itself carries (e.g. `-05:00`) is what's compared, so it's
+correct for every visitor regardless of their own timezone. Absent =
+feature off (`{active: false, date: null}` — nothing locked, the
+"normal, pre-configuration" state). Set-but-unparseable fails CLOSED
+(`{active: true, date: null}`) — a typo must never accidentally open
+the club early. **No fallback/default date is hardcoded anywhere in
+this codebase** (confirmed by a repo-wide grep for any literal
+`2026-11-01`/`2026-12-01` in production code — none existed before this
+task, none added by it either) — the only place the actual date value
+lives is the Vercel env var itself. Behaviors gated on it, beyond the
+obvious:
+- `bypassesDoors()` (`lib/config/doors.ts`) — admins and
+  `PREVIEW_USER_IDS` always skip the antechamber; **so does every
+  signed-in member while `APP_OPEN=true`**, entirely independent of
+  `DOORS_OPEN_DATE` (see #2 below — this already applies in
+  production today).
+- The antechamber redirect itself, at five separate gate points
+  (`/feed`, `/hall`, `/compose`, `/members`, and the nav-visibility
+  check in `(platform)/layout.tsx`) — all funnel through
+  `bypassesDoors()`, so this list is consistent by construction, not
+  by each site separately remembering the rule.
+- The public landing page's live countdown (`app/(landing)/page.tsx`
+  → `LaunchCountdown.tsx`) — renders only when `doors.date` is set at
+  all (regardless of whether it's in the future), swaps to an empty
+  placeholder once it reaches zero. Anonymous-visitor-facing only.
+- **The Newcomers-room 30-day window** (`lib/rating/room-access.ts`)
+  — the one non-obvious consequence, worth the founder's explicit
+  attention: while `APP_OPEN=true` AND `DOORS_OPEN_DATE` is still in
+  the future (or unset), the Newcomers room is open to **every**
+  member outright, bypassing the 30-day window entirely — the
+  "small, hand-picked early cohort shouldn't lock each other out of
+  the one ritual-completing room" soft-launch exception. **Pushing
+  `DOORS_OPEN_DATE` forward to Dec 1 re-opens this exception for
+  every member in production right now** (not just a future cohort —
+  see #2, `APP_OPEN` has been `true` since Nov 4), since today
+  (Nov 13) is before the new Dec 1 target. If the 6 existing members
+  are meant to stay on the plain 30-day rule rather than regain
+  unrestricted Newcomers access until Dec 1, that needs a separate,
+  explicit decision — flagged here, not decided or silently worked
+  around.
+
+**2 — since Nov 1 already passed, did anything trigger automatically?
+No.** This codebase has no cron, no scheduled job, no `vercel.json`
+cron config anywhere (confirmed by search) — `getDoorsState()` is a
+pure read-time comparison with zero side effects on the database.
+Direct evidence, read-only, counts only:
+- `app_state.appOpenedAt = 2026-11-04T06:46:47.468Z` — `APP_OPEN` was
+  manually set `true` in Vercel on **Nov 4** (three days *after* Nov 1,
+  not triggered by it), and the app recorded that first-observed
+  moment automatically into the database the next time any request
+  checked it — the env var change itself was a human action, only the
+  timestamp-recording was automatic.
+- **6 active users total, all `joinedAt` before Nov 1, zero on/after**
+  (zero in the Oct 28–Nov 5 window specifically — this is the small
+  team/testing cohort from earlier packages this session, not a
+  Nov-1-triggered wave).
+- **Waitlist: 5 approved / 1 declined / 2 pending, all `reviewedAt`
+  before Nov 1, zero on/after.** 4 of the 5 approved had
+  `decisionEmailSentAt` before Nov 1 (zero after).
+- **6 invite tokens redeemed, all before Nov 1, zero after** (matches
+  the 6 active users exactly).
+- Zero system-actor `ModerationAction` rows in the Oct 30–Nov 3 window.
+- **Confirmed live** (the real landing page, anonymous, via the
+  browser pane): the countdown's own wrapper `<div>` is present in the
+  DOM but empty — proving `DOORS_OPEN_DATE` **is** set in production
+  (not unset) and has already passed (the countdown reached zero and
+  swapped to `LaunchCountdownPlaceholder`, which renders `null`).
+
+**Plainly: doors are currently OPEN in production** — both because
+`DOORS_OPEN_DATE` has already passed on its own terms, and
+independently because `APP_OPEN=true` has bypassed the gate for every
+member since Nov 4 regardless. Nothing admitted, activated, or emailed
+automatically at any point; every real state change in the data above
+was a manual admin action, before Nov 1 arrived either way.
+
+**3 — hardcoded launch references, repo-wide grep.** Live, rendered
+copy: **none found** — the countdown and the antechamber's "The Hall
+opens [date]." line were already fully derived from `doors.date` since
+the *first* move (Sep 10), not hardcoded strings; the architecture was
+already built as a single source of truth before this task. What
+existed were narrative/illustrative comments, now split into two
+kinds:
+- **Present-tense description of the CURRENT target** (treated as a
+  live reference, updated — see Change below): `lib/config/doors.ts`
+  (header comment + `formatDoorsDate`'s own doc example),
+  `app/(platform)/antechamber/page.tsx` (header comment).
+- **Illustrative example values**, not assertions about history
+  (updated to stay non-confusing): `.env.example`'s own
+  `DOORS_OPEN_DATE` example, `LaunchCountdown.tsx`'s own doc comment
+  example.
+- **Genuine dated historical record, left UNCHANGED** (same "never
+  rewrite history" rule this project's DECISIONS.md/CHANGELOG.md
+  already follow, extended here to an in-code comment making the same
+  kind of claim): `lib/config/feature-flags.ts`'s `PUSH_ENABLED`
+  comment ("Turned on 2026-10-25... ahead of the Nov 1 public
+  launch") — true when written, about a specific past action; changing
+  "Nov 1" to "Dec 1" there would misrepresent what was actually true
+  on 2026-10-25. `CHANGELOG.md`/`DECISIONS.md`'s own prior "moved
+  October 1 → November 1" entries are the same category, untouched by
+  design (they're the historical record, not read by any running
+  code).
+
+**October 1 residue check**: zero real hits — every remaining
+`2026-10-01`/"October 1" string in the repo is either this project's
+own unrelated REP-engine work-session date (coincidentally the same
+calendar date, nothing to do with launch) or a correctly-dated
+historical "moved from October 1" comment.
+
+**4 — legal docs, listed only, NOT edited** (attorney protocol):
+`legal/02-terms-of-service.md:3`, `legal/03-privacy-policy.md:3`,
+`legal/04-acceptable-use-policy.md:3`, `legal/06-dmca-policy.md:3` —
+all four read `**Effective date:** October 1, 2026`, already stale
+from the *first* launch-date move (never updated then either) and now
+doubly so. `legal/07-registration-consent-clickwrap.md` has no
+effective-date line of its own (consistent with `scripts/
+check-legal.ts`'s own existing warning about it, unrelated to this
+task). Generic "launch cohort"/"at launch" phrasing elsewhere in
+`02`/`03`/`06` (no specific date attached) wasn't flagged — nothing to
+correct there, just descriptive language.
+
+**Change.** No logic changed — the architecture didn't need any (see
+#3). Comment-only updates for the present-tense references above, each
+now carrying the full chain (e.g. "the December 1 cohort launch gate
+(moved from November 1, 2026-11-13; originally October 1,
+2026-09-10)") rather than dropping the earlier move. No fallback/
+default date existed to update (item 6 of the task — confirmed
+conditional, didn't apply).
+
+**Tests** (`lib/config/doors.test.ts`, new — 11 tests; `doors.ts` had
+none before this task): `getDoorsState()` unset/unparseable/before/
+at-exactly/after/±1-second-around the new Dec 1 target (the
+task's own explicit boundary ask: Nov 30 23:59:59 ET closed, Dec 1
+00:00:00 ET open, using real zoned `Date` strings, not a UTC
+approximation); `formatDoorsDate()` renders the new target as
+"December 1st"; `bypassesDoors()` — admin always, `APP_OPEN=true`
+bypasses for anyone, neither present → false.
+
+`npx tsc --noEmit`, `npx next lint` (same one pre-existing
+`AdminConsole.tsx` warning), `npm test` (310 passing, 11 new), `npm
+run build` all clean. Committed locally. **Not pushed** (task's own
+instruction).
+
+**The exact value for Vercel, `DOORS_OPEN_DATE`:**
+```
+2026-12-01T00:00:00-05:00
+```
+Midnight America/New_York, Dec 1 — EST by then (DST already fell back
+Nov 1, so `-05:00` is correct, not `-04:00`).

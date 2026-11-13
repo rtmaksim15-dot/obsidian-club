@@ -29,7 +29,7 @@ const UNITS: { key: keyof Remaining; label: string }[] = [
 
 /**
  * Live countdown to `targetIso` — a fixed instant (parsed with its own
- * offset, e.g. "2026-11-01T00:00:00-04:00"), correct for a visitor in
+ * offset, e.g. "2026-12-01T00:00:00-05:00"), correct for a visitor in
  * any timezone since it's never compared against the viewer's local
  * midnight. Starts rendering only after mount (`remaining` starts
  * `null`) so the server-rendered markup never has to guess how much
