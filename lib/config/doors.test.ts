@@ -113,4 +113,21 @@ describe("bypassesDoors", () => {
     const { bypassesDoors } = await import("./doors");
     expect(bypassesDoors({ id: "u1", isAdmin: false })).toBe(true);
   });
+
+  // Dec 1 move follow-up (2026-11-14, see DECISIONS.md) — the exact
+  // case Vercel's live config now exercises: APP_OPEN=false (turned
+  // off precisely so it no longer bypasses everyone), a non-admin
+  // member, bypassing ONLY because PREVIEW_USER_IDS names them. No
+  // test previously covered isPreviewId()=true at all.
+  it("a non-admin member listed in PREVIEW_USER_IDS bypasses, even with APP_OPEN false", async () => {
+    vi.resetModules();
+    vi.doMock("@/lib/config/app-open", () => ({ isAppOpen: () => false, getAppOpenedAt: vi.fn() }));
+    vi.doMock("@/lib/auth/preview-allowlist", () => ({ isPreviewId: (id: string) => id === "preview-member-1" }));
+    const { bypassesDoors } = await import("./doors");
+
+    expect(bypassesDoors({ id: "preview-member-1", isAdmin: false })).toBe(true);
+    // A different non-admin, not on the list, still doesn't bypass —
+    // confirms this isn't accidentally permissive for everyone.
+    expect(bypassesDoors({ id: "someone-else", isAdmin: false })).toBe(false);
+  });
 });

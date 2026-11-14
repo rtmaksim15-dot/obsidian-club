@@ -4808,3 +4808,41 @@ instruction).
 ```
 Midnight America/New_York, Dec 1 — EST by then (DST already fell back
 Nov 1, so `-05:00` is correct, not `-04:00`).
+
+### 2026-11-14 — Live verification after the Vercel env changes landed
+
+GO-AHEAD follow-up: `DOORS_OPEN_DATE=2026-12-01T00:00:00-05:00`,
+`PREVIEW_USER_IDS` (4 member ids), `APP_OPEN=false` set in Vercel
+project `obsidian-club-isbg` (confirmed by the owner, via dashboard,
+to be the project actually serving `obsidianclub.online` — a prior
+check from this session found no linked/authenticated Vercel CLI
+session to confirm this itself, so the owner checked directly).
+
+An empty commit (`chore: rebuild for env changes...`) was needed — a
+prior report that the countdown still showed "done" after the
+founder's own claimed redeploy turned out to be because no NEW build
+had actually run (the live `BUILD_ID` was provably unchanged); forcing
+a real rebuild resolved it.
+
+**Verified live**: countdown renders (`17 Days 00 Hrs 20 Min 09 Sec`
+at check time), computed against the live clock to land within
+seconds of `2026-12-01T00:00:00` America/New_York — confirms the env
+var is actually being read as the live value, not stale. Anonymous
+`GET /feed` → `307` to `/login?next=%2Ffeed`, unchanged.
+
+**Doors logic — verified via source + a real test gap closed, not a
+live authenticated session (none available this session).**
+`lib/config/doors.ts`/`lib/config/app-open.ts`/`lib/auth/
+preview-allowlist.ts` read exactly `DOORS_OPEN_DATE`/`APP_OPEN`/
+`PREVIEW_USER_IDS` — the same three names just set in Vercel, no
+mismatch. `lib/config/doors.test.ts` already covered admin-always-
+bypasses and APP_OPEN=true-bypasses-everyone, but had **zero**
+coverage of `isPreviewId()=true` at all — the exact case Vercel's live
+config now exercises (APP_OPEN=false, a non-admin bypassing only
+because `PREVIEW_USER_IDS` names them). Added one test closing that
+gap, plus its negative case (a different non-admin, not listed, still
+doesn't bypass) — 12 tests total, all passing. `npx tsc --noEmit`,
+lint (same one pre-existing warning), `npm test` (311 passing), `npm
+run build` — all clean. Committed locally; **not pushed** (this
+GO-AHEAD's own steps didn't ask for a second push — flagging for the
+founder to decide).
