@@ -902,6 +902,33 @@ model PushSubscription {
   @@map("push_subscriptions")
 }
 
+// Invite list reconciliation, 2026-11-21 (see DECISIONS.md) — the
+// 907-row buyer list emailed invitations on 2026-11-21 (the file's own
+// name carried a typo'd "21.10.26"; the batch really is 2026-11-21).
+// No relation to User — matching is done at query time by lowercased
+// email (lib/invites/matching.ts), never a stored FK, since a row here
+// exists whether or not that person ever registers. Deny-all RLS,
+// service-role only (Prisma) — this table is customer PII imported
+// from a one-off CSV (scripts/import-invite-list.ts), never read or
+// written by a browser-side Supabase client, and never logged/printed
+// outside the one admin page that's allowed to show it
+// (/admin/invites).
+model InviteListEntry {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  // Normalized (lowercased, trimmed) by the import script before every
+  // write — this column's own `unique` constraint is what makes the
+  // upsert-by-email idempotent, not a DB-level trigger.
+  email     String   @unique
+  firstName String?  @map("first_name")
+  lastName  String?  @map("last_name")
+  country   String?
+  source    String   @default("obsidian-buyers")
+  batch     String   @default("2026-11-21")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("invite_list")
+}
+
 // ============================================================
 // STAGE 1 — WAITLIST (ARCHITECTURE.md §10)
 // ============================================================

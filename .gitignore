@@ -33,6 +33,15 @@ yarn-error.log*
 .env*.local
 .env.vercel
 
+# Customer/PII exports (2026-11-21 incident: a buyer-list CSV was
+# dropped directly in the repo root — never committed, but this is the
+# backstop) — never committed, no matter where in the tree one lands.
+# No .csv fixture currently exists anywhere in this repo (confirmed by
+# search) — nothing to whitelist; if a real, non-PII CSV test fixture
+# is ever needed, add it back with `git add -f` and a comment here
+# explaining why it's safe, rather than loosening this rule.
+*.csv
+
 # vercel
 .vercel
 

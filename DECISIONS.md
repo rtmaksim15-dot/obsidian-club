@@ -4846,3 +4846,93 @@ lint (same one pre-existing warning), `npm test` (311 passing), `npm
 run build` — all clean. Committed locally; **not pushed** (this
 GO-AHEAD's own steps didn't ask for a second push — flagging for the
 founder to decide).
+
+### 2026-11-21 — PII file in repo root, and invite list reconciliation
+
+**TASK 0, the PII file.** `baza obsidian 21.10.26.csv` (907 past
+buyers — the filename's own date is a typo, the real export/batch is
+2026-11-21) was found sitting in the repo root. **Confirmed: never
+staged or committed** (`git status` showed `??` untracked; `git log
+--all -- "<path>"` returned nothing) — no history to worry about, no
+go-ahead needed for a rewrite. Moved to `~/obsidian-private/
+invite-list-2026-11-21.csv` (`~/obsidian-private` created at perms 700,
+the file at 600). Added `*.csv` to `.gitignore` as a backstop — no
+`.csv` fixture existed anywhere in this repo already (confirmed by
+search), so nothing needed whitelisting.
+
+**TASK 1, invite list reconciliation.** New model, `InviteListEntry`
+(table `invite_list`) — id, email (**unique**, normalized lowercase+
+trim by the import script before every write — see `lib/invites/
+matching.ts#normalizeEmail`, not a DB-level constraint), first_name,
+last_name, country, source (default `"obsidian-buyers"`), batch
+(default `"2026-11-21"`), created_at. No FK to `User` — a row exists
+whether or not that person ever registers; matching is done at query
+time by normalized email, not a stored relation.
+
+**Migration**: `supabase/migrations/20261121120000_invite_list.sql` —
+**written, NOT applied**, per CLAUDE.md rule 11, awaiting explicit
+go-ahead naming this exact action. Deny-all RLS, same established
+precedent as `admin_notes`/`admin_access_log`/`push_subscriptions`.
+**`npm run check:rls` needs no code change** — `scripts/check-rls.ts`
+already introspects every table in the `public` schema generically (no
+hardcoded table list); it will pick up `invite_list` automatically the
+moment the migration is applied, same as it has for every new table
+this session.
+
+**Import script**, `scripts/import-invite-list.ts` — takes a CSV path
+as its one argument, parses with `csv-parse` (new dependency; a
+hand-rolled line-splitter risked silently mishandling a quoted/
+comma-containing name across 907 rows of real customer data — unlike
+this session's other hand-rolled parsers, e.g. user-agent sniffing,
+getting this one wrong corrupts PII, not just a cosmetic label).
+Upserts by normalized email — idempotent, safe to re-run against the
+same or a corrected file. **Output is counts only** (rows read/
+inserted/updated/skipped) — CLAUDE.md rule 12 extended to PII per this
+task's own instruction, verified by reading the script: no email or
+name is ever interpolated into a `console.log`/`console.error` call,
+success or failure path alike. Can't be run yet — the table doesn't
+exist until the migration is applied.
+
+**`/admin/invites`** (`requireAdmin()` — the same function Package
+S1's step-up/idle enforcement already covers for every `/admin/**`
+path via middleware, nothing extra needed here) — `lib/invites/
+reconciliation.ts#getInviteListReconciliation()` does the actual work:
+one raw-SQL query (`invite_list` LEFT JOIN `users` LEFT JOIN
+`waitlist`, both joins on `lower(trim(email))`) fetched once and
+bucketed in JS, rather than four separate aggregate queries each
+re-deriving the same join — cheap at this table's real scale (907
+rows).
+
+**Interpretation flagged, not assumed silently**: the task named four
+totals — "registered · pending approval · approved · conversion %" —
+without saying exactly what "pending approval"/"approved" mean. Read
+as the existing `Waitlist.status` values (`pending`/`held` →
+"pending approval"; `approved` → "approved"), which is this
+codebase's only existing admission-funnel concept matching those exact
+words. Bucketed with **strict precedence per invite-list row** —
+registered > approved > pending approval — so someone who applied,
+got approved, AND has since redeemed their invite only ever counts
+once (under "registered"), never double-counted into "approved" too.
+If a different meaning was intended (e.g., a separate invite-token
+flow instead of the public apply/waitlist funnel), this needs
+correcting — flagging now rather than guessing silently and shipping
+a dashboard that quietly means something else.
+
+**"Registered users NOT on the list"** — `status: 'active'` members
+with no matching `invite_list` row at all, by the same normalized-email
+anti-join. Shown with name + email, admin-only, the one place this
+task's own spec explicitly allows it.
+
+**Tests** (`lib/invites/matching.test.ts`, 12 — case variations,
+whitespace including tabs/newlines, empty/whitespace-only/undefined/
+null optional fields): the matching/normalization logic specifically,
+per the task's own ask. The reconciliation SQL itself isn't
+unit-tested — the table doesn't exist yet to test against, and the
+task's own item 4 scoped tests to "the matching logic," not the full
+query.
+
+`npx tsc --noEmit`, `npx next lint` (same one pre-existing
+`AdminConsole.tsx` warning), `npm test` (323 passing, 12 new), `npm
+run build` all clean. Committed locally. **Not pushed, migration not
+applied** — both await explicit go-ahead, per the task's own closing
+instruction.
