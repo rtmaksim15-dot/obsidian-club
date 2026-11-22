@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireAdminApi } from "@/lib/auth/require-admin";
+import { isRitualComplete } from "@/lib/auth/ritual";
 import {
   approveWaitlistEntry,
   holdWaitlistEntry,
@@ -11,6 +12,73 @@ import {
 type Action = "approve" | "decline" | "hold" | "resend";
 
 type Body = { action?: Action; ageVerified?: boolean; heldReason?: string; heldNote?: string };
+
+// GET /api/admin/applications/:id (2026-11-22, see DECISIONS.md) — the
+// single-row counterpart to admin/page.tsx's bulk applications fetch,
+// for the admin search feature: a search result can match a row
+// outside the console's own default-loaded set (any status, not just
+// pending/held/failed-send/approved), so AdminConsole fetches it here
+// on demand rather than requiring it to already be in client state.
+// Returns the exact same shape admin/page.tsx builds, just resolved
+// via direct relations (applicationToken, reviewer lookup) instead of
+// that file's batched-across-many-rows approach — simpler and correct
+// for exactly one row, not a reimplementation of the batching itself.
+export async function GET(_request: Request, { params }: { params: { id: string } }) {
+  const adminResult = await requireAdminApi();
+  if (!adminResult.ok) {
+    return adminResult.response;
+  }
+
+  const a = await prisma.waitlist.findUnique({
+    where: { id: params.id },
+    include: { applicationToken: { select: { redeemedAt: true, redeemedById: true } } },
+  });
+  if (!a) {
+    return NextResponse.json({ error: "Application not found." }, { status: 404 });
+  }
+
+  const reviewer = a.reviewedBy ? await prisma.user.findUnique({ where: { id: a.reviewedBy } }) : null;
+
+  let registered: boolean | null = null;
+  let memberAgeVerified: boolean | null = null;
+  let memberOnboardingComplete: boolean | null = null;
+  if (a.status === "approved") {
+    registered = Boolean(a.applicationToken?.redeemedAt);
+    const redeemedById = a.applicationToken?.redeemedById ?? null;
+    const member = redeemedById ? await prisma.user.findUnique({ where: { id: redeemedById } }) : null;
+    memberAgeVerified = member ? member.ageVerified : false;
+    memberOnboardingComplete = member ? await isRitualComplete(member) : false;
+  }
+
+  return NextResponse.json({
+    application: {
+      id: a.id,
+      name: a.name,
+      email: a.email,
+      age: a.age,
+      city: a.city,
+      source: a.source,
+      reason: a.reason,
+      referralCode: a.referralCode,
+      origin: a.origin,
+      status: a.status,
+      createdAt: a.createdAt.toISOString(),
+      heldReason: a.heldReason,
+      heldNote: a.heldNote,
+      heldAt: a.heldAt ? a.heldAt.toISOString() : null,
+      reviewedAt: a.reviewedAt ? a.reviewedAt.toISOString() : null,
+      reviewerName: reviewer?.displayName ?? null,
+      ageVerified: a.ageVerified,
+      ageVerifiedAt: a.ageVerifiedAt ? a.ageVerifiedAt.toISOString() : null,
+      hasToken: a.applicationTokenId !== null,
+      decisionEmailSentAt: a.decisionEmailSentAt ? a.decisionEmailSentAt.toISOString() : null,
+      decisionEmailSendError: a.decisionEmailSendError,
+      registered,
+      memberAgeVerified,
+      memberOnboardingComplete,
+    },
+  });
+}
 
 // PATCH /api/admin/applications/:id — approve, decline, hold, or resend
 // a waitlist entry.

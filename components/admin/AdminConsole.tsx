@@ -9,6 +9,8 @@ import ReportDetail from "./ReportDetail";
 import TokenDetail from "./TokenDetail";
 import CreatePersonalInvite from "./CreatePersonalInvite";
 import CommandPalette from "./CommandPalette";
+import AdminSearch from "./AdminSearch";
+import type { AdminSearchResult } from "@/lib/admin/search";
 import EmailCapturesPanel, { type EmailCaptureRow } from "./EmailCapturesPanel";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import { PUSH_ENABLED } from "@/lib/config/feature-flags";
@@ -392,6 +394,36 @@ export default function AdminConsole({
     setOpenId(null);
   }
 
+  // Admin search (2026-11-22, see DECISIONS.md) — a result can match a
+  // row outside whatever's already loaded client-side (any Waitlist
+  // status, or a member beyond the People zone's top-50 default), so
+  // this fetches the full record on demand before opening it, same
+  // "inject into local state" pattern updateApplication/updatePerson
+  // already use for in-place mutations. Already-loaded rows (the
+  // common case at this app's current scale) skip the fetch entirely.
+  async function handleSearchSelect(result: AdminSearchResult) {
+    setFilter(null);
+    if (result.type === "applicant") {
+      setZone("applications");
+      if (!applications.some((a) => a.id === result.id)) {
+        const res = await fetch(`/api/admin/applications/${result.id}`);
+        if (!res.ok) return;
+        const { application } = await res.json();
+        setApplications((prev) => [application, ...prev]);
+      }
+      setOpenId(result.id);
+    } else {
+      setZone("people");
+      if (!people.some((p) => p.id === result.id)) {
+        const res = await fetch(`/api/admin/members/${result.id}`);
+        if (!res.ok) return;
+        const { person } = await res.json();
+        setPeople((prev) => [person, ...prev]);
+      }
+      setOpenId(result.id);
+    }
+  }
+
   function selectStat(nextZone: Zone, nextFilter: Filter) {
     setZone(nextZone);
     setFilter(nextFilter);
@@ -659,6 +691,8 @@ export default function AdminConsole({
             />
           ) : null}
 
+          <AdminSearch onSelect={handleSearchSelect} />
+
           <StatusBar counts={counts} activeZone={zone} activeFilter={filter} onSelect={selectStat} />
 
           <EmailCapturesPanel captures={emailCaptures} total={emailCapturesTotal} />
@@ -711,12 +745,19 @@ export default function AdminConsole({
               Nothing here.
             </p>
           ) : (
-            <ul className="space-y-2">
+            <ul className="space-y-2" role={zone === "applications" || zone === "people" ? "listbox" : undefined}>
               {zone === "applications" &&
                 visibleApplications.map((a) => (
                   <li
                     key={a.id}
                     className="card cursor-pointer"
+                    role="option"
+                    aria-selected={a.id === openId}
+                    style={
+                      a.id === openId
+                        ? { borderColor: "var(--color-accent)", borderWidth: "2px", backgroundColor: "var(--color-accent-glow)" }
+                        : undefined
+                    }
                     onClick={() => setOpenId(a.id)}
                   >
                     <p className="text-data">{a.name || a.email}</p>
@@ -743,7 +784,18 @@ export default function AdminConsole({
                 ))}
               {zone === "people" &&
                 visiblePeople.map((p) => (
-                  <li key={p.id} className="card cursor-pointer" onClick={() => setOpenId(p.id)}>
+                  <li
+                    key={p.id}
+                    className="card cursor-pointer"
+                    role="option"
+                    aria-selected={p.id === openId}
+                    style={
+                      p.id === openId
+                        ? { borderColor: "var(--color-accent)", borderWidth: "2px", backgroundColor: "var(--color-accent-glow)" }
+                        : undefined
+                    }
+                    onClick={() => setOpenId(p.id)}
+                  >
                     <p className="text-data">
                       {p.displayName}
                       {/* Clean Hall, B6 (Package 5, Phase B, 2026-10-14,

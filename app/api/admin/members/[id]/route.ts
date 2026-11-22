@@ -3,8 +3,110 @@ import { prisma } from "@/lib/db/prisma";
 import { requireAdminApi } from "@/lib/auth/require-admin";
 import { logModerationAction } from "@/lib/moderation/log";
 import { MIN_MEMBER_AGE } from "@/lib/legal/eligibility";
+import { resolveAvatarUrls } from "@/lib/storage/resolve-media";
 
 type Body = { ageVerified?: boolean; removeAvatar?: boolean; removeAvatarReason?: string; isTest?: boolean };
+
+// GET /api/admin/members/:id (2026-11-22, see DECISIONS.md) — the
+// single-row counterpart to admin/page.tsx's bulk members fetch, for
+// the admin search feature: a search result can match a member
+// outside the console's own top-50-most-recent default load, so
+// AdminConsole fetches it here on demand. Returns the exact same
+// Person shape admin/page.tsx builds, resolved via direct relations
+// (invitedBy/invitees/partner/partnerOf, repHistory, legalConsents)
+// instead of that file's batched-across-many-rows approach — correct
+// for exactly one row, not a reimplementation of the batching.
+export async function GET(_request: Request, { params }: { params: { id: string } }) {
+  const adminResult = await requireAdminApi();
+  if (!adminResult.ok) {
+    return adminResult.response;
+  }
+
+  const p = await prisma.user.findUnique({
+    where: { id: params.id },
+    include: {
+      invitedBy: { select: { displayName: true } },
+      invitees: { select: { displayName: true } },
+      partner: { select: { displayName: true } },
+      partnerOf: { select: { displayName: true } },
+      ageVerifications: { orderBy: { createdAt: "desc" }, take: 1 },
+      _count: { select: { ageVerifications: true } },
+      repHistory: { orderBy: { createdAt: "desc" } },
+      legalConsents: { orderBy: { acceptedAt: "desc" } },
+      adminNotesAboutMe: { orderBy: { createdAt: "desc" }, include: { author: { select: { displayName: true } } } },
+    },
+  });
+  if (!p) {
+    return NextResponse.json({ error: "Member not found." }, { status: 404 });
+  }
+
+  const [postCount, commentCount, moderationActionRows, [avatarUrl]] = await Promise.all([
+    prisma.post.count({ where: { authorId: p.id, isPublished: true } }),
+    prisma.comment.count({ where: { authorId: p.id, isDeleted: false } }),
+    prisma.moderationAction.findMany({
+      where: { targetType: "user", targetId: p.id },
+      orderBy: { createdAt: "desc" },
+      include: { admin: { select: { displayName: true } } },
+    }),
+    resolveAvatarUrls([p.avatarUrl]),
+  ]);
+
+  return NextResponse.json({
+    person: {
+      id: p.id,
+      displayName: p.displayName,
+      username: p.username,
+      email: p.email,
+      avatarUrl,
+      rep: p.rep,
+      level: p.level,
+      trustScore: p.trustScore,
+      reputation: Number(p.reputation),
+      ageVerified: p.ageVerified,
+      ageVerifiedAt: p.ageVerifiedAt ? p.ageVerifiedAt.toISOString() : null,
+      isTest: p.isTest,
+      ageVerificationProvider: p.ageVerifications[0]?.provider ?? null,
+      ageVerificationMethod: p.ageVerifications[0]?.method ?? null,
+      ageVerificationAttempts: p._count.ageVerifications,
+      ageVerificationLastAt: p.ageVerifications[0] ? p.ageVerifications[0].createdAt.toISOString() : null,
+      joinedAt: p.joinedAt ? p.joinedAt.toISOString() : null,
+      postCount,
+      commentCount,
+      invitedByName: p.invitedBy?.displayName ?? null,
+      inviteeNames: p.invitees.map((u) => u.displayName),
+      partnerName: p.partner?.displayName ?? p.partnerOf?.displayName ?? null,
+      repHistory: p.repHistory.map((r) => ({
+        id: r.id,
+        delta: r.delta,
+        reason: r.reason,
+        source: r.source,
+        createdAt: r.createdAt.toISOString(),
+      })),
+      consents: p.legalConsents.map((c) => ({
+        id: c.id,
+        termsVersion: c.termsVersion,
+        privacyVersion: c.privacyVersion,
+        aupVersion: c.aupVersion,
+        dmRulesVersion: c.dmRulesVersion,
+        acceptedAt: c.acceptedAt.toISOString(),
+        acceptedIp: c.acceptedIp,
+      })),
+      adminActions: moderationActionRows.map((m) => ({
+        id: m.id,
+        action: m.action,
+        note: m.note,
+        createdAt: m.createdAt.toISOString(),
+        adminName: m.admin?.displayName ?? m.actorLabel ?? null,
+      })),
+      notes: p.adminNotesAboutMe.map((n) => ({
+        id: n.id,
+        body: n.body,
+        createdAt: n.createdAt.toISOString(),
+        authorName: n.author.displayName,
+      })),
+    },
+  });
+}
 
 // PATCH /api/admin/members/:id — toggle Age Verification on an existing
 // member (2026-08-03). Field first, no enforcement gate yet — see

@@ -4976,3 +4976,58 @@ interesting fact about them.
 passing, 9 new), `npm run build` — all clean. Still unexercised against
 a live `invite_list` table; migration still not applied as of this
 entry.
+
+### 2026-11-22 — Admin console: search, selected-row highlight
+
+Code only, no migration. Two independent pieces.
+
+**Search.** `GET /api/admin/search?q=` (`lib/admin/search.ts` +
+`app/api/admin/search/route.ts`) — a real, full-table search across
+Waitlist (every status, not just the console's own default pending/
+held/failed-send/approved view) and User (active only, matching the
+People zone's own existing scope), matched by Prisma's `contains` +
+`mode: "insensitive"` — a parameterized ILIKE under the hood, never
+string-concatenated SQL. Min 2 chars / max 20 combined results live in
+one pure module shared by the client's debounce guard and the route
+itself (`isSearchQueryValid`, `mergeSearchResults` — 10 tests). No
+search term or result is ever logged, same PII posture CLAUDE.md rule
+12 was extended to for the invite-list task yesterday — a name or
+email typed into this box is exactly that kind of data.
+
+The harder part was "links to its detail view": AdminConsole's
+existing Applications/People lists are a fixed top-50 window (oldest-
+pending-first for applications, most-recent-active for people), so a
+search match can easily be a row that isn't in client state at all —
+a declined application, or simply someone older than the window. Added
+`GET /api/admin/applications/:id` and `GET /api/admin/members/:id`
+(alongside those routes' existing PATCH handlers) returning the exact
+same `Application`/`Person` shape `admin/page.tsx`'s bulk fetch
+builds — resolved via direct Prisma relations for one row, rather than
+reusing that file's batched-across-many-rows machinery (correct and
+far simpler for exactly one row; the batching optimization doesn't
+apply at N=1). `AdminConsole#handleSearchSelect` checks local state
+first and only calls one of these when the match isn't already there
+— at this app's current real scale (tens of applicants, single-digit
+members) that's the common case, so most selections cost nothing extra.
+
+**Selected-row highlight.** Applications and People list rows get
+`aria-selected` (now valid: `role="option"` on the `<li>`, `role=
+"listbox"` on their shared `<ul>` — ESLint's jsx-a11y correctly
+flagged the attribute as unsupported on the implicit `listitem` role
+until this was added) plus an accent border + `--color-accent-glow`
+background when `openId` matches — the same accent/glow pairing
+StatusBar already uses for its active stat, so this reads as "the
+same kind of selected" rather than a new visual language. Reuses
+`openId`, already the single source of truth for which row is open;
+no new state.
+
+`npx tsc --noEmit`, lint clean (the aria-selected/listitem warnings
+above were fixed, not suppressed; one pre-existing unrelated warning
+remains), `npm test` (343 passing, 11 new — 10 in `search.test.ts`,
+plus the route-guard inventory test picking up the new search route
+automatically), `npm run build` clean, all three new/changed routes
+confirmed in the build output. Not exercised against a real admin
+login in this session — that needs the owner's own MFA-verified
+session, which this session has no credentials for; the owner should
+give it a look in their own already-open Chrome tab rather than take
+tsc/build cleanliness as a substitute for seeing it render.
