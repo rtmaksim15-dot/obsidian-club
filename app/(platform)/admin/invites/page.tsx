@@ -19,7 +19,7 @@ export default async function AdminInvitesPage() {
     notFound();
   }
 
-  const { totals, byCountry, registrationsByDay, unmatchedUsers } = await getInviteListReconciliation();
+  const { totals, byCountry, registrationsByDay, unmatched } = await getInviteListReconciliation();
 
   return (
     <main className="min-h-screen bg-ob-black px-6 pb-16 pt-4 text-ob-text">
@@ -29,12 +29,13 @@ export default async function AdminInvitesPage() {
 
         <section className="mb-10">
           <p className="text-label mb-3">Totals</p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {[
               { label: "Invited", value: totals.invited },
-              { label: "Registered", value: totals.registered },
+              { label: "Applied", value: totals.applied },
               { label: "Pending approval", value: totals.pendingApproval },
               { label: "Approved", value: totals.approved },
+              { label: "Active accounts", value: totals.activeAccount },
               { label: "Conversion", value: `${totals.conversionRate}%` },
             ].map((stat) => (
               <div key={stat.label} className="card px-4 py-3 text-center">
@@ -59,7 +60,7 @@ export default async function AdminInvitesPage() {
                 <li key={row.country} className="flex items-center justify-between py-1 text-caption">
                   <span>{row.country}</span>
                   <span style={{ color: "var(--color-text-muted)" }}>
-                    {row.registered} registered / {row.invited} invited
+                    {row.activeAccount} active / {row.invited} invited
                   </span>
                 </li>
               ))}
@@ -87,20 +88,22 @@ export default async function AdminInvitesPage() {
 
         <section>
           <p className="text-label mb-3">
-            Registered members NOT on the invite list ({unmatchedUsers.length})
+            Applicants/users NOT on the invite list ({unmatched.length})
           </p>
-          {unmatchedUsers.length === 0 ? (
+          {unmatched.length === 0 ? (
             <p className="text-body" style={{ color: "var(--color-text-secondary)" }}>
-              None — every registered member matches the invite list.
+              None — every applicant and registered member matches the invite list.
             </p>
           ) : (
             <ul className="space-y-2">
-              {unmatchedUsers.map((u) => (
+              {unmatched.map((u) => (
                 <li key={u.id} className="card px-4 py-2">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-data">{u.displayName}</p>
+                    <p className="text-data">
+                      {u.displayName} <span style={{ color: "var(--color-text-muted)" }}>({u.kind})</span>
+                    </p>
                     <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
-                      {formatAdminDateTime(u.joinedAt)}
+                      {formatAdminDateTime(u.eventAt)}
                     </p>
                   </div>
                   <p className="text-caption mt-1" style={{ color: "var(--color-text-secondary)" }}>

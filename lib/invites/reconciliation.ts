@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db/prisma";
+import { classifyInviteRow, hasApplied, type InviteWaitlistStatus } from "./funnel";
 
 // Invite list reconciliation, 2026-11-21 (see DECISIONS.md). One shared
 // query (invite_list LEFT JOIN users LEFT JOIN waitlist, all on
@@ -12,49 +13,52 @@ import { prisma } from "@/lib/db/prisma";
 // neither has that guarantee at the schema level — see
 // lib/invites/matching.ts's own comment.
 //
-// Bucketed with a strict precedence per invite-list row — registered
-// > approved > pending approval > (not yet applied) — so a person who
-// applied, got approved, AND has since redeemed their invite only ever
-// counts once, under "registered," never double-counted into "approved"
-// too.
+// Funnel, confirmed 2026-11-21: invited -> applied (Waitlist row
+// exists, any status) -> pending approval / approved (current
+// Waitlist status, among those not yet registered) -> active account
+// (User exists). "Applied" is a standalone total, not mutually
+// exclusive with "active account" — see lib/invites/funnel.ts's own
+// comment for why.
 export type InviteListTotals = {
   invited: number;
-  registered: number;
+  applied: number;
   pendingApproval: number;
   approved: number;
-  conversionRate: number; // registered / invited, 0–100, one decimal
+  activeAccount: number;
+  conversionRate: number; // activeAccount / invited, 0–100, one decimal
 };
 
-export type CountryBreakdownRow = { country: string; invited: number; registered: number };
+export type CountryBreakdownRow = { country: string; invited: number; activeAccount: number };
 
 export type RegistrationsByDayRow = { day: string; count: number }; // day: "YYYY-MM-DD"
 
-export type UnmatchedUserRow = {
+export type UnmatchedRow = {
   id: string;
   displayName: string;
   email: string;
-  joinedAt: string | null;
+  eventAt: string | null;
+  kind: "user" | "applicant";
 };
 
 export type InviteListReconciliation = {
   totals: InviteListTotals;
   byCountry: CountryBreakdownRow[];
   registrationsByDay: RegistrationsByDayRow[];
-  unmatchedUsers: UnmatchedUserRow[];
+  unmatched: UnmatchedRow[];
 };
 
 type JoinedRow = {
   country: string | null;
-  is_registered: boolean;
+  is_active: boolean;
   joined_at: Date | null;
-  waitlist_status: "pending" | "held" | "approved" | "declined" | null;
+  waitlist_status: InviteWaitlistStatus | null;
 };
 
 export async function getInviteListReconciliation(): Promise<InviteListReconciliation> {
   const joined = await prisma.$queryRaw<JoinedRow[]>`
     select
       il.country,
-      (u.id is not null) as is_registered,
+      (u.id is not null) as is_active,
       u.joined_at,
       w.status as waitlist_status
     from invite_list il
@@ -64,27 +68,31 @@ export async function getInviteListReconciliation(): Promise<InviteListReconcili
       on lower(trim(w.email)) = il.email
   `;
 
-  let registered = 0;
+  let applied = 0;
+  let activeAccount = 0;
   let approved = 0;
   let pendingApproval = 0;
-  const byCountry = new Map<string, { invited: number; registered: number }>();
+  const byCountry = new Map<string, { invited: number; activeAccount: number }>();
   const byDay = new Map<string, number>();
 
   for (const row of joined) {
     const countryLabel = row.country ?? "(unknown)";
-    const countryStats = byCountry.get(countryLabel) ?? { invited: 0, registered: 0 };
+    const countryStats = byCountry.get(countryLabel) ?? { invited: 0, activeAccount: 0 };
     countryStats.invited += 1;
 
-    if (row.is_registered) {
-      registered += 1;
-      countryStats.registered += 1;
+    const bucket = classifyInviteRow({ isActiveAccount: row.is_active, waitlistStatus: row.waitlist_status });
+    if (hasApplied(bucket)) applied += 1;
+
+    if (bucket === "activeAccount") {
+      activeAccount += 1;
+      countryStats.activeAccount += 1;
       if (row.joined_at) {
         const day = row.joined_at.toISOString().slice(0, 10);
         if (day >= "2026-11-21") byDay.set(day, (byDay.get(day) ?? 0) + 1);
       }
-    } else if (row.waitlist_status === "approved") {
+    } else if (bucket === "approved") {
       approved += 1;
-    } else if (row.waitlist_status === "pending" || row.waitlist_status === "held") {
+    } else if (bucket === "pendingApproval") {
       pendingApproval += 1;
     }
 
@@ -93,25 +101,35 @@ export async function getInviteListReconciliation(): Promise<InviteListReconcili
 
   const invited = joined.length;
 
-  const unmatchedUserRows = await prisma.$queryRaw<
-    { id: string; display_name: string; email: string; joined_at: Date | null }[]
+  // "Applicants/users NOT on the list": active Users and Waitlist rows
+  // whose (normalized) email matches no invite_list row, deduped so a
+  // person who both applied AND registered under the same email is
+  // listed once, as a user — not twice.
+  const unmatchedRows = await prisma.$queryRaw<
+    { id: string; display_name: string; email: string; event_at: Date | null; kind: "user" | "applicant" }[]
   >`
-    select u.id, u.display_name, u.email, u.joined_at
+    select u.id, u.display_name, u.email, u.joined_at as event_at, 'user' as kind
     from users u
     where u.status = 'active'
+      and not exists (select 1 from invite_list il where il.email = lower(trim(u.email)))
+    union all
+    select w.id, coalesce(w.name, w.email) as display_name, w.email, w.created_at as event_at, 'applicant' as kind
+    from waitlist w
+    where not exists (select 1 from invite_list il where il.email = lower(trim(w.email)))
       and not exists (
-        select 1 from invite_list il where il.email = lower(trim(u.email))
+        select 1 from users u2 where lower(trim(u2.email)) = lower(trim(w.email)) and u2.status = 'active'
       )
-    order by u.joined_at desc nulls last
+    order by event_at desc nulls last
   `;
 
   return {
     totals: {
       invited,
-      registered,
+      applied,
       pendingApproval,
       approved,
-      conversionRate: invited > 0 ? Math.round((registered / invited) * 1000) / 10 : 0,
+      activeAccount,
+      conversionRate: invited > 0 ? Math.round((activeAccount / invited) * 1000) / 10 : 0,
     },
     byCountry: Array.from(byCountry.entries())
       .map(([country, stats]) => ({ country, ...stats }))
@@ -119,11 +137,12 @@ export async function getInviteListReconciliation(): Promise<InviteListReconcili
     registrationsByDay: Array.from(byDay.entries())
       .map(([day, count]) => ({ day, count }))
       .sort((a, b) => a.day.localeCompare(b.day)),
-    unmatchedUsers: unmatchedUserRows.map((u) => ({
+    unmatched: unmatchedRows.map((u) => ({
       id: u.id,
       displayName: u.display_name,
       email: u.email,
-      joinedAt: u.joined_at ? u.joined_at.toISOString() : null,
+      eventAt: u.event_at ? u.event_at.toISOString() : null,
+      kind: u.kind,
     })),
   };
 }

@@ -4936,3 +4936,43 @@ query.
 run build` all clean. Committed locally. **Not pushed, migration not
 applied** — both await explicit go-ahead, per the task's own closing
 instruction.
+
+### 2026-11-21 — Invite list funnel: match against both Waitlist AND User
+
+Follow-up correction to the reconciliation above, before the migration
+was applied. The original totals only checked `invite_list` against
+`users` — meaning someone who had applied (a `Waitlist` row) but not
+yet been approved/registered was invisible: not counted anywhere.
+Corrected to match against **both** tables, with an explicit five-stage
+funnel: invited → applied (a `Waitlist` row exists, any status) →
+pending approval / approved (current `Waitlist.status`, only for those
+not yet registered) → active account (an active `User` row exists).
+
+Extracted the bucket precedence into a pure, unit-tested function —
+`lib/invites/funnel.ts#classifyInviteRow()` (9 tests in
+`funnel.test.ts`) — rather than inlining the if/else chain into
+`reconciliation.ts`'s loop, specifically so this precedence logic
+(active account beats approved beats pending beats "applied but
+declined/other" beats "never applied") has coverage independent of a
+live `invite_list` table, which still doesn't exist yet. `hasApplied()`
+is kept as a separate pure function rather than folded into the bucket
+enum: "applied" is NOT mutually exclusive with "active account" (both
+count someone who registered after applying), while the bucket itself
+IS mutually exclusive by construction — conflating the two would have
+made the active-account total silently exclude anyone who'd also
+applied.
+
+`byCountry`'s field renamed `registered` → `activeAccount` to match;
+`unmatchedUsers` (Users only) replaced with `unmatched` — now a
+deduped union of unmatched active Users AND unmatched Waitlist rows
+(`kind: "user" | "applicant"`), since "NOT on the list" must now also
+surface applicants, not just registered members. Dedup rule: if an
+email matches both an active User and a Waitlist row, it's listed once
+only, as `"user"` — the Waitlist row is suppressed, since by the time
+someone has registered, having also applied is no longer the
+interesting fact about them.
+
+`npx tsc --noEmit`, lint (same pre-existing warning), `npm test` (332
+passing, 9 new), `npm run build` — all clean. Still unexercised against
+a live `invite_list` table; migration still not applied as of this
+entry.
