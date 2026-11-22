@@ -23,7 +23,18 @@ import { useEffect, useState } from "react";
 // disagree with the server-rendered HTML (a hydration mismatch); the
 // effect runs after hydration, so the button's behavior settles a tick
 // later instead.
-export default function CopyShareLink({ url }: { url: string }) {
+export default function CopyShareLink({
+  url,
+  copyLabel = "Copy invitation link",
+  shareLabel = "Share invitation",
+}: {
+  url: string;
+  // "Vouch for someone" (2026-11-22, see DECISIONS.md) — the only
+  // other caller so far; defaults keep every existing call site's
+  // copy unchanged.
+  copyLabel?: string;
+  shareLabel?: string;
+}) {
   const [copied, setCopied] = useState(false);
   const [canShare, setCanShare] = useState(false);
 
@@ -61,7 +72,7 @@ export default function CopyShareLink({ url }: { url: string }) {
   if (!canShare) {
     return (
       <button type="button" onClick={copy} className="btn-primary !text-sm">
-        {copied ? "Copied" : "Copy invitation link"}
+        {copied ? "Copied" : copyLabel}
       </button>
     );
   }
@@ -69,7 +80,7 @@ export default function CopyShareLink({ url }: { url: string }) {
   return (
     <div className="flex items-center gap-3">
       <button type="button" onClick={share} className="btn-primary !text-sm">
-        Share invitation
+        {shareLabel}
       </button>
       <button type="button" onClick={copy} className="btn-secondary !text-sm">
         {copied ? "Copied" : "Copy link"}

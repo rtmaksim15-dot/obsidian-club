@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 type Props = {
   title: string;
@@ -8,6 +8,12 @@ type Props = {
   onConfirm: () => void;
   onCancel: () => void;
   busy?: boolean;
+  // Typed-confirmation (2026-11-22, see DECISIONS.md) — for an action
+  // destructive enough that a plain Confirm/Cancel click isn't enough
+  // friction (account deletion). When set, Confirm stays disabled
+  // until the admin types this exact string into the field shown
+  // below the title.
+  requireTypedText?: string;
 };
 
 /**
@@ -21,7 +27,9 @@ type Props = {
  * affordances (Escape, backdrop click) as `ReportModal.tsx`, and
  * deliberately no more text than the question itself.
  */
-export default function ConfirmDialog({ title, confirmLabel, onConfirm, onCancel, busy }: Props) {
+export default function ConfirmDialog({ title, confirmLabel, onConfirm, onCancel, busy, requireTypedText }: Props) {
+  const [typed, setTyped] = useState("");
+
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") onCancel();
@@ -29,6 +37,8 @@ export default function ConfirmDialog({ title, confirmLabel, onConfirm, onCancel
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [onCancel]);
+
+  const confirmDisabled = busy || (requireTypedText !== undefined && typed !== requireTypedText);
 
   return (
     <div
@@ -43,11 +53,26 @@ export default function ConfirmDialog({ title, confirmLabel, onConfirm, onCancel
             approve/decline) pass a two-line message with a literal "\n\n" —
             this renders that line break; a plain one-line title is unaffected. */}
         <p className="text-body whitespace-pre-line">{title}</p>
+        {requireTypedText !== undefined ? (
+          <div className="mt-4">
+            <label className="input-label" htmlFor="confirm-dialog-typed">
+              Type &ldquo;{requireTypedText}&rdquo; to confirm
+            </label>
+            <input
+              id="confirm-dialog-typed"
+              className="input mt-1 w-full"
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              autoFocus
+              autoComplete="off"
+            />
+          </div>
+        ) : null}
         <div className="mt-6 flex justify-end gap-3">
           <button type="button" className="btn-secondary" onClick={onCancel} disabled={busy}>
             Cancel
           </button>
-          <button type="button" className="btn-danger" onClick={onConfirm} disabled={busy}>
+          <button type="button" className="btn-danger" onClick={onConfirm} disabled={confirmDisabled}>
             {busy ? "…" : confirmLabel}
           </button>
         </div>

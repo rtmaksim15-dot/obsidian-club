@@ -373,6 +373,31 @@ export default async function HallPage() {
               <CreatePartnerButton />
             )}
           </div>
+
+          {/* "Vouch for someone" (2026-11-22, see DECISIONS.md) —
+              deliberately quiet: no counts, no rewards, no list of who
+              used it. Reuses the referralCode every member already has
+              (generated at account creation) — nothing to create here,
+              unlike the two cards above. Points at /invitation (the
+              applications form), not /join — vouching only tells the
+              club you sent someone, it doesn't skip the review. */}
+          <div className="card mt-4">
+            <p className="text-data !text-sm">Vouch for someone</p>
+            <p className="text-caption mt-1 mb-3" style={{ color: "var(--color-text-secondary)" }}>
+              Give this link to someone before they apply — it lets us know you sent them.
+            </p>
+            {baseUrl ? (
+              <CopyShareLink
+                url={`${baseUrl}/invitation?sponsor=${user.referralCode}`}
+                copyLabel="Copy vouch link"
+                shareLabel="Share vouch link"
+              />
+            ) : (
+              <p className="text-caption font-semibold" style={{ color: "var(--color-error)" }}>
+                This link is temporarily unavailable.
+              </p>
+            )}
+          </div>
         </section>
 
         {/* Notifications */}

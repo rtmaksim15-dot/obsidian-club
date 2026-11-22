@@ -5,8 +5,13 @@ import { logModerationAction } from "@/lib/moderation/log";
 import { MIN_MEMBER_AGE } from "@/lib/legal/eligibility";
 import { resolveAvatarUrls } from "@/lib/storage/resolve-media";
 import { mergeBroughtIn, resolveBondsForPerson } from "@/lib/admin/linked-accounts";
+import { deletedAdminActorLabel, deletionConfirmationText } from "@/lib/admin/account-deletion";
+import { createAdminClient } from "@/lib/auth/supabase-admin";
+import { errCode } from "@/lib/utils/safe-error";
 
 type Body = { ageVerified?: boolean; removeAvatar?: boolean; removeAvatarReason?: string; isTest?: boolean };
+
+type DeleteBody = { confirmUsername?: string };
 
 // GET /api/admin/members/:id (2026-11-22, see DECISIONS.md) — the
 // single-row counterpart to admin/page.tsx's bulk members fetch, for
@@ -240,4 +245,119 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   });
 
   return NextResponse.json({ ok: true });
+}
+
+// DELETE /api/admin/members/:id (2026-11-22, see DECISIONS.md) — real
+// account deletion, not a soft flag. Gated by typed-username
+// confirmation in the dialog (ConfirmDialog's requireTypedText) AND
+// again here server-side (never trust the client did the check).
+//
+// FK-safe by construction, not by hope: audited every live foreign key
+// referencing users.id via pg_constraint before writing this (see
+// DECISIONS.md for the full table). Most of them are already CASCADE
+// (bonds, push_subscriptions, likes, follows, blocks, notifications,
+// user_profiles/practices/achievements, rep_history, private_notes,
+// admin_notes.member_id, admin_access_log) or SET NULL (partner_id/
+// invited_by both directions, waitlist.invited_by, invite_tokens'
+// three user references, analytics_events, admin_auth_events,
+// comments/messages/direct_messages.deleted_by_id, rep_history.
+// granted_by_id, reports.reviewed_by_id) at the DB level already —
+// nothing to do for those, `prisma.user.delete()` alone handles them.
+// What's left is genuinely RESTRICT/NO ACTION and would otherwise
+// throw a real FK violation on the very first attempt (legal_consents
+// alone blocks every registered member, since every one has at least
+// one from joining) — deleted explicitly, in dependency order, in one
+// transaction ending with the user row itself:
+//   threads (cascades direct_messages + thread_participants) -> posts
+//   (cascades their own comments/likes/images) -> remaining comments ->
+//   messages -> reviews -> reports filed -> legal_consents ->
+//   age_verifications -> admin_notes they authored (about OTHER
+//   members — notes ABOUT this member cascade automatically) ->
+//   referrals -> marketplace_items -> moderation_actions they took AS
+//   AN ADMIN get adminId nulled (nullable column) + actorLabel
+//   swapped, never deleted — that's someone ELSE's moderation history,
+//   not this member's own content.
+export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+  const adminResult = await requireAdminApi();
+  if (!adminResult.ok) {
+    return adminResult.response;
+  }
+  const admin = adminResult.user;
+
+  if (admin.id === params.id) {
+    return NextResponse.json({ error: "You cannot delete your own account here." }, { status: 422 });
+  }
+
+  const target = await prisma.user.findUnique({
+    where: { id: params.id },
+    select: { id: true, username: true, displayName: true, isAdmin: true },
+  });
+  if (!target) {
+    return NextResponse.json({ error: "Member not found." }, { status: 404 });
+  }
+  if (target.isAdmin) {
+    return NextResponse.json({ error: "Cannot delete an admin account through this action." }, { status: 422 });
+  }
+
+  let body: DeleteBody;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request." }, { status: 400 });
+  }
+
+  const expected = deletionConfirmationText(target);
+  if (body.confirmUsername !== expected) {
+    return NextResponse.json({ error: "Confirmation text did not match." }, { status: 422 });
+  }
+
+  const actorLabel = deletedAdminActorLabel(target.displayName);
+
+  try {
+    await prisma.$transaction([
+      prisma.thread.deleteMany({ where: { OR: [{ participantAId: target.id }, { participantBId: target.id }] } }),
+      prisma.post.deleteMany({ where: { authorId: target.id } }),
+      prisma.comment.deleteMany({ where: { authorId: target.id } }),
+      prisma.message.deleteMany({ where: { userId: target.id } }),
+      prisma.review.deleteMany({ where: { OR: [{ reviewerId: target.id }, { reviewedId: target.id }] } }),
+      prisma.report.deleteMany({ where: { reporterId: target.id } }),
+      prisma.legalConsent.deleteMany({ where: { userId: target.id } }),
+      prisma.ageVerification.deleteMany({ where: { userId: target.id } }),
+      prisma.adminNote.deleteMany({ where: { authorId: target.id } }),
+      prisma.referral.deleteMany({ where: { OR: [{ inviterId: target.id }, { invitedId: target.id }] } }),
+      prisma.marketplaceItem.deleteMany({ where: { sellerId: target.id } }),
+      prisma.moderationAction.updateMany({
+        where: { adminId: target.id },
+        data: { adminId: null, actorLabel },
+      }),
+      prisma.user.delete({ where: { id: target.id } }),
+    ]);
+  } catch (err) {
+    console.error(`[admin/members/delete] Failed to delete user ${target.id}:`, errCode(err));
+    return NextResponse.json({ error: "Could not delete the account. Nothing was removed." }, { status: 503 });
+  }
+
+  // Logged AFTER deletion — moderation_actions.target_id has no FK
+  // (bare polymorphic uuid, same as every other targetId in this
+  // table), so pointing it at a now-deleted user is safe, same as a
+  // resolved report's target already can be.
+  await logModerationAction({
+    adminId: admin.id,
+    action: "member.deleted",
+    targetType: "user",
+    targetId: target.id,
+    note: `Deleted ${target.displayName} (${target.username ?? "no username"}).`,
+  });
+
+  const supabaseAdmin = createAdminClient();
+  const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(target.id);
+  if (authDeleteError) {
+    console.error(
+      `[admin/members/delete] App data for ${target.id} deleted, but the Supabase Auth identity could not be removed — needs manual follow-up:`,
+      errCode(authDeleteError),
+    );
+    return NextResponse.json({ ok: true, authDeleted: false });
+  }
+
+  return NextResponse.json({ ok: true, authDeleted: true });
 }

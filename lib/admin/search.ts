@@ -18,6 +18,10 @@ export type AdminSearchResult = {
   handle: string | null;
   status: string;
   createdAt: string; // ISO
+  // Clean Hall test-account flag (member results only; 2026-11-22, see
+  // DECISIONS.md — fixing the bug where an inactive/banned member was
+  // invisible to this search entirely, not just unlabeled).
+  isTest?: boolean;
 };
 
 export function normalizeSearchQuery(raw: string): string {

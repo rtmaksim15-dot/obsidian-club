@@ -11,16 +11,21 @@ import {
 
 // GET /api/admin/search?q=<term> (2026-11-22, see DECISIONS.md) — a
 // real, server-side, full-table search across both applicants
-// (Waitlist, every status — not just the console's own default
-// pending/held/failed-send/approved view) and members (User, active
-// only, matching the People zone's own existing scope). Matching
-// itself is Prisma's `contains` with `mode: "insensitive"` — compiles
-// to a parameterized ILIKE, never string-concatenated SQL. Min 2
-// chars / max 20 combined results are enforced by lib/admin/search.ts,
-// shared with the client's own debounce guard. No search term or
-// result is ever logged (CLAUDE.md rule 12, extended to PII by the
-// 2026-11-21 invite-list task — same posture here: a name/email typed
-// into this box is exactly that kind of PII).
+// (Waitlist, every status) and members (User, every status — fixed
+// 2026-11-22: originally filtered to status: "active", which made an
+// inactive/banned member invisible to this search entirely, not just
+// unlabeled, the actual cause of @hfjhgfhfffjnkn_ ("Тома2," member
+// #0004, status "inactive") not being findable. isTest is returned so
+// the UI can still visually flag a test account once found — the only
+// label this route should apply; status filtering itself is not how
+// that distinction belongs made). Matching itself is Prisma's
+// `contains` with `mode: "insensitive"` — compiles to a parameterized
+// ILIKE, never string-concatenated SQL. Min 2 chars / max 20 combined
+// results are enforced by lib/admin/search.ts, shared with the
+// client's own debounce guard. No search term or result is ever
+// logged (CLAUDE.md rule 12, extended to PII by the 2026-11-21
+// invite-list task — same posture here: a name/email typed into this
+// box is exactly that kind of PII).
 export async function GET(request: Request) {
   const adminResult = await requireAdminApi();
   if (!adminResult.ok) {
@@ -47,7 +52,6 @@ export async function GET(request: Request) {
     }),
     prisma.user.findMany({
       where: {
-        status: "active",
         OR: [
           { displayName: { contains: query, mode: "insensitive" } },
           { username: { contains: query, mode: "insensitive" } },
@@ -56,7 +60,16 @@ export async function GET(request: Request) {
       },
       orderBy: { joinedAt: "desc" },
       take: SEARCH_MAX_RESULTS,
-      select: { id: true, displayName: true, username: true, email: true, status: true, joinedAt: true, createdAt: true },
+      select: {
+        id: true,
+        displayName: true,
+        username: true,
+        email: true,
+        status: true,
+        joinedAt: true,
+        createdAt: true,
+        isTest: true,
+      },
     }),
   ]);
 
@@ -76,6 +89,7 @@ export async function GET(request: Request) {
     handle: m.username,
     status: m.status,
     createdAt: (m.joinedAt ?? m.createdAt).toISOString(),
+    isTest: m.isTest,
   }));
 
   return NextResponse.json({ results: mergeSearchResults(applicantResults, memberResults) });

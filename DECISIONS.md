@@ -5139,3 +5139,118 @@ statement. **Migration NOT applied, nothing pushed** — both await
 explicit go-ahead, per the task's own closing instruction. CLAUDE.md
 updated with a changelog entry and a clarifying note at the `/?ref=`
 rule itself, per the task's explicit ask.
+
+### 2026-11-22 — GO-AHEAD applied; Toma2 visibility fix; Delete account; Vouch link
+
+**Migration applied.** Backup first
+(`obsidian-club-backup-2026-11-22T13-55-10-942Z.json`, 745,593 bytes,
+49 tables, `~/obsidian-backups/`, perms 600). Applied
+`20261122000000_waitlist_sponsor_fk.sql`. `check:rls`: 49 tables, RLS
+enabled on every one (no new table, so no new RLS surface — expected).
+`prisma migrate diff` (live → schema): empty. Pushed as `3edf9fb`.
+Live BUILD_ID confirmed changed `HdgrxphdNcLukk9yWg73C` →
+`TSXNGepbyvuLzI-fP5L2c`.
+
+**Why @hfjhgfhfffjnkn_ ("Тома2," member #0004) was invisible.** Looked
+up the row directly: `status: "inactive"`, `isTest: false`. Both
+`admin/page.tsx`'s People-zone list AND the brand-new `GET /api/admin/
+search` filtered members to `status: "active"` — an inactive (or
+banned) member was excluded from search entirely, not just
+unlabeled. Fix, scoped to search only (not the default People-zone
+list, which stays active-only on purpose — that default view's whole
+point is "currently active members," same as `StatusBar`'s
+`membersTotal` stat): `GET /api/admin/search`'s User query drops the
+status filter, so any member is findable regardless of status; `GET
+/api/admin/members/:id` already had no status filter (confirmed by
+reading it, not assumed) — a search result for an inactive member
+already opened correctly once found, the bug was purely in not being
+findable at all. Added `isTest` to the search route's `select` and to
+`AdminSearchResult`, rendered as the same "Test" tag the People list
+already shows, so "all users findable, test accounts labelled TEST"
+holds in the one place it didn't before.
+
+**"Delete account."** Audited every live foreign key referencing
+`users.id` via `pg_constraint` before writing a line of this —
+not assumed from `schema.prisma`'s own `@relation` annotations, several
+of which carry no explicit `onDelete` at all. Findings (full table in
+this session's own tool output): most are already `CASCADE`
+(`bonds` — **both** `from_user_id` and `to_user_id`, confirming the
+task's own "confirm Bond rows are cleaned up" item — and
+`push_subscriptions`, also named in the task) or `SET NULL`
+(`users.partner_id`/`invited_by`, `waitlist.invited_by`, and others) —
+both auto-handled by `prisma.user.delete()` alone, nothing to write.
+What's genuinely `RESTRICT`/`NO ACTION` and would
+throw a real FK violation on the very first attempt — `legal_consents`
+alone blocks every registered member, since everyone has at least one
+from joining — is deleted explicitly in dependency order inside one
+transaction: `threads` (cascades `direct_messages` +
+`thread_participants` — **this does mean a deleted member's DM
+threads disappear for the other party too**, surfaced in the preview
+and the confirm dialog, not hidden), `posts` (cascades their own
+comments/likes/images), remaining `comments`, `messages`, `reviews`,
+`reports` filed, `legal_consents`, `age_verifications`, `admin_notes`
+they authored about *other* members (notes *about* this member cascade
+automatically via `member_id`), `referrals`, `marketplace_items`. One
+exception, handled differently on purpose: `moderation_actions.
+admin_id` (nullable) gets nulled with `actorLabel` swapped to
+`deleted-admin:<name>` rather than deleted — that's someone else's
+moderation history, erasing it would be wrong even though this member
+is gone. Logged via `logModerationAction()` (`action: "member.
+deleted"`) **after** deletion succeeds — `targetId` has no FK
+(bare polymorphic uuid, same as every other `targetId` in that table),
+so pointing it at a just-deleted user is safe. The Supabase Auth
+identity is deleted last, outside the Prisma transaction, specifically
+so a failure there logs "needs manual follow-up" rather than leaving
+the app-side data half-deleted — the owner's own instruction was NOT
+to delete Toma2, so this path is built and tested by inspection/tsc/
+build only, never actually run against a real account in this
+session.
+
+Guardrails beyond what was asked, flagged for visibility: an admin
+cannot delete their own account through this route (422), and cannot
+delete another `isAdmin` account through it either (422) — both
+rejections, not silent no-ops. Typed-confirmation is `ConfirmDialog`'s
+own existing component, extended with an optional `requireTypedText`
+prop (Confirm disabled until the typed value matches exactly) rather
+than a second dialog component — the task's own wording ("ConfirmDialog
+with typed-username confirmation") read as "extend it," not "replace
+it." The confirmation text is the member's `username` when they have
+one, else `displayName` (username is nullable — see its own schema
+comment) — re-checked server-side, never trusting the client's own
+disabled-button state. "Logged to admin_access_log," as the task's own
+item 1b literally named it, is **not** what that table is for — its
+own schema comment and the Security zone's own code both say "one row
+per successful step-up," a narrower, different thing than a general
+admin-action audit log. Used `logModerationAction()`/`ModerationAction`
+instead, the table this codebase already has for exactly this purpose
+(every other destructive admin action already logs there) — flagging
+the substitution rather than silently picking one.
+
+Counts preview: `GET /api/admin/members/:id/delete-preview`, a
+separate on-demand route (not extra fields on every `Person`, which
+would run several extra `count()` queries for every one of the 50
+people loaded on every page view, almost none of whom anyone will
+ever try to delete).
+
+**"Vouch for someone."** Every member already has a `referralCode`
+(generated at account creation) — reused as-is; nothing new to create
+or store. A quiet third card on `/hall`'s existing "My Invitation"
+section (Hall *is* the Profile tab in this app's nav — satisfies the
+task's "profile menu" placement without inventing a new page), right
+after the invite/partner cards: a link to `/invitation?sponsor=
+<code>`, `CopyShareLink` (now taking optional `copyLabel`/`shareLabel`
+props, defaulting to its original hardcoded text so every existing
+call site is unchanged) for the actual copy/share action. No counts,
+no "N people used your link," no list — exactly as asked. Deliberately
+does **not** touch the permanently-retired `REFERRALS_UI_ENABLED`
+block a few lines above it in the same file (that one stays off for
+good, per its own comment) — this is new, separate surface, not a
+revival.
+
+`npx tsc --noEmit`, lint clean (same one pre-existing warning), `npm
+test` (357 passing, 4 new — 3 in `account-deletion.test.ts`, plus the
+route-guard inventory picking up the new `delete-preview` route
+automatically), `npm run build` clean, all new/changed routes
+confirmed in the build output. Toma2 was **not** deleted, per
+instruction — the fix and the feature are both built and verified by
+inspection, not exercised against that specific account.

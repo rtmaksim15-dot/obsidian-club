@@ -5,6 +5,22 @@ import type { Person } from "./AdminConsole";
 import { levelName } from "@/lib/rating/levels";
 import { formatAdminDateTime as formatDate, formatAdminDateOnly as formatDay } from "@/lib/admin/format-date";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
+import { deletionConfirmationText } from "@/lib/admin/account-deletion";
+
+type DeletePreviewCounts = {
+  posts: number;
+  comments: number;
+  messages: number;
+  directMessageThreads: number;
+  reviews: number;
+  reportsFiled: number;
+  legalConsents: number;
+  ageVerifications: number;
+  adminNotesAuthored: number;
+  bonds: number;
+  pushSubscriptions: number;
+  moderationActionsAsAdmin: number;
+};
 
 // Zone 2 full depth (2026-09-11, see DECISIONS.md). Reuses the existing
 // PATCH /api/admin/members/[id] action route unchanged for the
@@ -23,11 +39,13 @@ export default function PersonDetail({
   onUpdate,
   onNavigateToPerson,
   onNavigateToApplication,
+  onDeleted,
 }: {
   person: Person;
   onUpdate: (id: string, patch: Partial<Person>) => void;
   onNavigateToPerson: (id: string) => void;
   onNavigateToApplication: (id: string) => void;
+  onDeleted: (id: string) => void;
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,6 +61,12 @@ export default function PersonDetail({
   // Clean Hall, B6 (Package 5, Phase B, 2026-10-14, see DECISIONS.md)
   const [testPending, setTestPending] = useState(false);
   const [testError, setTestError] = useState<string | null>(null);
+  // Delete account (2026-11-22, see DECISIONS.md)
+  const [deletePreview, setDeletePreview] = useState<DeletePreviewCounts | null>(null);
+  const [deletePreviewLoading, setDeletePreviewLoading] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   async function addNote() {
     const text = noteDraft.trim();
@@ -104,6 +128,45 @@ export default function PersonDetail({
       setTestError(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
       setTestPending(false);
+    }
+  }
+
+  // Delete account (2026-11-22, see DECISIONS.md) — fetches the
+  // counts preview first, THEN opens the typed-confirmation dialog, so
+  // "shows counts of what will be removed" is answered before the
+  // admin ever sees a Confirm button, not buried inside it.
+  async function startDelete() {
+    setDeleteError(null);
+    setDeletePreviewLoading(true);
+    try {
+      const res = await fetch(`/api/admin/members/${person.id}/delete-preview`);
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || "Something went wrong.");
+      setDeletePreview(json.counts);
+      setConfirmingDelete(true);
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : "Something went wrong.");
+    } finally {
+      setDeletePreviewLoading(false);
+    }
+  }
+
+  async function performDelete() {
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/admin/members/${person.id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmUsername: deletionConfirmationText(person) }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || "Something went wrong.");
+      setConfirmingDelete(false);
+      onDeleted(person.id);
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : "Something went wrong.");
+      setDeleteBusy(false);
     }
   }
 
@@ -442,6 +505,54 @@ export default function PersonDetail({
           </p>
         ) : null}
       </div>
+
+      {/* Delete account (2026-11-22, see DECISIONS.md) — real
+          deletion, not a flag. Admin accounts and the admin's own
+          account are rejected server-side; this button is always
+          shown (no client-side gate duplicating that check) since the
+          error message alone explains it clearly enough on the rare
+          attempt. */}
+      <div className="mt-6 border-t border-ob-border pt-4">
+        <p className="text-label mb-2" style={{ color: "var(--color-error)" }}>
+          Danger Zone
+        </p>
+        <button type="button" className="btn-danger" disabled={deletePreviewLoading} onClick={startDelete}>
+          {deletePreviewLoading ? "…" : "Delete Account"}
+        </button>
+        {deleteError ? (
+          <p className="text-caption mt-2" style={{ color: "var(--color-error)" }}>
+            {deleteError}
+          </p>
+        ) : null}
+      </div>
+
+      {confirmingDelete && deletePreview ? (
+        <ConfirmDialog
+          title={[
+            `Permanently delete ${person.displayName}'s account?`,
+            "This cannot be undone. The following will be removed:",
+            `${deletePreview.posts} post(s), ${deletePreview.comments} comment(s), ${deletePreview.messages} room message(s)`,
+            `${deletePreview.directMessageThreads} DM thread(s) (both sides' messages), ${deletePreview.reviews} review(s)`,
+            `${deletePreview.reportsFiled} report(s) filed, ${deletePreview.legalConsents} consent record(s), ${deletePreview.ageVerifications} age-verification attempt(s)`,
+            `${deletePreview.bonds} bond(s), ${deletePreview.pushSubscriptions} push subscription(s), ${deletePreview.adminNotesAuthored} note(s) they wrote about other members`,
+            deletePreview.moderationActionsAsAdmin > 0
+              ? `${deletePreview.moderationActionsAsAdmin} moderation action(s) they took as admin will be kept but anonymized, not deleted.`
+              : "",
+            "Their partner pair, who invited them, and everyone they sponsored or invited will simply lose that link, not be deleted themselves.",
+            "Their sign-in is deleted too — they will not be able to log in again.",
+          ]
+            .filter(Boolean)
+            .join("\n")}
+          confirmLabel="Delete Account"
+          busy={deleteBusy}
+          requireTypedText={deletionConfirmationText(person)}
+          onConfirm={performDelete}
+          onCancel={() => {
+            setConfirmingDelete(false);
+            setDeleteError(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

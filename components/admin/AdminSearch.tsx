@@ -91,6 +91,17 @@ export default function AdminSearch({ onSelect }: { onSelect: (result: AdminSear
                           @{r.handle}
                         </span>
                       ) : null}
+                      {/* Clean Hall (2026-11-22, see DECISIONS.md) — a test
+                          account is now findable here same as any other;
+                          this is the label that distinguishes it. */}
+                      {r.isTest ? (
+                        <span
+                          className="text-caption ml-2 rounded-ob border px-1.5 py-0.5 uppercase tracking-brand"
+                          style={{ borderColor: "var(--color-warning)", color: "var(--color-warning)" }}
+                        >
+                          Test
+                        </span>
+                      ) : null}
                     </p>
                     <p className="text-caption mt-0.5" style={{ color: "var(--color-text-muted)" }}>
                       {r.type === "applicant" ? "Applicant" : "Member"} · {r.status} · {formatAdminDateTime(r.createdAt)}

@@ -465,6 +465,14 @@ export default function AdminConsole({
     setPeople((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   }
 
+  // Delete account (2026-11-22, see DECISIONS.md) — the account is
+  // genuinely gone server-side by the time this fires; mirror that
+  // here instead of leaving a stale row the next click would 404 on.
+  function deletePerson(id: string) {
+    setPeople((prev) => prev.filter((p) => p.id !== id));
+    setOpenId(null);
+  }
+
   function updateReport(id: string, patch: Partial<ReportRow>) {
     setReports((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   }
@@ -1008,6 +1016,7 @@ export default function AdminConsole({
                 onUpdate={updatePerson}
                 onNavigateToPerson={navigateToPerson}
                 onNavigateToApplication={navigateToApplication}
+                onDeleted={deletePerson}
               />
             ) : null}
             {openReport ? (
