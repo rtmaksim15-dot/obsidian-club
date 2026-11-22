@@ -5335,3 +5335,25 @@ section is present."
 
 `npx tsc --noEmit`, lint clean (same one pre-existing warning), `npm
 test` (371 passing, 14 new), `npm run build` clean.
+
+### 2026-11-22 — Delete account simplified: one-click confirm
+
+By instruction: removed the typed-username confirmation step. Flow is
+now click "Delete account" → `ConfirmDialog` with the same counts
+summary as before → "Delete"/"Cancel", one click. `ConfirmDialog`
+reverted to its original shape (the `requireTypedText` prop added for
+this feature had no other caller, so removed entirely rather than
+left as dead optional API); `lib/admin/account-deletion.ts`'s
+`deletionConfirmationText()` dropped along with its 2 tests, since
+nothing calls it anymore — `deletedAdminActorLabel()` (moderation-
+action anonymization on delete) is untouched. `DELETE /api/admin/
+members/:id` no longer reads or checks a request body at all.
+Step-up (middleware.ts, unchanged), the `logModerationAction()` audit
+record (unchanged), and the backup-before-any-production-change
+practice (an operational step for whoever runs this, not something
+in the code) are all exactly as before — only the extra typing step
+is gone.
+
+`npx tsc --noEmit`, lint clean (same one pre-existing warning), `npm
+test` (369 passing — 2 fewer, the removed `deletionConfirmationText`
+tests), `npm run build` clean.

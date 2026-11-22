@@ -6,7 +6,6 @@ import { levelName } from "@/lib/rating/levels";
 import { formatAdminDateTime as formatDate, formatAdminDateOnly as formatDay } from "@/lib/admin/format-date";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
 import LinkedAccountsSection from "./LinkedAccountsSection";
-import { deletionConfirmationText } from "@/lib/admin/account-deletion";
 
 type DeletePreviewCounts = {
   posts: number;
@@ -132,10 +131,11 @@ export default function PersonDetail({
     }
   }
 
-  // Delete account (2026-11-22, see DECISIONS.md) — fetches the
-  // counts preview first, THEN opens the typed-confirmation dialog, so
-  // "shows counts of what will be removed" is answered before the
-  // admin ever sees a Confirm button, not buried inside it.
+  // Delete account (2026-11-22, see DECISIONS.md; simplified to a
+  // single click 2026-11-22) — fetches the counts preview first, THEN
+  // opens the confirm dialog, so "shows counts of what will be
+  // removed" is answered before the admin ever sees a Confirm button,
+  // not buried inside it.
   async function startDelete() {
     setDeleteError(null);
     setDeletePreviewLoading(true);
@@ -156,11 +156,7 @@ export default function PersonDetail({
     setDeleteBusy(true);
     setDeleteError(null);
     try {
-      const res = await fetch(`/api/admin/members/${person.id}`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirmUsername: deletionConfirmationText(person) }),
-      });
+      const res = await fetch(`/api/admin/members/${person.id}`, { method: "DELETE" });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json?.error || "Something went wrong.");
       setConfirmingDelete(false);
@@ -494,7 +490,6 @@ export default function PersonDetail({
             .join("\n")}
           confirmLabel="Delete Account"
           busy={deleteBusy}
-          requireTypedText={deletionConfirmationText(person)}
           onConfirm={performDelete}
           onCancel={() => {
             setConfirmingDelete(false);

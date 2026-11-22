@@ -5,13 +5,11 @@ import { logModerationAction } from "@/lib/moderation/log";
 import { MIN_MEMBER_AGE } from "@/lib/legal/eligibility";
 import { resolveAvatarUrls } from "@/lib/storage/resolve-media";
 import { mergeBroughtIn, resolveBondsForPerson } from "@/lib/admin/linked-accounts";
-import { deletedAdminActorLabel, deletionConfirmationText } from "@/lib/admin/account-deletion";
+import { deletedAdminActorLabel } from "@/lib/admin/account-deletion";
 import { createAdminClient } from "@/lib/auth/supabase-admin";
 import { errCode } from "@/lib/utils/safe-error";
 
 type Body = { ageVerified?: boolean; removeAvatar?: boolean; removeAvatarReason?: string; isTest?: boolean };
-
-type DeleteBody = { confirmUsername?: string };
 
 // GET /api/admin/members/:id (2026-11-22, see DECISIONS.md) — the
 // single-row counterpart to admin/page.tsx's bulk members fetch, for
@@ -249,9 +247,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 }
 
 // DELETE /api/admin/members/:id (2026-11-22, see DECISIONS.md) — real
-// account deletion, not a soft flag. Gated by typed-username
-// confirmation in the dialog (ConfirmDialog's requireTypedText) AND
-// again here server-side (never trust the client did the check).
+// account deletion, not a soft flag. One-click confirm in the dialog
+// (simplified 2026-11-22 — the typed-username step this started with
+// was dropped by instruction); requireAdminApi() + the step-up/idle
+// gate in middleware.ts are the actual access control, unchanged.
 //
 // FK-safe by construction, not by hope: audited every live foreign key
 // referencing users.id via pg_constraint before writing this (see
@@ -278,7 +277,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 //   AN ADMIN get adminId nulled (nullable column) + actorLabel
 //   swapped, never deleted — that's someone ELSE's moderation history,
 //   not this member's own content.
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
   const adminResult = await requireAdminApi();
   if (!adminResult.ok) {
     return adminResult.response;
@@ -298,18 +297,6 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   }
   if (target.isAdmin) {
     return NextResponse.json({ error: "Cannot delete an admin account through this action." }, { status: 422 });
-  }
-
-  let body: DeleteBody;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid request." }, { status: 400 });
-  }
-
-  const expected = deletionConfirmationText(target);
-  if (body.confirmUsername !== expected) {
-    return NextResponse.json({ error: "Confirmation text did not match." }, { status: 422 });
   }
 
   const actorLabel = deletedAdminActorLabel(target.displayName);
