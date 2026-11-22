@@ -4,6 +4,7 @@ import { requireAdminApi } from "@/lib/auth/require-admin";
 import { logModerationAction } from "@/lib/moderation/log";
 import { MIN_MEMBER_AGE } from "@/lib/legal/eligibility";
 import { resolveAvatarUrls } from "@/lib/storage/resolve-media";
+import { mergeBroughtIn, resolveBondsForPerson } from "@/lib/admin/linked-accounts";
 
 type Body = { ageVerified?: boolean; removeAvatar?: boolean; removeAvatarReason?: string; isTest?: boolean };
 
@@ -26,7 +27,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     where: { id: params.id },
     include: {
       invitedBy: { select: { displayName: true } },
-      invitees: { select: { displayName: true } },
+      invitees: { select: { id: true, displayName: true } },
       partner: { select: { displayName: true } },
       partnerOf: { select: { displayName: true } },
       ageVerifications: { orderBy: { createdAt: "desc" }, take: 1 },
@@ -40,7 +41,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     return NextResponse.json({ error: "Member not found." }, { status: 404 });
   }
 
-  const [postCount, commentCount, moderationActionRows, [avatarUrl]] = await Promise.all([
+  const [postCount, commentCount, moderationActionRows, [avatarUrl], sponsoredApplicantRows, bondRows] = await Promise.all([
     prisma.post.count({ where: { authorId: p.id, isPublished: true } }),
     prisma.comment.count({ where: { authorId: p.id, isDeleted: false } }),
     prisma.moderationAction.findMany({
@@ -49,6 +50,24 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       include: { admin: { select: { displayName: true } } },
     }),
     resolveAvatarUrls([p.avatarUrl]),
+    // Linked accounts (2026-11-22, see DECISIONS.md) — applicants who
+    // used this member's sponsor code but haven't registered yet.
+    prisma.waitlist.findMany({
+      where: { invitedBy: p.id },
+      select: { id: true, name: true, email: true, status: true },
+    }),
+    prisma.bond.findMany({
+      where: { OR: [{ fromUserId: p.id }, { toUserId: p.id }] },
+      select: {
+        id: true,
+        kind: true,
+        status: true,
+        fromUserId: true,
+        toUserId: true,
+        fromUser: { select: { displayName: true } },
+        toUser: { select: { displayName: true } },
+      },
+    }),
   ]);
 
   return NextResponse.json({
@@ -72,9 +91,26 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       joinedAt: p.joinedAt ? p.joinedAt.toISOString() : null,
       postCount,
       commentCount,
+      invitedById: p.invitedById,
       invitedByName: p.invitedBy?.displayName ?? null,
-      inviteeNames: p.invitees.map((u) => u.displayName),
+      partnerId: p.partnerId,
       partnerName: p.partner?.displayName ?? p.partnerOf?.displayName ?? null,
+      broughtIn: mergeBroughtIn(
+        p.invitees,
+        sponsoredApplicantRows.map((w) => ({ id: w.id, displayName: w.name || w.email, status: w.status })),
+      ),
+      bonds: resolveBondsForPerson(
+        p.id,
+        bondRows.map((b) => ({
+          id: b.id,
+          kind: b.kind,
+          status: b.status,
+          fromUserId: b.fromUserId,
+          toUserId: b.toUserId,
+          fromUserName: b.fromUser.displayName,
+          toUserName: b.toUser.displayName,
+        })),
+      ),
       repHistory: p.repHistory.map((r) => ({
         id: r.id,
         delta: r.delta,

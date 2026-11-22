@@ -21,9 +21,13 @@ import ConfirmDialog from "@/components/shared/ConfirmDialog";
 export default function PersonDetail({
   person,
   onUpdate,
+  onNavigateToPerson,
+  onNavigateToApplication,
 }: {
   person: Person;
   onUpdate: (id: string, patch: Partial<Person>) => void;
+  onNavigateToPerson: (id: string) => void;
+  onNavigateToApplication: (id: string) => void;
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -272,14 +276,73 @@ export default function PersonDetail({
         ) : null}
       </div>
 
-      {person.invitedByName || person.inviteeNames.length > 0 || person.partnerName ? (
+      {/* Linked accounts (2026-11-22, see DECISIONS.md) — Partner
+          (invite-time pairing, User.partnerId — the field that backs
+          the public profile's own "Partner of" line), Bonds (the
+          separate, member-declared partner/dominant_of/submissive_of
+          model), Invited by / People they brought in (direct
+          member-invite-link registrations plus applicants who used
+          this member's sponsor code but haven't registered yet).
+          Every link here reuses the SAME zone-switch-and-open
+          mechanism AdminSearch's own result-click does — see
+          AdminConsole#handleSearchSelect. */}
+      {person.partnerName || person.invitedByName || person.broughtIn.length > 0 || person.bonds.length > 0 ? (
         <div className="mt-6 border-t border-ob-border pt-4">
-          <p className="text-label mb-2">Connections</p>
-          {person.invitedByName ? <p className="text-caption">Invited by {person.invitedByName}</p> : null}
-          {person.inviteeNames.length > 0 ? (
-            <p className="text-caption mt-1">Invited: {person.inviteeNames.join(", ")}</p>
+          <p className="text-label mb-2">Linked Accounts</p>
+          {person.partnerName && person.partnerId ? (
+            <p className="text-caption">
+              Partner of{" "}
+              <button type="button" className="underline" onClick={() => onNavigateToPerson(person.partnerId!)}>
+                {person.partnerName}
+              </button>
+            </p>
           ) : null}
-          {person.partnerName ? <p className="text-caption mt-1">Partner of {person.partnerName}</p> : null}
+          {person.invitedByName && person.invitedById ? (
+            <p className="text-caption mt-1">
+              Invited by{" "}
+              <button type="button" className="underline" onClick={() => onNavigateToPerson(person.invitedById!)}>
+                {person.invitedByName}
+              </button>
+            </p>
+          ) : null}
+          {person.bonds.length > 0 ? (
+            <div className="mt-2">
+              <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
+                Bonds
+              </p>
+              <ul className="mt-1 space-y-1">
+                {person.bonds.map((b) => (
+                  <li key={b.id} className="text-caption">
+                    {b.kind.replace(/_/g, " ")} ({b.status}) —{" "}
+                    <button type="button" className="underline" onClick={() => onNavigateToPerson(b.otherId)}>
+                      {b.otherName}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {person.broughtIn.length > 0 ? (
+            <div className="mt-2">
+              <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
+                People they brought in ({person.broughtIn.length})
+              </p>
+              <ul className="mt-1 space-y-1">
+                {person.broughtIn.map((b) => (
+                  <li key={`${b.type}-${b.id}`} className="text-caption">
+                    <button
+                      type="button"
+                      className="underline"
+                      onClick={() => (b.type === "member" ? onNavigateToPerson(b.id) : onNavigateToApplication(b.id))}
+                    >
+                      {b.displayName}
+                    </button>{" "}
+                    <span style={{ color: "var(--color-text-muted)" }}>({b.status})</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </div>
       ) : null}
 

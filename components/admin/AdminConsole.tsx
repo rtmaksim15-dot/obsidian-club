@@ -90,6 +90,13 @@ export type Application = {
   registered: boolean | null;
   memberAgeVerified: boolean | null;
   memberOnboardingComplete: boolean | null;
+  // Linked accounts: sponsor tracking for admin vetting (2026-11-22,
+  // see DECISIONS.md) — admin-only, never shown to members, no
+  // rewards/REP/counts. sponsorId resolves to a real active member
+  // only when the submitted code matched one; referralCode above is
+  // the raw code as submitted, kept even on a non-match.
+  sponsorId: string | null;
+  sponsorName: string | null;
 };
 // Zone 2 full depth (2026-09-11) — REP/level (+RepHistory), post/
 // comment counts, invited-by/invited-whom/partner, LegalConsent history
@@ -122,9 +129,14 @@ export type Person = {
   joinedAt: string | null;
   postCount: number;
   commentCount: number;
+  invitedById: string | null;
   invitedByName: string | null;
-  inviteeNames: string[];
+  partnerId: string | null;
   partnerName: string | null;
+  // Linked accounts (2026-11-22, see DECISIONS.md) — see
+  // lib/admin/linked-accounts.ts for how these two are built.
+  broughtIn: { id: string; type: "member" | "applicant"; displayName: string; status: string }[];
+  bonds: { id: string; kind: string; status: string; otherId: string; otherName: string; direction: "from" | "to" }[];
   repHistory: { id: string; delta: number; reason: string | null; source: string | null; createdAt: string }[];
   consents: {
     id: string;
@@ -422,6 +434,21 @@ export default function AdminConsole({
       }
       setOpenId(result.id);
     }
+  }
+
+  // Linked accounts (2026-11-22, see DECISIONS.md) — a partner/sponsor/
+  // bond/brought-in chip inside a detail panel links to the OTHER
+  // record by id alone (no AdminSearchResult in hand), so this reuses
+  // handleSearchSelect's exact same "fetch if not already loaded, then
+  // open" logic with a minimal stand-in result rather than duplicating
+  // it. Every one of these links points at a member except the
+  // "brought in" list's pending-applicant entries, which is the one
+  // case navigateToApplication is for.
+  function navigateToPerson(id: string) {
+    void handleSearchSelect({ id, type: "member", displayName: "", handle: null, status: "", createdAt: "" });
+  }
+  function navigateToApplication(id: string) {
+    void handleSearchSelect({ id, type: "applicant", displayName: "", handle: null, status: "", createdAt: "" });
   }
 
   function selectStat(nextZone: Zone, nextFilter: Filter) {
@@ -760,7 +787,19 @@ export default function AdminConsole({
                     }
                     onClick={() => setOpenId(a.id)}
                   >
-                    <p className="text-data">{a.name || a.email}</p>
+                    <p className="text-data">
+                      {a.name || a.email}
+                      {/* Linked accounts (2026-11-22, see DECISIONS.md) — sponsor badge. */}
+                      {a.sponsorId ? (
+                        <span
+                          className="ml-2"
+                          title={`Sponsored by ${a.sponsorName ?? "a member"}`}
+                          style={{ color: "var(--color-accent)" }}
+                        >
+                          ↳
+                        </span>
+                      ) : null}
+                    </p>
                     <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
                       {a.status}
                       {a.status === "approved" && a.reviewedAt ? ` · accepted ${formatAdminDateTime(a.reviewedAt)}` : ""}
@@ -806,6 +845,17 @@ export default function AdminConsole({
                           style={{ borderColor: "var(--color-warning)", color: "var(--color-warning)" }}
                         >
                           Test
+                        </span>
+                      ) : null}
+                      {/* Linked accounts (2026-11-22, see DECISIONS.md) — partner/invited-by badges. */}
+                      {p.partnerId ? (
+                        <span className="ml-2" title={`Partner of ${p.partnerName ?? "a member"}`} style={{ color: "var(--color-accent)" }}>
+                          ♦
+                        </span>
+                      ) : null}
+                      {p.invitedById ? (
+                        <span className="ml-1" title={`Invited by ${p.invitedByName ?? "a member"}`} style={{ color: "var(--color-accent)" }}>
+                          ↳
                         </span>
                       ) : null}
                     </p>
@@ -949,9 +999,17 @@ export default function AdminConsole({
                 application={openApplication}
                 onUpdate={updateApplication}
                 onClose={() => setOpenId(null)}
+                onNavigateToPerson={navigateToPerson}
               />
             ) : null}
-            {openPerson ? <PersonDetail person={openPerson} onUpdate={updatePerson} /> : null}
+            {openPerson ? (
+              <PersonDetail
+                person={openPerson}
+                onUpdate={updatePerson}
+                onNavigateToPerson={navigateToPerson}
+                onNavigateToApplication={navigateToApplication}
+              />
+            ) : null}
             {openReport ? (
               <ReportDetail report={openReport} onUpdate={updateReport} onClose={() => setOpenId(null)} />
             ) : null}

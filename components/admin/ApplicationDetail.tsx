@@ -47,7 +47,8 @@ const ApplicationDetail = forwardRef<ApplicationDetailHandle, {
   application: Application;
   onUpdate: (id: string, patch: Partial<Application>) => void;
   onClose: () => void;
-}>(function ApplicationDetail({ application, onUpdate, onClose }, ref) {
+  onNavigateToPerson: (id: string) => void;
+}>(function ApplicationDetail({ application, onUpdate, onClose, onNavigateToPerson }, ref) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ageVerifiedChecked, setAgeVerifiedChecked] = useState(false);
@@ -161,6 +162,24 @@ const ApplicationDetail = forwardRef<ApplicationDetailHandle, {
       </p>
       {a.reason ? <p className="text-body mt-4 !text-base italic">&ldquo;{a.reason}&rdquo;</p> : null}
       <p className="text-caption mt-3">Applied {formatDate(a.createdAt)}</p>
+
+      {/* Linked accounts (2026-11-22, see DECISIONS.md), requirement 4
+          — shown before approval, since that's when it's most useful:
+          admin-only sponsor tracking, never a public referral program
+          (no rewards/REP/counts). */}
+      {a.sponsorId ? (
+        <div className="mt-6 border-t border-ob-border pt-4">
+          <p className="text-label mb-2">Linked Accounts</p>
+          <button
+            type="button"
+            className="text-caption underline"
+            style={{ color: "var(--color-text-secondary)" }}
+            onClick={() => onNavigateToPerson(a.sponsorId!)}
+          >
+            Sponsored by {a.sponsorName ?? "a member"}
+          </button>
+        </div>
+      ) : null}
 
       <div className="mt-6 border-t border-ob-border pt-4">
         <p className="text-label mb-2">Status</p>

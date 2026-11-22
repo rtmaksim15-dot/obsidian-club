@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/auth/require-admin";
 import { isStepUpSecretConfigured } from "@/lib/auth/admin-stepup";
 import { prisma } from "@/lib/db/prisma";
 import { TOKEN_SELECT, shapeTokenRow, sortTokensFailedFirst } from "@/lib/admin/token-shape";
+import { mergeBroughtIn, resolveBondsForPerson } from "@/lib/admin/linked-accounts";
 import { isRitualComplete } from "@/lib/auth/ritual";
 import { resolveAvatarUrls } from "@/lib/storage/resolve-media";
 import AdminConsole from "@/components/admin/AdminConsole";
@@ -173,6 +174,7 @@ export default async function AdminConsolePage() {
         source: true,
         reason: true,
         referralCode: true,
+        invitedBy: true,
         origin: true,
         status: true,
         createdAt: true,
@@ -380,7 +382,8 @@ export default async function AdminConsolePage() {
     : [];
   const linkedWaitlistByEmail = new Map(linkedWaitlistRows.map((w) => [w.email, w]));
 
-  const [postCounts, commentCounts, invitees, repHistoryRows, consentRows, adminActionRows, adminNoteRows] = await Promise.all([
+  const [postCounts, commentCounts, invitees, repHistoryRows, consentRows, adminActionRows, adminNoteRows, sponsoredApplicantRows, bondRows] =
+    await Promise.all([
     prisma.post.groupBy({
       by: ["authorId"],
       where: { authorId: { in: peopleIds }, isPublished: true },
@@ -393,7 +396,7 @@ export default async function AdminConsolePage() {
     }),
     prisma.user.findMany({
       where: { invitedById: { in: peopleIds } },
-      select: { invitedById: true, displayName: true },
+      select: { id: true, invitedById: true, displayName: true },
     }),
     prisma.repHistory.findMany({
       where: { userId: { in: peopleIds } },
@@ -411,16 +414,63 @@ export default async function AdminConsolePage() {
       where: { memberId: { in: peopleIds } },
       orderBy: { createdAt: "desc" },
     }),
+    // Linked accounts (2026-11-22, see DECISIONS.md) — applicants who
+    // used this member's sponsor code but haven't registered yet (no
+    // User row to show up in the `invitees` query above).
+    prisma.waitlist.findMany({
+      where: { invitedBy: { in: peopleIds } },
+      select: { id: true, invitedBy: true, name: true, email: true, status: true },
+    }),
+    // Linked accounts: every Bond (partner/dominant_of/submissive_of,
+    // member-declared, separate from the invite-time partnerId pairing
+    // below) touching any listed member, from either side.
+    prisma.bond.findMany({
+      where: { OR: [{ fromUserId: { in: peopleIds } }, { toUserId: { in: peopleIds } }] },
+      select: {
+        id: true,
+        kind: true,
+        status: true,
+        fromUserId: true,
+        toUserId: true,
+        fromUser: { select: { displayName: true } },
+        toUser: { select: { displayName: true } },
+      },
+    }),
   ]);
 
   const postCountById = new Map(postCounts.map((r) => [r.authorId, r._count._all]));
   const commentCountById = new Map(commentCounts.map((r) => [r.authorId, r._count._all]));
-  const inviteesById = new Map<string, string[]>();
+  const inviteesById = new Map<string, { id: string; displayName: string }[]>();
   for (const inv of invitees) {
     if (!inv.invitedById) continue;
     const list = inviteesById.get(inv.invitedById) ?? [];
-    list.push(inv.displayName);
+    list.push({ id: inv.id, displayName: inv.displayName });
     inviteesById.set(inv.invitedById, list);
+  }
+  // Linked accounts (2026-11-22, see DECISIONS.md).
+  const sponsoredApplicantsById = new Map<string, { id: string; displayName: string; status: string }[]>();
+  for (const w of sponsoredApplicantRows) {
+    if (!w.invitedBy) continue;
+    const list = sponsoredApplicantsById.get(w.invitedBy) ?? [];
+    list.push({ id: w.id, displayName: w.name || w.email, status: w.status });
+    sponsoredApplicantsById.set(w.invitedBy, list);
+  }
+  const bondsById = new Map<string, Parameters<typeof resolveBondsForPerson>[1]>();
+  for (const b of bondRows) {
+    const row = {
+      id: b.id,
+      kind: b.kind,
+      status: b.status,
+      fromUserId: b.fromUserId,
+      toUserId: b.toUserId,
+      fromUserName: b.fromUser.displayName,
+      toUserName: b.toUser.displayName,
+    };
+    for (const side of [b.fromUserId, b.toUserId]) {
+      const list = bondsById.get(side) ?? [];
+      list.push(row);
+      bondsById.set(side, list);
+    }
   }
   const repHistoryById = new Map<string, typeof repHistoryRows>();
   for (const r of repHistoryRows) {
@@ -610,6 +660,7 @@ export default async function AdminConsolePage() {
     new Set(
       [
         ...applicationsToShow.map((a) => a.reviewedBy),
+        ...applicationsToShow.map((a) => a.invitedBy),
         ...peopleBase.map((p) => p.invitedById),
         ...peopleBase.map((p) => p.partnerId),
         ...adminActionRows.map((m) => m.adminId),
@@ -699,6 +750,8 @@ export default async function AdminConsolePage() {
         registered: a.registered,
         memberAgeVerified: a.memberAgeVerified,
         memberOnboardingComplete: a.memberOnboardingComplete,
+        sponsorId: a.invitedBy,
+        sponsorName: a.invitedBy ? (nameById.get(a.invitedBy) ?? null) : null,
       }))}
       people={peopleBase.map((p, i) => ({
         id: p.id,
@@ -720,9 +773,12 @@ export default async function AdminConsolePage() {
         joinedAt: p.joinedAt ? p.joinedAt.toISOString() : null,
         postCount: postCountById.get(p.id) ?? 0,
         commentCount: commentCountById.get(p.id) ?? 0,
+        invitedById: p.invitedById,
         invitedByName: p.invitedById ? (nameById.get(p.invitedById) ?? null) : null,
-        inviteeNames: inviteesById.get(p.id) ?? [],
+        partnerId: p.partnerId,
         partnerName: p.partnerId ? (nameById.get(p.partnerId) ?? null) : null,
+        broughtIn: mergeBroughtIn(inviteesById.get(p.id) ?? [], sponsoredApplicantsById.get(p.id) ?? []),
+        bonds: resolveBondsForPerson(p.id, bondsById.get(p.id) ?? []),
         repHistory: (repHistoryById.get(p.id) ?? []).map((r) => ({
           id: r.id,
           delta: r.delta,

@@ -62,7 +62,10 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
     );
   }
 
-  const invite = await prisma.inviteToken.findUnique({ where: { token: params.token } });
+  const invite = await prisma.inviteToken.findUnique({
+    where: { token: params.token },
+    include: { waitlistApplication: { select: { invitedBy: true } } },
+  });
   if (!invite) {
     return NextResponse.json({ error: "Invalid invite link." }, { status: 404 });
   }
@@ -182,7 +185,19 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
           // referral-code system's own trust-chain infra, and wiring
           // these three new sources into it wasn't asked for (see
           // TECH_DEBT.md).
-          invitedById: invite.source === "member" ? invite.inviterId : null,
+          // Sponsor tracking for admin vetting (2026-11-22, see
+          // DECISIONS.md): an application-sourced token carries its
+          // originating Waitlist row's own invitedBy (the sponsor code
+          // match made at application time, if any) forward onto the
+          // new member — same field, same "Invited by" meaning, just a
+          // second way to arrive at it besides a direct member-invite
+          // link.
+          invitedById:
+            invite.source === "member"
+              ? invite.inviterId
+              : invite.source === "application"
+                ? (invite.waitlistApplication?.invitedBy ?? null)
+                : null,
           // partner: the redeemer's partnerId points at whoever created
           // the link; the creator's own `partnerOf` resolves to this
           // new user automatically via Prisma's reverse relation — no

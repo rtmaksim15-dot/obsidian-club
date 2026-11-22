@@ -38,6 +38,9 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   }
 
   const reviewer = a.reviewedBy ? await prisma.user.findUnique({ where: { id: a.reviewedBy } }) : null;
+  // Linked accounts (2026-11-22, see DECISIONS.md) — admin-only
+  // sponsor tracking, see Waitlist.sponsor's own schema comment.
+  const sponsor = a.invitedBy ? await prisma.user.findUnique({ where: { id: a.invitedBy } }) : null;
 
   let registered: boolean | null = null;
   let memberAgeVerified: boolean | null = null;
@@ -76,6 +79,8 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       registered,
       memberAgeVerified,
       memberOnboardingComplete,
+      sponsorId: a.invitedBy,
+      sponsorName: sponsor?.displayName ?? null,
     },
   });
 }

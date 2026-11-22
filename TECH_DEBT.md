@@ -1553,3 +1553,19 @@ decision anyone made about them specifically. Flagged in DECISIONS.md
 at the moment the date was changed; not fixed here — it's a real
 product question (should already-onboarded members be exempted from
 this exception?) that this task wasn't asked to resolve.
+
+**Possible-duplicate detection for the admin Linked Accounts feature
+(2026-11-22, see DECISIONS.md) — explicitly deferred, not forgotten.**
+The original ask included flagging "possible duplicate" accounts by
+shared device/IP or email domain. Decided not to build either for
+this task: IP/device capture is new tracking of real applicants/
+members (not just the already-anonymous `EmailCapture.hashedIp`) and
+needs a Privacy Policy update + attorney review first, same protocol
+TECH_DEBT.md's other legal-review items already follow; email-domain
+matching alone was rejected outright (gmail.com etc. would flag nearly
+everyone, pure noise). If IP/device detection is picked up later: the
+one-way `hashIp()` in `lib/security/hash-ip.ts` (keyed by
+`IP_HASH_SALT`) is the existing pattern to reuse, written at
+application/registration time onto new `hashedIp` columns on
+`Waitlist`/`User` — existing rows would read "unknown," by design, not
+backfilled.

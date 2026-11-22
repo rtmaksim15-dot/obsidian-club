@@ -374,6 +374,10 @@ model User {
   privateNotesAuthored  PrivateNote[] @relation("PrivateNoteAuthor")
   privateNotesAboutMe   PrivateNote[] @relation("PrivateNoteSubject")
 
+  // Sponsor tracking for admin vetting (2026-11-22, see DECISIONS.md)
+  // — see Waitlist.sponsor's own comment.
+  sponsoredApplications Waitlist[] @relation("WaitlistSponsor")
+
   @@map("users")
 }
 
@@ -1019,6 +1023,20 @@ model Waitlist {
   // decision-email failures, for the same reason.
   receiptEmailSentAt    DateTime? @map("receipt_email_sent_at")
   receiptEmailSendError String?   @map("receipt_email_send_error")
+
+  // Sponsor tracking for admin vetting (2026-11-22, see DECISIONS.md)
+  // — NOT the public referral program CLAUDE.md keeps permanently off
+  // (no rewards, no REP, no counts, never shown to members): a member
+  // can share their existing referralCode with a prospective applicant
+  // ahead of the application form; this is admin-only context for
+  // reviewing the application, nothing else. `invitedBy` (above)
+  // already existed as a bare uuid with no relation and was never
+  // written by any code path — this adds the actual FK now that it
+  // is. onDelete: SetNull matches the identical, already-live pattern
+  // on users.partner_id/invited_by (confirmed via pg_constraint, not
+  // assumed) — deleting the sponsor's account drops the reference
+  // instead of blocking the delete or leaving it dangling.
+  sponsor User? @relation("WaitlistSponsor", fields: [invitedBy], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
   @@map("waitlist")
 }

@@ -5,6 +5,7 @@ import { track } from "@/lib/analytics/track";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limit";
 import { MIN_MEMBER_AGE } from "@/lib/legal/eligibility";
 import { errCode } from "@/lib/utils/safe-error";
+import { normalizeSponsorCode } from "@/lib/invites/sponsor";
 
 // POST /api/applications — the invitation panel's intake (Invitation
 // Panel flow, A2/A3, 2026-08-2x, see DECISIONS.md). Writes to the same
@@ -23,6 +24,7 @@ type Body = {
   city?: string;
   ageConfirmed?: boolean;
   answer?: string;
+  sponsorCode?: string;
 };
 
 export async function POST(request: NextRequest) {
@@ -59,9 +61,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: `Please write at least ${MIN_ANSWER_LENGTH} characters.` }, { status: 422 });
   }
 
+  // Sponsor tracking for admin vetting (2026-11-22, see DECISIONS.md)
+  // — admin-only context, not the public referral program. The raw
+  // code is stored on `referralCode` even when it doesn't resolve to
+  // a real member (a typo'd/stale code is still a signal worth an
+  // admin seeing); `invitedBy` only gets set when it actually matches
+  // an active member's referralCode.
+  const sponsorCode = normalizeSponsorCode(body.sponsorCode);
+  const sponsor = sponsorCode
+    ? await prisma.user.findFirst({ where: { referralCode: sponsorCode, status: "active" }, select: { id: true } })
+    : null;
+
   try {
     await prisma.waitlist.create({
-      data: { email, name, city, reason: answer, origin: "card" },
+      data: { email, name, city, reason: answer, origin: "card", referralCode: sponsorCode, invitedBy: sponsor?.id ?? null },
     });
     // Only on a genuine new application — not the duplicate/idempotent
     // path below, which isn't a real new submission.

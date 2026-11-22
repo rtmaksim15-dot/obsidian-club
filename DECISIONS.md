@@ -5031,3 +5031,111 @@ login in this session — that needs the owner's own MFA-verified
 session, which this session has no credentials for; the owner should
 give it a look in their own already-open Chrome tab rather than take
 tsc/build cleanliness as a substitute for seeing it render.
+
+### 2026-11-22 — Admin: Linked Accounts, sponsor tracking (migration NOT applied)
+
+Researched before writing anything, per the task's own instruction:
+what does this codebase already store about who's connected to whom?
+Findings — **already exists, fully populated**: `User.partnerId`/
+`partnerOf` (the invite-time pairing that backs the public profile's
+own "Partner of" line — confirmed by reading that page's code, not
+assumed), the separate member-declared `Bond` model (kind `partner`/
+`dominant_of`/`submissive_of`), and `User.invitedById`/`invitees`
+— but that last one **only** for direct member-invite-link
+redemptions. **Already exists, never written** — `Waitlist.invitedBy`
+and `Waitlist.referralCode`: both columns have sat on the table since
+before this session, selected and even displayed
+(`ApplicationDetail.tsx` already had `a.referralCode ? \`code:
+${a.referralCode}\` : null\` in its metadata line) but no code path
+ever wrote either one — every application created via `/api/
+applications`, `/api/waitlist`, or the auth callback omits them
+entirely. **Dead**: the old `Referral` model + `User.referralCode`'s
+original purpose — read by a maturation job, written by nothing,
+leftover from the `/?ref=` system CLAUDE.md already called
+permanently off. **Didn't exist at all**: any device/IP signal tied
+to a real applicant or member (`EmailCapture.hashedIp` is the only
+one, and it's on a table with no identity link to Waitlist/User).
+
+Reported this, then asked two design questions rather than guess:
+whether to build a capture mechanism for application-sponsor tracking
+at all, and whether to add IP/device duplicate detection. Decided:
+**yes** to sponsor tracking, **explicitly scoped as admin-only vetting
+context, not a revival of the referral program** — no rewards, no
+REP, no counts, never shown to members or on profiles (CLAUDE.md's
+`/?ref=` rule gets a clarifying note, not an exception). **No** to
+duplicate detection of any kind this time — IP/device needs a Privacy
+Policy update and attorney review first (TECH_DEBT.md), and
+email-domain alone was rejected outright (flags nearly everyone on
+gmail.com). Linked Accounts, as built, is Partner/Bond + sponsor
+(invited by / brought in) only.
+
+**Sponsor capture.** Reuses each member's own `referralCode` (already
+unique, already generated at registration) as their shareable sponsor
+code — no new per-member code needed. A member hands a prospect a
+link like `/invitation?sponsor=<code>` (the invitation panel's one
+fixed public URL); `InvitationPanelForm.tsx` reads it straight from
+`window.location.search` at submit time (not `useSearchParams()`,
+which would force a Suspense boundary onto an already-client component
+for a value that's only needed once, at submit). `POST /api/
+applications` resolves it against active members' `referralCode`:
+the raw submitted code is stored on `Waitlist.referralCode` **even
+when it doesn't match anyone** (a typo'd or stale code is still a
+signal worth an admin seeing — a non-match isn't silently dropped),
+while `Waitlist.invitedBy` only gets set on an actual match.
+
+**Migration (written, NOT applied)** —
+`supabase/migrations/20261122000000_waitlist_sponsor_fk.sql`: adds the
+actual foreign key `waitlist.invited_by → users.id`, `ON DELETE SET
+NULL`. Checked which `ON DELETE` rule to use by querying
+`pg_constraint` directly against the live DB rather than assuming —
+`users.partner_id` and `users.invited_by` (the two existing self-
+referencing FKs on `User`) are **already** `ON DELETE SET NULL` in
+production, confirmed before writing a single line of schema. This
+directly answers the "deleting Toma2 must dissolve the pair" item:
+**already true today, verified, no code change needed** — Postgres
+already nulls out the other side of `partner_id` (and any
+`invited_by`) automatically on a real delete, regardless of whether
+there's an admin "delete member" action yet (there isn't one — out of
+scope for this task, not asked for). The new FK matches that same
+pattern for consistency. `prisma migrate diff` (live → schema)
+produces exactly this one `ADD CONSTRAINT`, confirmed by running it,
+not just by eyeballing the hand-written SQL.
+
+**Propagation at redemption.** `POST /api/join/[token]` already set
+`User.invitedById` for `source: "member"` tokens; now also carries it
+forward for `source: "application"` tokens, reading the redeemed
+token's own `waitlistApplication.invitedBy` (the Waitlist row's
+resolved sponsor, if any) — one added `include`, no new query. Same
+field, same "Invited by" meaning on the resulting member either way.
+
+**Shared pure logic** — `lib/admin/linked-accounts.ts`
+(`mergeBroughtIn`, `resolveBondsForPerson`, 6 tests) and
+`lib/invites/sponsor.ts` (`normalizeSponsorCode`, 4 tests; kept out of
+`lib/admin` since the public, unauthenticated applications route needs
+it too). Used by both the bulk `admin/page.tsx` fetch and the
+single-row `GET /api/admin/applications/:id` / `GET /api/admin/
+members/:id` endpoints, so the "brought in" merge and the bond
+other-party resolution exist exactly once, not copy-pasted across all
+three call sites.
+
+**UI.** `ApplicationDetail.tsx` gets a "Linked Accounts" section
+**before the approve/hold/decline controls** (the task's own
+instruction — most useful before the decision, not after), showing
+"Sponsored by X" as a link when `sponsorId` is set. `PersonDetail.tsx`'s
+old plain-text "Connections" section is now "Linked Accounts": Partner
+(link), Bonds (link per bond, kind + status), "People they brought in"
+— direct invite-link registrations and still-pending sponsored
+applicants merged into one list, each linking to its own detail. Every
+link reuses `AdminConsole`'s existing search-result navigation
+(`handleSearchSelect`) via two thin wrappers (`navigateToPerson`/
+`navigateToApplication`) rather than a second "open this record" code
+path. List rows get ♦ (partner) and ↳ (invited-by/sponsor) badges,
+`title`-attributed with who.
+
+`npx tsc --noEmit`, lint clean (same one pre-existing warning), `npm
+test` (353 passing, 10 new), `npm run build` clean. `prisma migrate
+diff` against live confirmed to produce exactly the one hand-written
+statement. **Migration NOT applied, nothing pushed** — both await
+explicit go-ahead, per the task's own closing instruction. CLAUDE.md
+updated with a changelog entry and a clarifying note at the `/?ref=`
+rule itself, per the task's explicit ask.

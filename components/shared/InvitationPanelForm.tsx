@@ -33,6 +33,15 @@ export default function InvitationPanelForm() {
     const form = e.currentTarget;
     const formData = new FormData(form);
 
+    // Sponsor tracking for admin vetting (2026-11-22, see DECISIONS.md)
+    // — a member can share this same fixed URL with a prospective
+    // applicant by adding ?sponsor=<their referral code>. Read directly
+    // from the URL rather than useSearchParams(), which would force
+    // this already-client component's page into a Suspense boundary
+    // for no real benefit here — this only needs the value once, at
+    // submit time, not reactively.
+    const sponsorCode = new URLSearchParams(window.location.search).get("sponsor") || undefined;
+
     try {
       const res = await fetch("/api/applications", {
         method: "POST",
@@ -43,6 +52,7 @@ export default function InvitationPanelForm() {
           city: formData.get("city"),
           ageConfirmed: ageAndTruthChecked,
           answer: trimmedAnswer,
+          sponsorCode,
         }),
       });
       if (!res.ok) {
