@@ -133,6 +133,10 @@ export type Person = {
   invitedByName: string | null;
   partnerId: string | null;
   partnerName: string | null;
+  // Shown as "DisplayName @handle" in the Linked Accounts section's
+  // worked example (2026-11-22, see DECISIONS.md) — nullable same as
+  // User.username itself (a partner who hasn't picked one yet).
+  partnerUsername: string | null;
   // Linked accounts (2026-11-22, see DECISIONS.md) — see
   // lib/admin/linked-accounts.ts for how these two are built.
   broughtIn: { id: string; type: "member" | "applicant"; displayName: string; status: string }[];

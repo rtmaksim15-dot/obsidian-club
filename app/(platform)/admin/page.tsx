@@ -675,9 +675,12 @@ export default async function AdminConsolePage() {
     ),
   );
   const nameLookupRows = nameLookupIds.length
-    ? await prisma.user.findMany({ where: { id: { in: nameLookupIds } }, select: { id: true, displayName: true } })
+    ? await prisma.user.findMany({ where: { id: { in: nameLookupIds } }, select: { id: true, displayName: true, username: true } })
     : [];
   const nameById = new Map(nameLookupRows.map((r) => [r.id, r.displayName]));
+  // Linked accounts (2026-11-22, see DECISIONS.md) — only Partner's
+  // worked example asked for "DisplayName @handle" together.
+  const usernameById = new Map(nameLookupRows.map((r) => [r.id, r.username]));
 
   // Profile lite, B7 (Package 4, Phase B, 2026-10-13, see DECISIONS.md)
   // — People zone's avatar thumbnail + "Remove avatar" action need a
@@ -777,6 +780,7 @@ export default async function AdminConsolePage() {
         invitedByName: p.invitedById ? (nameById.get(p.invitedById) ?? null) : null,
         partnerId: p.partnerId,
         partnerName: p.partnerId ? (nameById.get(p.partnerId) ?? null) : null,
+        partnerUsername: p.partnerId ? (usernameById.get(p.partnerId) ?? null) : null,
         broughtIn: mergeBroughtIn(inviteesById.get(p.id) ?? [], sponsoredApplicantsById.get(p.id) ?? []),
         bonds: resolveBondsForPerson(p.id, bondsById.get(p.id) ?? []),
         repHistory: (repHistoryById.get(p.id) ?? []).map((r) => ({

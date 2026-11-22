@@ -5254,3 +5254,84 @@ automatically), `npm run build` clean, all new/changed routes
 confirmed in the build output. Toma2 was **not** deleted, per
 instruction — the fix and the feature are both built and verified by
 inspection, not exercised against that specific account.
+
+### 2026-11-22 — Linked Accounts: always-visible, uniform across every card
+
+Owner checked the live `@toma` card (member, not Тома2 — their
+partner) after the previous entry's deploy and saw no Linked Accounts
+section and no Delete Account button. Before changing anything,
+confirmed git/DB state rather than guessing: `3edf9fb` and `75d66cb`
+were both committed AND pushed (`git log origin/main..HEAD` and the
+reverse were both empty), `waitlist_sponsor_fk` was applied (`prisma
+migrate diff` against live: empty), live BUILD_ID at the time
+(`Z4vzNYs0HbtsRnxzX0n5T`) postdated both pushes — so the previous
+work genuinely was live. The actual gap was a real one in the
+previous design, not a deploy problem: Linked Accounts was built to
+render conditionally (hidden entirely when nothing was linked) and
+positioned near the bottom of `PersonDetail`, below Age Verification/
+Avatar/Test Account — exactly matching what the owner described
+seeing and *not* seeing. `@toma` likely does have a partner (Тома2)
+and should have shown the section; either way, "hidden when empty"
+was the wrong design the moment the instruction became "never hide
+the section."
+
+Redesigned per the clarification: one shared
+`components/admin/LinkedAccountsSection.tsx`, used by both
+`ApplicationDetail` and `PersonDetail`, always rendered, directly
+under the name/email block (moved up in both — it was below "Applied
+{date}" in `ApplicationDetail` and near the bottom in `PersonDetail`),
+showing all four fields unconditionally — **Partner · Bonds ·
+Invited by / Sponsor · Brought in** — "None" per empty field rather
+than omitting it. An application card has no Partner/Bonds/Brought-in
+concept at all (pre-registration) and simply shows "None" for all
+three, by instruction, for a uniform shape across every card type
+rather than a shape that varies by what happens to be empty.
+"Invited by / Sponsor" unifies what were two different labels before
+("Sponsored by X" on applications, "Invited by X" on members) into
+one, and now also surfaces the raw, unmatched sponsor code
+(`Waitlist.referralCode`) when it didn't resolve to a real member —
+`code "xyz" (no match)` — previously only shown as a terse inline
+`code: xyz` in the metadata line, now folded into this section instead
+(removed from that line to avoid showing it twice). Partner also now
+carries the partner's own `username` (new `partnerUsername` field,
+threaded through both `admin/page.tsx`'s bulk query and the single-row
+`GET /api/admin/members/:id`), rendered as "DisplayName @handle"
+per the owner's own worked example — the other three fields stay
+displayName-only, not asked to carry a handle too.
+
+Delete Account was never actually missing — it was already
+unconditional at the bottom of `PersonDetail`, which the owner's
+screenshot-description simply didn't scroll to. No application-card
+equivalent exists or was asked for.
+
+**First component-render tests this repo has had.** `npm test` ran
+"pure logic only" tests exclusively until now (`vitest.config.ts`'s
+own comment: "Node environment only; nothing here needs a DOM").
+Added `@testing-library/react`, `@testing-library/jest-dom`
+(pinned to `^6` — the `^8` latest requires vitest 5, this repo is on
+2.1.9), and `jsdom` as dev dependencies; `.tsx` test files now opt
+into `environment: "jsdom"` individually via a `// @vitest-environment
+jsdom` pragma rather than switching the whole suite's default, so the
+other ~360 tests stay on the lighter node environment unchanged. Hit
+two real setup issues worth recording: esbuild's default JSX mode is
+classic (needs `React` in scope, which no component in this app
+imports — Next.js's own compiler already assumes the automatic
+runtime), fixed with `esbuild: { jsx: "automatic" }` in
+`vitest.config.ts`; and `@testing-library/react`'s automatic
+`afterEach` cleanup only fires when it detects Jest-style global
+test hooks, which this suite doesn't enable, so both new test files
+call `cleanup()` in an explicit `afterEach` themselves. `.tsx` added
+to `vitest.config.ts`'s `include` glob.
+
+`components/admin/ApplicationDetail.test.tsx` (8 tests: renders for
+pending/held/approved/declined status, shows None for the three
+member-only fields, shows a matched sponsor linked, shows an
+unmatched code, shows None with no code at all) and
+`components/admin/PersonDetail.test.tsx` (6 tests: ordinary member,
+test account, Partner with handle, a Bond, mixed Brought-in entries,
+Delete Account always present) — per the task's own explicit ask for
+"a test that renders each card type and asserts the Linked accounts
+section is present."
+
+`npx tsc --noEmit`, lint clean (same one pre-existing warning), `npm
+test` (371 passing, 14 new), `npm run build` clean.

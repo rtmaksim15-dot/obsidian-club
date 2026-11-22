@@ -33,8 +33,8 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     include: {
       invitedBy: { select: { displayName: true } },
       invitees: { select: { id: true, displayName: true } },
-      partner: { select: { displayName: true } },
-      partnerOf: { select: { displayName: true } },
+      partner: { select: { displayName: true, username: true } },
+      partnerOf: { select: { displayName: true, username: true } },
       ageVerifications: { orderBy: { createdAt: "desc" }, take: 1 },
       _count: { select: { ageVerifications: true } },
       repHistory: { orderBy: { createdAt: "desc" } },
@@ -100,6 +100,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       invitedByName: p.invitedBy?.displayName ?? null,
       partnerId: p.partnerId,
       partnerName: p.partner?.displayName ?? p.partnerOf?.displayName ?? null,
+      partnerUsername: p.partner?.username ?? p.partnerOf?.username ?? null,
       broughtIn: mergeBroughtIn(
         p.invitees,
         sponsoredApplicantRows.map((w) => ({ id: w.id, displayName: w.name || w.email, status: w.status })),

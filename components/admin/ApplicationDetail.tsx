@@ -4,6 +4,7 @@ import { forwardRef, useImperativeHandle, useState } from "react";
 import type { Application } from "./AdminConsole";
 import { formatAdminDateTime as formatDate } from "@/lib/admin/format-date";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
+import LinkedAccountsSection from "./LinkedAccountsSection";
 
 export type ApplicationDetailHandle = {
   approve: () => void;
@@ -155,31 +156,33 @@ const ApplicationDetail = forwardRef<ApplicationDetailHandle, {
     <div>
       <p className="text-h2 !text-base">{a.name || "(no name given)"}</p>
       <p className="text-data mt-1">{a.email}</p>
-      <p className="text-caption mt-3" style={{ color: "var(--color-text-secondary)" }}>
-        {[a.age ? `${a.age} yrs` : null, a.city, a.source, a.referralCode ? `code: ${a.referralCode}` : null, a.origin]
-          .filter(Boolean)
-          .join(" · ") || "No additional details."}
+
+      {/* Linked accounts (2026-11-22, see DECISIONS.md) — directly
+          under the name/email block, always rendered (never hidden:
+          "None" per empty field), same shared component and same four
+          fields PersonDetail shows, so every card in the admin console
+          has an identical, predictable Linked Accounts shape. An
+          application has no Partner/Bonds/Brought-in concept at all
+          (pre-registration) — shown as "None" rather than omitted, by
+          instruction, for that same consistency. The raw sponsor code
+          (Waitlist.referralCode) is shown even when it didn't match a
+          real member — see lib/invites/sponsor.ts's own comment on why
+          that's still worth an admin seeing, shown before approval
+          since that's when it's most useful. */}
+      <LinkedAccountsSection
+        partner={null}
+        bonds={[]}
+        invitedBy={a.sponsorId ? { id: a.sponsorId, displayName: a.sponsorName ?? "a member" } : null}
+        unmatchedSponsorCode={!a.sponsorId ? a.referralCode : null}
+        broughtIn={[]}
+        onNavigateToPerson={onNavigateToPerson}
+      />
+
+      <p className="text-caption mt-6" style={{ color: "var(--color-text-secondary)" }}>
+        {[a.age ? `${a.age} yrs` : null, a.city, a.source, a.origin].filter(Boolean).join(" · ") || "No additional details."}
       </p>
       {a.reason ? <p className="text-body mt-4 !text-base italic">&ldquo;{a.reason}&rdquo;</p> : null}
       <p className="text-caption mt-3">Applied {formatDate(a.createdAt)}</p>
-
-      {/* Linked accounts (2026-11-22, see DECISIONS.md), requirement 4
-          — shown before approval, since that's when it's most useful:
-          admin-only sponsor tracking, never a public referral program
-          (no rewards/REP/counts). */}
-      {a.sponsorId ? (
-        <div className="mt-6 border-t border-ob-border pt-4">
-          <p className="text-label mb-2">Linked Accounts</p>
-          <button
-            type="button"
-            className="text-caption underline"
-            style={{ color: "var(--color-text-secondary)" }}
-            onClick={() => onNavigateToPerson(a.sponsorId!)}
-          >
-            Sponsored by {a.sponsorName ?? "a member"}
-          </button>
-        </div>
-      ) : null}
 
       <div className="mt-6 border-t border-ob-border pt-4">
         <p className="text-label mb-2">Status</p>

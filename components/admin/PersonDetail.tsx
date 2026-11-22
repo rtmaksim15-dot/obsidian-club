@@ -5,6 +5,7 @@ import type { Person } from "./AdminConsole";
 import { levelName } from "@/lib/rating/levels";
 import { formatAdminDateTime as formatDate, formatAdminDateOnly as formatDay } from "@/lib/admin/format-date";
 import ConfirmDialog from "@/components/shared/ConfirmDialog";
+import LinkedAccountsSection from "./LinkedAccountsSection";
 import { deletionConfirmationText } from "@/lib/admin/account-deletion";
 
 type DeletePreviewCounts = {
@@ -208,6 +209,24 @@ export default function PersonDetail({
         {person.joinedAt ? ` · Joined ${formatDay(person.joinedAt)}` : ""}
       </p>
 
+      {/* Linked accounts (2026-11-22, see DECISIONS.md) — directly
+          under the name/email block, always rendered (never hidden:
+          "None" per empty field), same shared component and same four
+          fields every card in the admin console shows. */}
+      <LinkedAccountsSection
+        partner={
+          person.partnerId && person.partnerName
+            ? { id: person.partnerId, displayName: person.partnerName, handle: person.partnerUsername }
+            : null
+        }
+        bonds={person.bonds.map((b) => ({ id: b.id, kind: b.kind, status: b.status, otherId: b.otherId, otherName: b.otherName }))}
+        invitedBy={person.invitedById && person.invitedByName ? { id: person.invitedById, displayName: person.invitedByName } : null}
+        unmatchedSponsorCode={null}
+        broughtIn={person.broughtIn}
+        onNavigateToPerson={onNavigateToPerson}
+        onNavigateToApplication={onNavigateToApplication}
+      />
+
       <div className="mt-6 grid grid-cols-1 gap-4 border-t border-ob-border pt-4 sm:grid-cols-3">
         <div>
           <p className="text-label">REP</p>
@@ -338,76 +357,6 @@ export default function PersonDetail({
           </p>
         ) : null}
       </div>
-
-      {/* Linked accounts (2026-11-22, see DECISIONS.md) — Partner
-          (invite-time pairing, User.partnerId — the field that backs
-          the public profile's own "Partner of" line), Bonds (the
-          separate, member-declared partner/dominant_of/submissive_of
-          model), Invited by / People they brought in (direct
-          member-invite-link registrations plus applicants who used
-          this member's sponsor code but haven't registered yet).
-          Every link here reuses the SAME zone-switch-and-open
-          mechanism AdminSearch's own result-click does — see
-          AdminConsole#handleSearchSelect. */}
-      {person.partnerName || person.invitedByName || person.broughtIn.length > 0 || person.bonds.length > 0 ? (
-        <div className="mt-6 border-t border-ob-border pt-4">
-          <p className="text-label mb-2">Linked Accounts</p>
-          {person.partnerName && person.partnerId ? (
-            <p className="text-caption">
-              Partner of{" "}
-              <button type="button" className="underline" onClick={() => onNavigateToPerson(person.partnerId!)}>
-                {person.partnerName}
-              </button>
-            </p>
-          ) : null}
-          {person.invitedByName && person.invitedById ? (
-            <p className="text-caption mt-1">
-              Invited by{" "}
-              <button type="button" className="underline" onClick={() => onNavigateToPerson(person.invitedById!)}>
-                {person.invitedByName}
-              </button>
-            </p>
-          ) : null}
-          {person.bonds.length > 0 ? (
-            <div className="mt-2">
-              <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
-                Bonds
-              </p>
-              <ul className="mt-1 space-y-1">
-                {person.bonds.map((b) => (
-                  <li key={b.id} className="text-caption">
-                    {b.kind.replace(/_/g, " ")} ({b.status}) —{" "}
-                    <button type="button" className="underline" onClick={() => onNavigateToPerson(b.otherId)}>
-                      {b.otherName}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-          {person.broughtIn.length > 0 ? (
-            <div className="mt-2">
-              <p className="text-caption" style={{ color: "var(--color-text-muted)" }}>
-                People they brought in ({person.broughtIn.length})
-              </p>
-              <ul className="mt-1 space-y-1">
-                {person.broughtIn.map((b) => (
-                  <li key={`${b.type}-${b.id}`} className="text-caption">
-                    <button
-                      type="button"
-                      className="underline"
-                      onClick={() => (b.type === "member" ? onNavigateToPerson(b.id) : onNavigateToApplication(b.id))}
-                    >
-                      {b.displayName}
-                    </button>{" "}
-                    <span style={{ color: "var(--color-text-muted)" }}>({b.status})</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
 
       <div className="mt-6 border-t border-ob-border pt-4">
         <p className="text-label mb-2">REP History</p>
